@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Edit(**/INSIGHTS.md)",
-      "Write(**/INSIGHTS.md)"
+      "Write(**/INSIGHTS.md)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm exec vitest run *)",
+      "Bash(pnpm test *)",
+      "Bash(npm run typecheck)"
     ]
   }
 }

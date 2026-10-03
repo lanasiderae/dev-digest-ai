@@ -8,6 +8,7 @@ import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
+import { computeRunCost } from '../reviews/helpers.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -116,16 +117,42 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
     // not surfaced on the list — findings live on the PR detail page.)
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<string, { score: number | null }>();
+    const latestReviewByPr = new Map<string, { score: number | null; runId: string | null }>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score })
+        .select({ prId: t.reviews.prId, score: t.reviews.score, runId: t.reviews.runId })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
       // Rows are newest-first → first seen per PR is the latest review.
       for (const rv of reviewRows) {
-        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
+        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score, runId: rv.runId });
+      }
+    }
+
+    // Cost (USD) of the run behind that same latest review, for the list's
+    // Cost column. Batch-fetched the same "IN-query + Map" way as the score
+    // lookup above — reviews.run_id has no FK, so this is a second query.
+    const runIds = [...latestReviewByPr.values()]
+      .map((v) => v.runId)
+      .filter((id): id is string => id != null);
+    const runById = new Map<
+      string,
+      { model: string | null; status: string | null; tokensIn: number | null; tokensOut: number | null }
+    >();
+    if (runIds.length > 0) {
+      const runRows = await container.db
+        .select({
+          id: t.agentRuns.id,
+          model: t.agentRuns.model,
+          status: t.agentRuns.status,
+          tokensIn: t.agentRuns.tokensIn,
+          tokensOut: t.agentRuns.tokensOut,
+        })
+        .from(t.agentRuns)
+        .where(inArray(t.agentRuns.id, runIds));
+      for (const r of runRows) {
+        runById.set(r.id, { model: r.model, status: r.status, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
       }
     }
 
@@ -153,6 +180,12 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost: review?.runId
+          ? computeRunCost(
+              (m, i, o) => container.priceBook.estimate(m, i, o),
+              runById.get(review.runId) ?? { model: null, status: null, tokensIn: null, tokensOut: null },
+            )
+          : null,
       };
     });
   });

@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
@@ -57,6 +57,8 @@ export async function listRunsForPull(
     status: run.status,
     error: run.error,
     duration_ms: run.durationMs,
+    // Set by the service (needs container.priceBook, unavailable in this pure repo fn).
+    cost: null,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
     findings_count: run.findingsCount,
@@ -65,6 +67,30 @@ export async function listRunsForPull(
     score: run.score,
     blockers: run.blockers,
   }));
+}
+
+/** Batch lookup of the token/model/status info behind a set of run ids — used
+ *  to compute cost for reviews (which only carry `run_id`, not tokens). */
+export async function tokensForRuns(
+  db: Db,
+  runIds: string[],
+): Promise<Map<string, { model: string | null; status: string | null; tokensIn: number | null; tokensOut: number | null }>> {
+  const map = new Map<string, { model: string | null; status: string | null; tokensIn: number | null; tokensOut: number | null }>();
+  if (runIds.length === 0) return map;
+  const rows = await db
+    .select({
+      id: t.agentRuns.id,
+      model: t.agentRuns.model,
+      status: t.agentRuns.status,
+      tokensIn: t.agentRuns.tokensIn,
+      tokensOut: t.agentRuns.tokensOut,
+    })
+    .from(t.agentRuns)
+    .where(inArray(t.agentRuns.id, runIds));
+  for (const r of rows) {
+    map.set(r.id, { model: r.model, status: r.status, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
+  }
+  return map;
 }
 
 /**
