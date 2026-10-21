@@ -24,3 +24,15 @@
 - **2026-10-20** — Precise evidence for the entry above: the en dash is
   `client/src/lib/format-cost.ts:7`; the em dash is
   `client/src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.tsx:55`.
+- **2026-10-21** — The PR list's Findings column shows a count the SERVER
+  computed (`findings_by_severity`) next to a popover the CLIENT derives from
+  a different endpoint (`usePrReviews`), so the "which reviews count" rule is
+  duplicated on both sides and nothing type-checks that they agree. Both must
+  take each AGENT's latest review, not the PR's latest: the client copy is
+  `FindingsPopover/helpers.ts:18` (`latestReviewPerAgent`), the server's is
+  `server/src/modules/pulls/status.ts:34-70`. Changing either one alone makes
+  the badge numbers and the popover list disagree on screen with no test
+  failure to catch it — each side has its own unit coverage of the same rule
+  instead. Evidence:
+  `client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:102`,
+  `client/src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsCell.tsx:27`.

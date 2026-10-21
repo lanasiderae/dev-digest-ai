@@ -97,7 +97,10 @@
       "updated": "Updated"
     },
     "findingsPopover": {
-      "title": "{count} findings in this run",
+      "title": "{count} findings",
+      "titleMultiAgent": "{count} findings · {agents} agents",
+      "agentSection": "{agent} · {count}",
+      "unattributedAgent": "Unattributed run",
       "loading": "Loading findings…",
       "empty": "No findings.",
       "errorBody": "Couldn’t load findings."

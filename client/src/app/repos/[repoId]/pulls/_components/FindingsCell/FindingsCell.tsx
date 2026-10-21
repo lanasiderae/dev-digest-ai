@@ -1,9 +1,13 @@
 /* FindingsCell — the PR list's Findings column: a compact severity-badge
-   cluster (critical/warning/suggestion counts from the PR's latest review)
-   that opens a read-only popover of that review's findings on HOVER (with a
-   short close delay so crossing from the trigger into the popover itself
-   doesn't close it) — keyboard users get the same popover via focus +
-   Enter/Space, since hover alone isn't reachable without a pointer. */
+   cluster (critical/warning/suggestion counts summed across every agent that
+   reviewed the PR, each contributing its own latest review) that opens a
+   read-only popover of those findings on HOVER (with a short close delay so
+   crossing from the trigger into the popover itself doesn't close it) —
+   keyboard users get the same popover via focus + Enter/Space, since hover
+   alone isn't reachable without a pointer.
+
+   The popover breaks the same findings down per agent, so the cluster answers
+   "how much is open on this PR" and the popover answers "who found it". */
 "use client";
 
 import React from "react";

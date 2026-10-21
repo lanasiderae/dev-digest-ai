@@ -46,6 +46,24 @@
   `repository.ts` (DB access), `helpers.ts`/`constants.ts` as needed. A new
   module should follow this same file set rather than inventing new role
   names. Evidence: `ls server/src/modules/*/` across all 8 folders.
+- **2026-10-21** — `file:line` anchors for the entry above, which cited only
+  an `ls`: the registry that fixes the module set is
+  `server/src/modules/index.ts:24-33`, with the "ADD A MODULE" procedure
+  (and why registration is static, not autoloaded) at
+  `server/src/modules/index.ts:15-18`; the same vocabulary is stated as a
+  repo-wide naming convention at `CLAUDE.md:99-103`.
+- **2026-10-21** — `GET /repos/:id/pulls` derives its three review columns
+  from ONE newest-first `reviews` query but applies three different "which
+  reviews count" rules, which is easy to break by reusing the wrong map:
+  `score` = the PR's single latest review; `findings_by_severity` /
+  `findings_by_agent` = each AGENT's latest review, summed (via
+  `latestReviewPerAgent`); `cost` = every successful run ever, superseded
+  re-runs included. Adding a column here means deciding which of the three
+  scopes it belongs to — the rationale per column is spec'd rather than left
+  to the code. Evidence: `server/src/modules/pulls/routes.ts:115` (the one
+  shared query), `:135` (score), `:144` (cost), `:182` (per-agent findings),
+  `server/src/modules/pulls/status.ts:34-70` (`latestReviewPerAgent`),
+  `server/specs/review-flow.md:85-103`.
 - **2026-10-20** — `server/package.json`'s committed `test` script is plain
   `vitest run` (no unit/integration split — it would need Docker for the
   `.it.test.ts` files too). That's why CI inlines the split directly

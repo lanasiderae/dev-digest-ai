@@ -82,6 +82,26 @@ computes it on read from `{model, tokensIn, tokensOut, status}` via
 - `GET /pulls/:id/reviews` and the Trace drawer's Stats both compute cost
   per-run the same way, just without summing across runs.
 
+## Contract: each PR-list review column has its own scope
+
+`GET /repos/:id/pulls` derives three columns from the same
+newest-first `reviews` query, and they deliberately disagree about which
+reviews count:
+
+- **`score`** — the single latest review for the PR, whichever agent
+  produced it. A score is one agent's verdict on the whole diff, so summing
+  or averaging several would invent a number no agent produced.
+- **`findings_by_severity` / `findings_by_agent`** — each AGENT's own latest
+  review, summed (`latestReviewPerAgent` in `modules/pulls/status.ts`).
+  Findings are additive facts about the code, so a PR reviewed by three
+  agents must report all three agents' open findings; taking only the PR's
+  latest review would silently drop every other agent's. A re-run still
+  supersedes that same agent's earlier review, so nothing double-counts
+  across one review's own history. Reviews with a null `agent_id`
+  (unattributed runs) collapse into one bucket.
+- **`cost`** — every successful run behind every review ever run on the PR,
+  including superseded re-runs (see above): the money was spent either way.
+
 ## Contract: the grounding gate is structural, not advisory
 
 `REPO_INTEL_ENABLED`, the grounding gate, and the prompt-injection guard are

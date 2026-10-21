@@ -260,6 +260,165 @@ d('Testcontainers: DB-backed routes via app.inject', () => {
 
     const unreviewed = pulls.find((p) => p.id === prUnreviewed!.id)!;
     expect(unreviewed.findings_by_severity).toEqual({ CRITICAL: 0, WARNING: 0, SUGGESTION: 0 });
+    expect(unreviewed.findings_by_agent).toEqual([]);
+
+    await app.close();
+  });
+
+  it('GET /repos/:id/pulls Findings spans every agent that reviewed the PR, each at its own latest review', async () => {
+    const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+    const app = await buildApp({
+      config,
+      db: pg.handle.db,
+      overrides: { git: new MockGitClient(), github: new MockGitHubClient({ pulls: [] }) },
+    });
+    const [ws] = await pg.handle.db.select().from(t.workspaces);
+    const workspaceId = ws!.id;
+
+    const [repo] = await pg.handle.db
+      .insert(t.repos)
+      .values({ workspaceId, owner: 'acme', name: 'multi-agent-findings', fullName: 'acme/multi-agent-findings' })
+      .returning();
+    const [pr] = await pg.handle.db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId: repo!.id,
+        number: 201,
+        title: 'Reviewed by two agents',
+        author: 'marisa.koch',
+        branch: 'feat/multi',
+        base: 'main',
+        headSha: 'f00dface',
+        additions: 20,
+        deletions: 4,
+        filesCount: 2,
+        status: 'open',
+      })
+      .returning();
+
+    const [security, perf] = await pg.handle.db
+      .insert(t.agents)
+      .values([
+        {
+          workspaceId,
+          name: 'Security Reviewer',
+          provider: 'openai' as const,
+          model: 'gpt-4.1',
+          systemPrompt: 'security',
+        },
+        {
+          workspaceId,
+          name: 'Perf Reviewer',
+          provider: 'openai' as const,
+          model: 'gpt-4.1',
+          systemPrompt: 'perf',
+        },
+      ])
+      .returning();
+
+    const finding = (reviewId: string, severity: string, title: string) => ({
+      reviewId,
+      file: 'src/app.ts',
+      startLine: 1,
+      endLine: 1,
+      severity,
+      category: 'security',
+      title,
+      rationale: 'x',
+      confidence: 0.9,
+    });
+
+    // Security agent reviewed twice — only its NEWER review may contribute.
+    const [securityOld] = await pg.handle.db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: pr!.id,
+        agentId: security!.id,
+        kind: 'review',
+        score: 30,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+      .returning();
+    await pg.handle.db
+      .insert(t.findings)
+      .values(finding(securityOld!.id, 'CRITICAL', 'Superseded security finding'));
+
+    const [securityNew] = await pg.handle.db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: pr!.id,
+        agentId: security!.id,
+        kind: 'review',
+        score: 55,
+        createdAt: new Date('2026-02-01T00:00:00Z'),
+      })
+      .returning();
+    await pg.handle.db
+      .insert(t.findings)
+      .values([finding(securityNew!.id, 'CRITICAL', 'Hardcoded key')]);
+
+    // Perf agent reviewed in between — its review is NOT the PR's latest, so
+    // the old "latest review only" rule dropped these findings entirely.
+    const [perfReview] = await pg.handle.db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: pr!.id,
+        agentId: perf!.id,
+        kind: 'review',
+        score: 80,
+        createdAt: new Date('2026-01-15T00:00:00Z'),
+      })
+      .returning();
+    await pg.handle.db
+      .insert(t.findings)
+      .values([
+        finding(perfReview!.id, 'WARNING', 'N+1 query'),
+        finding(perfReview!.id, 'SUGGESTION', 'Extract helper'),
+      ]);
+
+    const res = await app.inject({ method: 'GET', url: `/repos/${repo!.id}/pulls` });
+    expect(res.statusCode).toBe(200);
+    const pulls = res.json() as {
+      id: string;
+      score: number | null;
+      findings_by_severity: Record<string, number>;
+      findings_by_agent: {
+        agent_id: string | null;
+        agent_name: string | null;
+        review_id: string;
+        counts: Record<string, number>;
+      }[];
+    }[];
+    const row = pulls.find((p) => p.id === pr!.id)!;
+
+    // BOTH agents count: 1 CRITICAL from Security's newest + Perf's 1 WARNING
+    // and 1 SUGGESTION. Security's superseded CRITICAL is excluded, so the
+    // total is 3 — not 2 (latest review only) and not 4 (every review ever).
+    expect(row.findings_by_severity).toEqual({ CRITICAL: 1, WARNING: 1, SUGGESTION: 1 });
+
+    // Per-agent breakdown, newest-reviewing agent first.
+    expect(row.findings_by_agent).toEqual([
+      {
+        agent_id: security!.id,
+        agent_name: 'Security Reviewer',
+        review_id: securityNew!.id,
+        counts: { CRITICAL: 1, WARNING: 0, SUGGESTION: 0 },
+      },
+      {
+        agent_id: perf!.id,
+        agent_name: 'Perf Reviewer',
+        review_id: perfReview!.id,
+        counts: { CRITICAL: 0, WARNING: 1, SUGGESTION: 1 },
+      },
+    ]);
+
+    // SCORE stays the single latest review's (Security's newer one) — it is
+    // deliberately NOT combined across agents.
+    expect(row.score).toBe(55);
 
     await app.close();
   });
