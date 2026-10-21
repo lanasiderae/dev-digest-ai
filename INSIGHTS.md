@@ -19,6 +19,12 @@ that; this is a working log of findings and open decisions.
   `git update-index --skip-worktree <file>` then `git ls-files -v <file>`
   → `S`; `--no-skip-worktree` → back to `H`. None of this repo's
   `package.json` files or `skills-lock.json` actually have the bit set.
+- **2026-10-21** — `file:line` anchors for the entry above, since it only
+  cited commands: the corrected state (real committed `lint` scripts, no
+  `npx eslint .` caveat) is documented at `server/CLAUDE.md:20-21`,
+  `client/CLAUDE.md:13`, `reviewer-core/CLAUDE.md:15-16`, and
+  `e2e/CLAUDE.md:16-17`; the scripts themselves are each package's
+  `package.json` `"lint": "eslint ."`.
 
 ## Codebase Patterns
 
@@ -66,6 +72,16 @@ that; this is a working log of findings and open decisions.
   `client/src/vendor/shared/contracts/platform.ts`,
   `server/src/vendor/shared/contracts/platform.ts`), confirming the "apply
   by hand" rule above is followed in practice, not just documented.
+- **2026-10-21** — `file:line` anchors for the two entries above, which
+  cited whole files/directories only: the aspirational "one schema, every
+  package" framing is `README.md:47` (the architecture diagram edge) and
+  `README.md:18` (the package table); the rule that actually holds —
+  hand-sync, no shared package — is `client/CLAUDE.md:25-27`, enforced as a
+  do-not-touch at `client/CLAUDE.md:34-36`. Confirmed again this session:
+  adding `PrFindingsByAgent` to `PrMeta` required the identical edit in both
+  `server/src/vendor/shared/contracts/platform.ts:167-174` and
+  `client/src/vendor/shared/contracts/platform.ts:167-174` (`cp` + `diff`
+  to verify byte-parity, since nothing in CI checks it).
 - **2026-10-20** — Precise evidence for the `scripts/e2e.sh` not-mentioned
   entry (2026-09-29, second entry in this section): `scripts/e2e.sh` is 166
   lines (the whole file is the

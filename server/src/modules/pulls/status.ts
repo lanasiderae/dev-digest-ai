@@ -4,10 +4,11 @@ import type { PrStatus } from '@devdigest/shared';
  * PR-list rollup helpers (pure — no DB / `this`, so they unit-test cleanly).
  *
  * The Pull Requests list shows, per PR: the latest review's SCORE, a FINDINGS
- * severity breakdown, and a review STATUS. The DB `status` column holds
- * GitHub's merge state (open/merged/closed); the review status
- * (needs_review / reviewed / stale) is DERIVED here for OPEN PRs from the
- * commit a review last ran against (`lastReviewedSha`) vs the PR head, plus age.
+ * severity breakdown across every agent that reviewed it, and a review STATUS.
+ * The DB `status` column holds GitHub's merge state (open/merged/closed); the
+ * review status (needs_review / reviewed / stale) is DERIVED here for OPEN PRs
+ * from the commit a review last ran against (`lastReviewedSha`) vs the PR head,
+ * plus age.
  */
 
 /** Open PRs whose current head was reviewed but untouched this long read "stale". */
@@ -28,6 +29,44 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
     else if (r.severity === 'SUGGESTION') c.suggestion += 1;
   }
   return c;
+}
+
+/**
+ * Group reviews (ordered NEWEST-FIRST) into, per PR, each agent's OWN latest
+ * review — one entry per agent that has ever reviewed that PR.
+ *
+ * This is what makes the list's FINDINGS column span agents. Taking only the
+ * single latest review per PR understates a PR that several agents reviewed:
+ * whichever agent happened to run last wins, and every other agent's open
+ * findings silently vanish from the badge counts. Keyed per agent instead, a
+ * re-run still supersedes that same agent's earlier review (newest wins), so
+ * counts never double up across a review's own history.
+ *
+ * SCORE deliberately stays single-latest-review (see the route): a score is
+ * one agent's verdict on the whole diff, so summing or averaging several
+ * would invent a number no agent actually produced. Findings are additive
+ * facts about the code; scores are not.
+ *
+ * `agentId` is nullable (an unattributed/one-off run). Every null-agent review
+ * collapses into ONE bucket rather than counting as a distinct agent each
+ * time — so a PR whose reviews are all unattributed keeps exactly the old
+ * latest-review-only behaviour.
+ */
+export function latestReviewPerAgent<T extends { prId: string; agentId: string | null }>(
+  reviewsNewestFirst: T[],
+): Map<string, T[]> {
+  const byPr = new Map<string, T[]>();
+  const seen = new Set<string>();
+  for (const rv of reviewsNewestFirst) {
+    // \u0000 can't occur in a uuid, so it can't collide with a real id pair.
+    const key = `${rv.prId}\u0000${rv.agentId ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const forPr = byPr.get(rv.prId) ?? [];
+    forPr.push(rv);
+    byPr.set(rv.prId, forPr);
+  }
+  return byPr;
 }
 
 /**

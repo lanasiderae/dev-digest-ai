@@ -37,8 +37,20 @@ Other top-level folders (not packages — no `package.json`, nothing to
 - Manual sequence: `docker compose up -d` → `cd server && pnpm install &&
   pnpm db:migrate && pnpm db:seed && pnpm dev` → `cd client && pnpm install
   && pnpm dev`.
-- Per-package scripts are listed in each package's own `CLAUDE.md`/`README.md`
-  — don't assume a script name without checking there first.
+- Validation (phase 4 below) — the exact command per package. Note the
+  package-manager split: `server`/`client` use **pnpm**, `reviewer-core`/`e2e`
+  use **npm**.
+  - `cd server && pnpm exec vitest run --exclude '**/*.it.test.ts' && pnpm
+    typecheck && pnpm lint` — unit lane, hermetic (no Docker). Integration is
+    the separate `pnpm exec vitest run .it.test` and needs Docker; plain
+    `pnpm test` runs both and will fail without it.
+  - `cd client && pnpm test && pnpm typecheck && pnpm lint`
+  - `cd reviewer-core && npm test && npm run typecheck && npm run lint`
+  - `cd e2e && npm run typecheck && npm run lint` — flows are
+    `./scripts/e2e.sh` (hermetic), not part of typecheck.
+- Anything beyond the above is in each package's own
+  `CLAUDE.md`/`README.md` — don't assume a script name without checking
+  there first.
 
 ## Workflow
 

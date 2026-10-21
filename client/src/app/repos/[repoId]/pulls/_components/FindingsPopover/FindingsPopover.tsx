@@ -1,7 +1,13 @@
-/* FindingsPopover — read-only list of one PR's latest-review findings, shown
-   from the list page's Findings column. Lazy-fetches via the existing
-   usePrReviews hook (the same data FindingsTab/FindingCard use on the PR
-   detail page) rather than a new endpoint.
+/* FindingsPopover — read-only list of one PR's open findings, shown from the
+   list page's Findings column. Lazy-fetches via the existing usePrReviews
+   hook (the same data FindingsTab/FindingCard use on the PR detail page)
+   rather than a new endpoint.
+
+   Grouped per AGENT, matching the column's badge counts: each agent that
+   reviewed the PR contributes its own latest review (see `helpers.ts`), so a
+   PR several agents checked shows who found what instead of only whichever
+   agent ran last. The per-agent heading appears only when more than one agent
+   reviewed — with a single reviewer it would just be noise.
 
    Rendered through a portal into document.body, positioned from the
    trigger's real screen coordinates: the list's tableCard has
@@ -19,7 +25,7 @@ import { SeverityBadge, CategoryTag, MonoLink, ConfidenceNum, Skeleton, EmptySta
 import { usePrReviews } from "@/lib/hooks/reviews";
 import { useActiveRepo } from "@/lib/repo-context";
 import { githubBlobUrl } from "@/lib/github-urls";
-import { SEVERITY_ORDER } from "../FindingsCell/constants";
+import { latestReviewPerAgent, sortBySeverity } from "./helpers";
 import { s } from "./styles";
 
 const POPOVER_WIDTH = 360;
@@ -91,13 +97,11 @@ export function FindingsPopover({
     };
   }, [onClose]);
 
-  // Reviews come newest-first (see usePrReviews) — the first 'review'-kind
-  // entry is the latest review, matching the list column's own "latest
-  // review only" rule.
-  const latest = reviews?.find((r) => r.kind === "review");
-  const findings = [...(latest?.findings ?? [])].sort(
-    (a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity),
-  );
+  // One group per agent, each holding that agent's latest review — the same
+  // rule the list column's badge counts use, so the two always agree.
+  const groups = latestReviewPerAgent(reviews);
+  const total = groups.reduce((n, g) => n + g.findings.length, 0);
+  const showAgentHeadings = groups.length > 1;
 
   if (!pos) return null;
 
@@ -109,37 +113,53 @@ export function FindingsPopover({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div style={s.header}>{t("list.findingsPopover.title", { count: findings.length })}</div>
+      <div style={s.header}>
+        {showAgentHeadings
+          ? t("list.findingsPopover.titleMultiAgent", { count: total, agents: groups.length })
+          : t("list.findingsPopover.title", { count: total })}
+      </div>
       {isLoading ? (
         <Skeleton height={60} />
       ) : isError ? (
         <div style={s.empty}>{t("list.findingsPopover.errorBody")}</div>
-      ) : findings.length === 0 ? (
+      ) : total === 0 ? (
         <EmptyState icon="CheckCircle" title={t("list.findingsPopover.empty")} />
       ) : (
-        findings.map((f) => (
-          <div key={f.id} style={s.item}>
-            <SeverityBadge severity={f.severity} compact />
-            <div style={s.itemMain}>
-              <div style={s.itemTitleRow}>
-                <span style={s.itemTitle}>{f.title}</span>
-                <CategoryTag category={f.category} />
+        groups.map((g) => (
+          <React.Fragment key={g.id}>
+            {showAgentHeadings && (
+              <div style={s.agentHeader}>
+                {t("list.findingsPopover.agentSection", {
+                  agent: g.agent_name ?? t("list.findingsPopover.unattributedAgent"),
+                  count: g.findings.length,
+                })}
               </div>
-              <div style={s.itemMetaRow}>
-                <MonoLink
-                  href={
-                    activeRepo?.full_name
-                      ? githubBlobUrl(activeRepo.full_name, headSha, f.file, f.start_line, f.end_line)
-                      : undefined
-                  }
-                >
-                  {f.file}:{f.start_line === f.end_line ? f.start_line : `${f.start_line}-${f.end_line}`}
-                </MonoLink>
-                <ConfidenceNum value={f.confidence} />
+            )}
+            {sortBySeverity(g.findings).map((f) => (
+              <div key={f.id} style={s.item}>
+                <SeverityBadge severity={f.severity} compact />
+                <div style={s.itemMain}>
+                  <div style={s.itemTitleRow}>
+                    <span style={s.itemTitle}>{f.title}</span>
+                    <CategoryTag category={f.category} />
+                  </div>
+                  <div style={s.itemMetaRow}>
+                    <MonoLink
+                      href={
+                        activeRepo?.full_name
+                          ? githubBlobUrl(activeRepo.full_name, headSha, f.file, f.start_line, f.end_line)
+                          : undefined
+                      }
+                    >
+                      {f.file}:{f.start_line === f.end_line ? f.start_line : `${f.start_line}-${f.end_line}`}
+                    </MonoLink>
+                    <ConfidenceNum value={f.confidence} />
+                  </div>
+                  <div style={s.itemRationale}>{f.rationale}</div>
+                </div>
               </div>
-              <div style={s.itemRationale}>{f.rationale}</div>
-            </div>
-          </div>
+            ))}
+          </React.Fragment>
         ))
       )}
     </div>,

@@ -8,7 +8,7 @@ for that). Keep this in sync when a route's data dependency changes.
 |---|---|---|
 | `/` | `HomePage` (`src/app/page.tsx`) | `useRepos()` — redirects to the first repo's `/repos/:id/pulls`, or to `/onboarding` if the list is empty once loaded. |
 | `/onboarding` | `AddRepoView` | None on load; posts a repo URL to add one. |
-| `/repos/:repoId/pulls` | `PullsPage` (PR list) | `usePulls(repoId)` — see `server/src/modules/pulls/routes.ts`'s `GET /repos/:id/pulls` contract (score/cost/findings_by_severity are all latest-review-only, cost is summed across every successful run — see `server/specs/review-flow.md`). |
+| `/repos/:repoId/pulls` | `PullsPage` (PR list) | `usePulls(repoId)` — see `server/src/modules/pulls/routes.ts`'s `GET /repos/:id/pulls` contract. The three review-derived columns each have their own scope: `score` is the single latest review's, `findings_by_severity`/`findings_by_agent` sum each AGENT's latest review, and `cost` sums every successful run ever — see `server/specs/review-flow.md`. |
 | `/repos/:repoId/pulls/:number` | `PRDetailPage` | Resolves `:number` → the PR's internal uuid via the (cached) `usePulls(repoId)` list first (every other PR API is keyed by that uuid, not the GitHub number), then `usePullDetail(prId)`, `usePrReviews(prId)`, `usePrActiveRuns(prId)`, `usePrRuns(prId)`. Tab state (`?tab=`) and the trace drawer (`?trace=`) both live in the URL query string. |
 | `/agents` | `AgentsListView` | `useAgents()`. |
 | `/agents/:id` | Agent editor | `useAgents()` (left list) + `useAgent(id)` (detail); tab state in `?tab=` (currently only `config` is valid). |

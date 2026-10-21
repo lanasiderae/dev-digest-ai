@@ -29,6 +29,16 @@ export const s = {
     padding: "2px 2px 6px",
     borderBottom: "1px solid var(--border)",
   } satisfies CSSProperties,
+  // Per-agent section heading — only rendered when more than one agent
+  // reviewed the PR. Lighter than `header` so it reads as a subdivision of
+  // the popover rather than a second title.
+  agentHeader: {
+    fontSize: 11.5,
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    color: "var(--text-secondary)",
+    padding: "6px 2px 0",
+  } satisfies CSSProperties,
   empty: {
     fontSize: 13,
     color: "var(--text-secondary)",

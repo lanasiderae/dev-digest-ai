@@ -155,6 +155,24 @@ export type Repo = z.infer<typeof Repo>;
 export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
 export type PrStatus = z.infer<typeof PrStatus>;
 
+/**
+ * One agent's contribution to a PR's findings count — that agent's OWN latest
+ * review. The list's Findings column sums these across agents, so a PR
+ * reviewed by several agents reports every agent's open findings rather than
+ * only whichever agent happened to run last.
+ *
+ * `agent_id`/`agent_name` are null for an unattributed (one-off) run; every
+ * such review collapses into a single entry.
+ */
+export const PrFindingsByAgent = z.object({
+  agent_id: z.string().nullable(),
+  agent_name: z.string().nullable(),
+  /** The specific review these counts came from (that agent's latest). */
+  review_id: z.string(),
+  counts: SeverityCounts,
+});
+export type PrFindingsByAgent = z.infer<typeof PrFindingsByAgent>;
+
 export const PrMeta = z.object({
   id: z.string().nullish(),
   number: z.number().int(),
@@ -170,15 +188,23 @@ export const PrMeta = z.object({
   opened_at: z.string().nullish(),
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
+  // Single latest review, NOT per-agent: a score is one agent's verdict on the
+  // whole diff, so several can't be meaningfully combined.
   score: z.number().int().nullish(),
-  // Cost (USD) of the run behind `score` — same latest-review-for-this-PR run.
+  // Cost (USD) summed over every successful run behind every review ever run on
+  // the PR — including superseded re-runs, which score/findings exclude (see
+  // `server/specs/review-flow.md`).
   cost: z.number().nullish(),
-  // Latest-review severity breakdown for the list's Findings column (list
-  // endpoint only; nullish like score/cost — GitHubClient's raw PrMeta has no
-  // review data). "Never reviewed" and "reviewed with 0 findings" render the
-  // same, so the route always fills this in with a concrete all-zero object
-  // rather than leaving it absent.
+  // Severity breakdown for the list's Findings column, summed across every
+  // agent's latest review — i.e. `findings_by_agent` totalled (list endpoint
+  // only; nullish like score/cost — GitHubClient's raw PrMeta has no review
+  // data). "Never reviewed" and "reviewed with 0 findings" render the same, so
+  // the route always fills this in with a concrete all-zero object rather than
+  // leaving it absent.
   findings_by_severity: SeverityCounts.nullish(),
+  // The per-agent breakdown behind `findings_by_severity`, newest-reviewing
+  // agent first. Empty array (not absent) for a never-reviewed PR.
+  findings_by_agent: z.array(PrFindingsByAgent).nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 
