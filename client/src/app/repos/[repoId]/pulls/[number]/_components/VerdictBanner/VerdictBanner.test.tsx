@@ -15,19 +15,20 @@ function renderWithIntl(ui: React.ReactElement) {
 }
 
 describe("VerdictBanner (smoke)", () => {
-  it("shows verdict label + score + finding/blocker counts", () => {
+  it("shows verdict label + score + a severity badge per non-zero count", () => {
     renderWithIntl(
       <VerdictBanner
         verdict="request_changes"
         summary="Hardcoded secret introduced."
         score={42}
-        findingsCount={1}
-        blockers={1}
+        severityCounts={{ CRITICAL: 1, WARNING: 2, SUGGESTION: 0 }}
         agentName="Security Reviewer"
       />,
     );
     expect(screen.getByText("Request changes")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
-    expect(screen.getByText(/1 findings · 1 blockers/)).toBeInTheDocument();
+    expect(screen.getByText("Critical")).toBeInTheDocument();
+    expect(screen.getByText("Warning")).toBeInTheDocument();
+    expect(screen.queryByText("Suggestion")).not.toBeInTheDocument();
   });
 });

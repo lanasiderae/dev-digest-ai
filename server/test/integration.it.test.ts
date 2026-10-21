@@ -131,6 +131,268 @@ d('Testcontainers: DB-backed routes via app.inject', () => {
     await app.close();
   });
 
+  it("GET /repos/:id/pulls surfaces the latest review's findings_by_severity, not older reviews", async () => {
+    const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+    const app = await buildApp({
+      config,
+      db: pg.handle.db,
+      overrides: { git: new MockGitClient(), github: new MockGitHubClient({ pulls: [] }) },
+    });
+    const [ws] = await pg.handle.db.select().from(t.workspaces);
+    const workspaceId = ws!.id;
+
+    const [repo] = await pg.handle.db
+      .insert(t.repos)
+      .values({ workspaceId, owner: 'acme', name: 'findings-rollup', fullName: 'acme/findings-rollup' })
+      .returning();
+    const [prWithReviews] = await pg.handle.db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId: repo!.id,
+        number: 101,
+        title: 'Add rate limiting',
+        author: 'marisa.koch',
+        branch: 'feat/rl',
+        base: 'main',
+        headSha: 'deadbeef',
+        additions: 10,
+        deletions: 2,
+        filesCount: 1,
+        status: 'open',
+      })
+      .returning();
+    const [prUnreviewed] = await pg.handle.db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId: repo!.id,
+        number: 102,
+        title: 'Unreviewed PR',
+        author: 'deepak.r',
+        branch: 'feat/other',
+        base: 'main',
+        headSha: 'cafef00d',
+        additions: 3,
+        deletions: 0,
+        filesCount: 1,
+        status: 'open',
+      })
+      .returning();
+
+    const [olderReview] = await pg.handle.db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: prWithReviews!.id,
+        kind: 'review',
+        score: 20,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      })
+      .returning();
+    await pg.handle.db.insert(t.findings).values({
+      reviewId: olderReview!.id,
+      file: 'src/old.ts',
+      startLine: 1,
+      endLine: 1,
+      severity: 'CRITICAL',
+      category: 'security',
+      title: 'Old critical finding (superseded)',
+      rationale: 'From an earlier review run.',
+      confidence: 0.9,
+    });
+
+    const [newerReview] = await pg.handle.db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: prWithReviews!.id,
+        kind: 'review',
+        score: 70,
+        createdAt: new Date('2026-02-01T00:00:00Z'),
+      })
+      .returning();
+    await pg.handle.db.insert(t.findings).values([
+      {
+        reviewId: newerReview!.id,
+        file: 'src/new.ts',
+        startLine: 1,
+        endLine: 1,
+        severity: 'WARNING',
+        category: 'perf',
+        title: 'New warning finding #1',
+        rationale: 'From the latest review run.',
+        confidence: 0.8,
+      },
+      {
+        reviewId: newerReview!.id,
+        file: 'src/new.ts',
+        startLine: 5,
+        endLine: 5,
+        severity: 'WARNING',
+        category: 'perf',
+        title: 'New warning finding #2',
+        rationale: 'From the latest review run.',
+        confidence: 0.75,
+      },
+      {
+        reviewId: newerReview!.id,
+        file: 'src/new.ts',
+        startLine: 9,
+        endLine: 9,
+        severity: 'SUGGESTION',
+        category: 'style',
+        title: 'New suggestion finding',
+        rationale: 'From the latest review run.',
+        confidence: 0.6,
+      },
+    ]);
+
+    const res = await app.inject({ method: 'GET', url: `/repos/${repo!.id}/pulls` });
+    expect(res.statusCode).toBe(200);
+    const pulls = res.json() as { id: string; findings_by_severity: Record<string, number> }[];
+
+    const reviewed = pulls.find((p) => p.id === prWithReviews!.id)!;
+    // Only the NEWER review's findings count — the older review's CRITICAL
+    // finding must not be summed in, proving "latest review only" (not a sum
+    // across every historical run).
+    expect(reviewed.findings_by_severity).toEqual({ CRITICAL: 0, WARNING: 2, SUGGESTION: 1 });
+
+    const unreviewed = pulls.find((p) => p.id === prUnreviewed!.id)!;
+    expect(unreviewed.findings_by_severity).toEqual({ CRITICAL: 0, WARNING: 0, SUGGESTION: 0 });
+
+    await app.close();
+  });
+
+  it("GET /repos/:id/pulls Cost = SUM of every successful run's cost, not just the latest", async () => {
+    const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+    const app = await buildApp({
+      config,
+      db: pg.handle.db,
+      overrides: { git: new MockGitClient(), github: new MockGitHubClient({ pulls: [] }) },
+    });
+    const [ws] = await pg.handle.db.select().from(t.workspaces);
+    const workspaceId = ws!.id;
+
+    const [repo] = await pg.handle.db
+      .insert(t.repos)
+      .values({ workspaceId, owner: 'acme', name: 'cost-rollup', fullName: 'acme/cost-rollup' })
+      .returning();
+    const [prTwoSuccessfulRuns] = await pg.handle.db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId: repo!.id,
+        number: 201,
+        title: 'Two successful re-reviews',
+        author: 'marisa.koch',
+        branch: 'feat/two-runs',
+        base: 'main',
+        headSha: 'deadbeef',
+        additions: 10,
+        deletions: 2,
+        filesCount: 1,
+        status: 'open',
+      })
+      .returning();
+    const [prNoRuns] = await pg.handle.db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId: repo!.id,
+        number: 202,
+        title: 'Never reviewed',
+        author: 'deepak.r',
+        branch: 'feat/never',
+        base: 'main',
+        headSha: 'cafef00d',
+        additions: 3,
+        deletions: 0,
+        filesCount: 1,
+        status: 'open',
+      })
+      .returning();
+
+    // Two SUCCESSFUL runs (status='done') on the same PR, each costing
+    // (1e6 tok in * $0.14 + 1e6 tok out * $0.28) / 1e6 = $0.42, from the
+    // static pricing fallback in src/adapters/llm/pricing.ts.
+    const [runA] = await pg.handle.db
+      .insert(t.agentRuns)
+      .values({
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        model: 'deepseek/deepseek-v4-flash',
+        status: 'done',
+        tokensIn: 1_000_000,
+        tokensOut: 1_000_000,
+      })
+      .returning();
+    const [runB] = await pg.handle.db
+      .insert(t.agentRuns)
+      .values({
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        model: 'deepseek/deepseek-v4-flash',
+        status: 'done',
+        tokensIn: 1_000_000,
+        tokensOut: 1_000_000,
+      })
+      .returning();
+    // A third, FAILED run — must not contribute to the sum.
+    const [runFailed] = await pg.handle.db
+      .insert(t.agentRuns)
+      .values({
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        model: 'deepseek/deepseek-v4-flash',
+        status: 'failed',
+        tokensIn: 1_000_000,
+        tokensOut: 1_000_000,
+      })
+      .returning();
+
+    await pg.handle.db.insert(t.reviews).values([
+      {
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        runId: runA!.id,
+        kind: 'review',
+        score: 60,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      },
+      {
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        runId: runB!.id,
+        kind: 'review',
+        score: 80,
+        createdAt: new Date('2026-02-01T00:00:00Z'),
+      },
+      {
+        workspaceId,
+        prId: prTwoSuccessfulRuns!.id,
+        runId: runFailed!.id,
+        kind: 'review',
+        score: null,
+        createdAt: new Date('2026-03-01T00:00:00Z'),
+      },
+    ]);
+
+    const res = await app.inject({ method: 'GET', url: `/repos/${repo!.id}/pulls` });
+    expect(res.statusCode).toBe(200);
+    const pulls = res.json() as { id: string; cost: number | null }[];
+
+    const reviewed = pulls.find((p) => p.id === prTwoSuccessfulRuns!.id)!;
+    // Sum of both successful runs ($0.42 + $0.42), not either single run's
+    // cost alone, and not inflated by the failed run (which costs null).
+    expect(reviewed.cost).toBeCloseTo(0.84, 9);
+
+    const unreviewed = pulls.find((p) => p.id === prNoRuns!.id)!;
+    expect(unreviewed.cost).toBeNull();
+
+    await app.close();
+  });
+
   it('POST /repos/:id/poll syncs PR list and does NOT trigger a review', async () => {
     const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
     const app = await buildApp({

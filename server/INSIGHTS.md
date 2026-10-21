@@ -9,6 +9,9 @@
   Gotchas section has no equivalent note → should `server/CLAUDE.md` gain the
   same clarifying line, so the file isn't mistaken for stray monorepo config?
   Evidence: `server/pnpm-workspace.yaml`, `client/CLAUDE.md` Gotchas section.
+- **2026-10-20** — Precise evidence for the entry above:
+  `server/pnpm-workspace.yaml:1-5` (the `allowBuilds` list); the existing
+  clarifying note is `client/CLAUDE.md:41-43`.
 
 ## Codebase Patterns
 
@@ -32,3 +35,26 @@
   check that 0/0 pair, not look for a status field. Evidence:
   `server/src/modules/reviews/run-executor.ts` (`traceFromBuffer`),
   `server/src/vendor/shared/contracts/trace.ts` (`RunTrace`/`RunStats`).
+- **2026-10-20** — Precise evidence for the entry above: the sentinel is set
+  at `server/src/modules/reviews/run-executor.ts:426` (inside
+  `traceFromBuffer`, defined at line 410); `RunTrace`/`RunStats` are
+  `server/src/vendor/shared/contracts/trace.ts:72` and `:61` respectively.
+- **2026-10-20** — Every `server/src/modules/<name>/` folder (all 8:
+  `agents`, `polling`, `pulls`, `repo-intel`, `repos`, `reviews`,
+  `settings`, `workspace`) uses the same fixed file-role vocabulary —
+  `routes.ts` (Fastify plugin entry), `service.ts` (orchestration),
+  `repository.ts` (DB access), `helpers.ts`/`constants.ts` as needed. A new
+  module should follow this same file set rather than inventing new role
+  names. Evidence: `ls server/src/modules/*/` across all 8 folders.
+- **2026-10-20** — `server/package.json`'s committed `test` script is plain
+  `vitest run` (no unit/integration split — it would need Docker for the
+  `.it.test.ts` files too). That's why CI inlines the split directly
+  (`pnpm exec vitest run --exclude '**/*.it.test.ts'` /
+  `pnpm exec vitest run .it.test`) instead of calling a `test:unit`/
+  `test:integration` script pair. This is a `server`-specific CI design
+  choice, not a repo-wide pattern — `client.yml`/`reviewer-core.yml`'s CI
+  jobs call the plain `test` script directly, no inlining needed. Evidence:
+  `.github/workflows/server-unit.yml:99`,
+  `.github/workflows/server-integration.yml:65`, vs.
+  `.github/workflows/client.yml:49`,
+  `.github/workflows/reviewer-core.yml:49`.

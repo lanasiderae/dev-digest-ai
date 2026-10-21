@@ -4,8 +4,9 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon, Badge, CircularScore } from "@devdigest/ui";
-import type { Verdict } from "@devdigest/shared";
+import { Icon, SeverityBadge, Badge, CircularScore } from "@devdigest/ui";
+import type { Severity, Verdict } from "@devdigest/shared";
+import { SEVERITY_ORDER } from "@/lib/severity";
 import { VERDICT_META } from "./constants";
 import { s } from "./styles";
 
@@ -13,15 +14,13 @@ export function VerdictBanner({
   verdict,
   summary,
   score,
-  findingsCount,
-  blockers,
+  severityCounts,
   agentName,
 }: {
   verdict: Verdict;
   summary: string | null;
   score: number | null;
-  findingsCount: number;
-  blockers: number;
+  severityCounts: Record<Severity, number>;
   agentName?: string | null;
 }) {
   const t = useTranslations("prReview");
@@ -35,10 +34,9 @@ export function VerdictBanner({
       <div style={s.main}>
         <div style={s.titleRow}>
           <span style={s.label(m.c)}>{t(`verdict.${m.labelKey}`)}</span>
-          <Badge color="var(--text-secondary)">
-            {t("verdict.findingsCount", { count: findingsCount })}
-            {blockers > 0 ? t("verdict.blockers", { count: blockers }) : ""}
-          </Badge>
+          {SEVERITY_ORDER.filter((sev) => severityCounts[sev] > 0).map((sev) => (
+            <SeverityBadge key={sev} severity={sev} count={severityCounts[sev]} />
+          ))}
           {agentName && (
             <Badge color="var(--accent-text)" bg="var(--accent-bg)" icon="Cpu">
               {agentName}

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
+import { SeverityCounts } from './findings.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -172,6 +173,12 @@ export const PrMeta = z.object({
   score: z.number().int().nullish(),
   // Cost (USD) of the run behind `score` — same latest-review-for-this-PR run.
   cost: z.number().nullish(),
+  // Latest-review severity breakdown for the list's Findings column (list
+  // endpoint only; nullish like score/cost — GitHubClient's raw PrMeta has no
+  // review data). "Never reviewed" and "reviewed with 0 findings" render the
+  // same, so the route always fills this in with a concrete all-zero object
+  // rather than leaving it absent.
+  findings_by_severity: SeverityCounts.nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

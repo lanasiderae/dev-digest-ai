@@ -5,4 +5,6 @@ Deeper design notes for the e2e suite that don't belong in `e2e/README.md`
 Not to be confused with `e2e/specs/` — that folder holds the executable
 `*.flow.json` flow specs, not documentation.
 
-Empty for now.
+- [`harness.md`](harness.md) — how the flow runner actually works: why
+  `wait --text`/`wait --url` are the real assertions, the shared browser
+  session, and why flow filename order is load-bearing.

@@ -2,14 +2,18 @@
 
 ## Overview
 
-Pure review engine: diff → prompt → LLM → grounded findings. No database,
-GitHub, or filesystem — the only side effect is an LLM call through an
-injected `LLMProvider`.
+TypeScript pure review engine: diff → prompt → LLM → grounded findings. No
+database, GitHub, or filesystem — the only side effect is an LLM call
+through an injected `LLMProvider`. Key libraries: `zod` (structured-output
+validation against the `Review` schema), `openai` SDK (OpenRouter's chat
+completions are OpenAI-compatible, so the same client drives both).
 
 ## Commands
 
 - `npm test` — vitest, stubbed `LLMProvider`.
 - `npm run typecheck` — doubles as the build; the package never emits JS.
+- `npm run lint` — flat config at `eslint.config.mjs`. Not run in CI (only
+  typecheck/test are).
 
 ## Conventions
 
@@ -48,7 +52,10 @@ injected `LLMProvider`.
   `grounding.ts`, `run.ts`, or `reduce.ts`; explains why each convention
   above exists and what silently breaks if violated.
 - `../TESTING.md` — read before any test change.
-- `reviewer-core/docs/`, `reviewer-core/specs/` — deeper design notes /
-  formal specs; currently empty placeholders, read when populated.
+- `reviewer-core/docs/pipeline.md` — read before touching the pipeline's
+  stage order, mode selection, or cost accumulation.
+- `reviewer-core/specs/review-engine.md` — read before touching
+  `grounding.ts` or `prompt.ts`'s injection guard; the exact pass/fail
+  contracts both must keep.
 - `../.claude/rules/` — always-applied project rules; authoritative over
   this file if it ever contains anything.

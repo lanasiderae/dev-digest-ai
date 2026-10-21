@@ -4,6 +4,22 @@ Notes from reviewing this repo's `CLAUDE.md` documentation set. Not
 authoritative project docs — see root `CLAUDE.md` and `.claude/rules/` for
 that; this is a working log of findings and open decisions.
 
+## What Doesn't Work
+
+- **2026-10-20** — `git ls-files -v`'s tag letter alone is NOT a reliable
+  skip-worktree indicator: `H` is the standard "cached" tag shown for every
+  normal tracked file (always capital, regardless of skip-worktree state)
+  — the real skip-worktree indicator is a capital `S`. Misreading `H` as
+  "skip-worktree" led to an incorrect root `CLAUDE.md` claim (repeated
+  across `client`/`server`/`reviewer-core`/`e2e` `CLAUDE.md` and
+  `TESTING.md`) that every package's `package.json` was skip-worktree, and
+  a whole tooling decision built on it (avoiding real `package.json`
+  `"lint"` scripts in favor of undocumented `npx eslint .` + "install
+  locally, won't persist" caveats). Verify skip-worktree properly:
+  `git update-index --skip-worktree <file>` then `git ls-files -v <file>`
+  → `S`; `--no-skip-worktree` → back to `H`. None of this repo's
+  `package.json` files or `skills-lock.json` actually have the bit set.
+
 ## Codebase Patterns
 
 - **2026-09-29** — `server/src/vendor/shared` (`@devdigest/shared`) has no
@@ -37,3 +53,21 @@ that; this is a working log of findings and open decisions.
   removal commit before assuming it's unfinished — other L01–L08 lessons
   likely follow the same pattern. Evidence: `git show d45ab0d`,
   `reviewer-core/src/review/run.ts:110,216`.
+- **2026-10-20** — Precise evidence for the `server/src/vendor/shared` vs.
+  `client/src/vendor/shared` divergence entry (2026-09-29, first entry in
+  this section): as of this date the 5
+  differing files are `adapters.ts`, `contracts/eval-ci.ts`,
+  `contracts/knowledge.ts`, `contracts/productionize.ts`, and
+  `contracts/trace.ts` (`diff -rq server/src/vendor/shared
+  client/src/vendor/shared`). `contracts/findings.ts` and
+  `contracts/platform.ts` were kept byte-identical by hand this session
+  (`client/src/vendor/shared/contracts/findings.ts`,
+  `server/src/vendor/shared/contracts/findings.ts`,
+  `client/src/vendor/shared/contracts/platform.ts`,
+  `server/src/vendor/shared/contracts/platform.ts`), confirming the "apply
+  by hand" rule above is followed in practice, not just documented.
+- **2026-10-20** — Precise evidence for the `scripts/e2e.sh` not-mentioned
+  entry (2026-09-29, second entry in this section): `scripts/e2e.sh` is 166
+  lines (the whole file is the
+  hermetic-runner script, no single-line anchor); the "recommended" framing
+  is `e2e/CLAUDE.md:10-11`.

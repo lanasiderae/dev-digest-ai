@@ -2,8 +2,8 @@
 
 ## Overview
 
-Fastify 5 + Drizzle ORM (Postgres/pgvector) API — clones/indexes repos,
-stores agents, runs the reviewer (diff → `reviewer-core` → grounded
+TypeScript, Fastify 5 + Drizzle ORM (Postgres/pgvector) API — clones/indexes
+repos, stores agents, runs the reviewer (diff → `reviewer-core` → grounded
 findings). It is the client's only backend.
 
 ## Commands
@@ -17,6 +17,8 @@ findings). It is the client's only backend.
     testcontainers.
   - `pnpm test` — both.
 - `pnpm typecheck`.
+- `pnpm lint` — flat config at `eslint.config.mjs`. Not run in CI (only
+  test/typecheck are).
 
 ## Conventions
 
@@ -45,7 +47,6 @@ findings). It is the client's only backend.
 
 - `server/clones/**` — git-ignored clone dir (`DEVDIGEST_CLONE_DIR`); runtime
   data only, may contain unrelated nested repos.
-- `server/package.json` — `skip-worktree`; see root `CLAUDE.md`.
 - `~/.devdigest/secrets.json` access outside `LocalSecretsProvider`
   (`src/adapters/secrets/local.ts`) — it is the one read chokepoint by
   design. `GITHUB_TOKEN` is canonical; `GITHUB_PAT` is an accepted fallback,
@@ -76,7 +77,9 @@ findings). It is the client's only backend.
   repo-intel indexing/ranking.
 - `../reviewer-core/README.md` — read before touching what the server sends
   into the review engine.
-- `server/docs/`, `server/specs/` — deeper design notes / formal specs;
-  currently empty placeholders, read when populated.
+- `server/docs/architecture.md` — read before touching the DI container,
+  adding an adapter, or registering a new module.
+- `server/specs/review-flow.md` — read before touching the review-run
+  trigger/execution/persistence/cost path.
 - `../.claude/rules/` — always-applied project rules; authoritative over
   this file if it ever contains anything.

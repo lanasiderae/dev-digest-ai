@@ -4,11 +4,16 @@
  * a settled run is colored/labelled by its denormalized blocker/finding counts,
  * and shows the review score ring.
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { RunSummary, FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
+
+vi.mock("../RunFindingsPopover", () => ({
+  RunFindingsPopover: () => <div data-testid="run-findings-popover" />,
+}));
+
 import { RunHistory } from "./RunHistory";
 
 afterEach(cleanup);
@@ -35,12 +40,34 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummary[], findingsByRunId?: Record<string, FindingRecord[]>) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} findingsByRunId={findingsByRunId} onOpenTrace={() => {}} />
     </NextIntlClientProvider>,
   );
+}
+
+function finding(o: Partial<FindingRecord>): FindingRecord {
+  return {
+    id: "f1",
+    severity: "CRITICAL",
+    category: "security",
+    title: "Hardcoded secret",
+    file: "src/config.ts",
+    start_line: 11,
+    end_line: 11,
+    rationale: "A live key is committed.",
+    suggestion: null,
+    confidence: 0.95,
+    kind: "finding",
+    trifecta_components: null,
+    evidence: null,
+    review_id: "r1",
+    accepted_at: null,
+    dismissed_at: null,
+    ...o,
+  };
 }
 
 describe("RunHistory — outcome badge", () => {
@@ -90,5 +117,39 @@ describe("RunHistory — cost", () => {
   it("shows no tokens/cost line for a run that hasn't settled", () => {
     renderRuns([run({ status: "failed", error: "boom", score: null, blockers: null, cost: null })]);
     expect(screen.queryByText(/tok ·/)).not.toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — per-run findings cluster", () => {
+  it("shows a severity badge per non-zero count when findings are known for the run", () => {
+    renderRuns(
+      [run({ status: "done", findings_count: 2, blockers: 1, score: 61 })],
+      { "run-1": [finding({ id: "f1", severity: "CRITICAL" }), finding({ id: "f2", severity: "WARNING" })] },
+    );
+    const trigger = screen.getByRole("button", { name: /\d/ });
+    expect(trigger.textContent).toBe("11");
+    // The old plain-text fallback must not also render.
+    expect(screen.queryByText(/finding\(s\)/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the plain finding/blocker text when the run isn't in findingsByRunId", () => {
+    renderRuns([run({ status: "done", findings_count: 5, blockers: 5, score: 0 })]);
+    expect(screen.getByText(/5 blockers/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /\d/ })).not.toBeInTheDocument();
+  });
+
+  it("shows nothing for a clean run with an empty findings array", () => {
+    renderRuns([run({ status: "done", findings_count: 0, blockers: 0, score: 95 })], { "run-1": [] });
+    expect(screen.queryByRole("button", { name: /\d/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/finding\(s\)/)).not.toBeInTheDocument();
+  });
+
+  it("opens the per-run popover on click", () => {
+    renderRuns([run({ status: "done", findings_count: 1, blockers: 1, score: 20 })], {
+      "run-1": [finding({})],
+    });
+    expect(screen.queryByTestId("run-findings-popover")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /\d/ }));
+    expect(screen.getByTestId("run-findings-popover")).toBeInTheDocument();
   });
 });

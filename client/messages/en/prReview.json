@@ -4,7 +4,7 @@
     "dismissed": "dismissed",
     "suggestedFix": "Suggested fix",
     "accept": "Accept",
-    "dismiss": "Dismiss",
+    "dismiss": "Reject",
     "learn": "Learn",
     "replyToAuthor": "Reply to author",
     "replyPlaceholder": "Reply to the author about this finding…",
@@ -92,8 +92,15 @@
       "size": "Size",
       "score": "Score",
       "cost": "Cost",
+      "findings": "Findings",
       "status": "Status",
       "updated": "Updated"
+    },
+    "findingsPopover": {
+      "title": "{count} findings in this run",
+      "loading": "Loading findings…",
+      "empty": "No findings.",
+      "errorBody": "Couldn’t load findings."
     },
     "filesCount": "{count} files",
     "errorTitle": "Couldn’t load pull requests",
@@ -105,6 +112,8 @@
   "timeline": {
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",
-    "deleteRun": "Delete run"
+    "deleteRun": "Delete run",
+    "findingsInRun": "{count} findings in this run",
+    "noFindings": "No findings."
   }
 }

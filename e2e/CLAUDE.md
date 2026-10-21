@@ -2,7 +2,7 @@
 
 ## Overview
 
-Deterministic browser flows for the web app, driven by Vercel
+TypeScript, deterministic browser flows for the web app, driven by Vercel
 `agent-browser` (native CDP CLI) — no Playwright, no LLM, no API key.
 
 ## Commands
@@ -12,6 +12,9 @@ Deterministic browser flows for the web app, driven by Vercel
 - Against your own dev stack: `./scripts/dev.sh` then `cd e2e && npm test` —
   only safe if the dev DB has *only* the seeded repo (see Gotchas).
 - One-time setup: `npm i -g agent-browser && agent-browser install`.
+- `npm run typecheck`.
+- `npm run lint` — flat config at `eslint.config.mjs`. Not run in CI (only
+  typecheck/the flow suite are).
 
 ## Conventions
 
@@ -47,7 +50,9 @@ Deterministic browser flows for the web app, driven by Vercel
 - `e2e/specs/*.flow.json` — read before adding a new flow, to match existing
   style and locator conventions.
 - `../TESTING.md` — read before any test change.
-- `e2e/docs/` — deeper design notes; currently an empty placeholder
-  (distinct from `e2e/specs/`, which holds the executable flow specs).
+- `e2e/docs/harness.md` — read before changing `run.ts` itself (the
+  runner), or before assuming a flow's step order/failure handling works a
+  particular way (distinct from `e2e/specs/`, which holds the executable
+  flow specs, not the runner's own design).
 - `../.claude/rules/` — always-applied project rules; authoritative over
   this file if it ever contains anything.

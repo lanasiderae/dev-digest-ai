@@ -7,7 +7,7 @@ import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, rollupSeverities } from './status.js';
 import { computeRunCost } from '../reviews/helpers.js';
 
 /**
@@ -112,35 +112,42 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE per PR for the list's score ring. Computed on read
-    // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // Latest-review SCORE per PR for the list's score ring, plus its own `id`
+    // (used below to batch-fetch that same review's findings). Computed on
+    // read from reviews (no FK denorm); the list is small, so one IN-query +
+    // JS grouping is cheap.
     const prIds = rows.map((r) => r.id);
-    const latestReviewByPr = new Map<string, { score: number | null; runId: string | null }>();
+    const latestReviewByPr = new Map<string, { id: string; score: number | null }>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score, runId: t.reviews.runId })
+        .select({ id: t.reviews.id, prId: t.reviews.prId, score: t.reviews.score })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
       // Rows are newest-first → first seen per PR is the latest review.
       for (const rv of reviewRows) {
-        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score, runId: rv.runId });
+        if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { id: rv.id, score: rv.score });
       }
     }
 
-    // Cost (USD) of the run behind that same latest review, for the list's
-    // Cost column. Batch-fetched the same "IN-query + Map" way as the score
-    // lookup above — reviews.run_id has no FK, so this is a second query.
-    const runIds = [...latestReviewByPr.values()]
-      .map((v) => v.runId)
-      .filter((id): id is string => id != null);
+    // Cost (USD) for the list's Cost column = SUM of every SUCCESSFUL run's
+    // cost across every review ever run on the PR (not just the latest —
+    // distinct from score/findings above, which are latest-review-only).
+    // Separate query against ALL reviews for these PRs (not the
+    // latest-only map), since every re-review's run should count.
+    const allReviewRows =
+      prIds.length > 0
+        ? await container.db
+            .select({ prId: t.reviews.prId, runId: t.reviews.runId })
+            .from(t.reviews)
+            .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
+        : [];
+    const costRunIds = [...new Set(allReviewRows.map((rv) => rv.runId).filter((id): id is string => id != null))];
     const runById = new Map<
       string,
       { model: string | null; status: string | null; tokensIn: number | null; tokensOut: number | null }
     >();
-    if (runIds.length > 0) {
+    if (costRunIds.length > 0) {
       const runRows = await container.db
         .select({
           id: t.agentRuns.id,
@@ -150,9 +157,40 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           tokensOut: t.agentRuns.tokensOut,
         })
         .from(t.agentRuns)
-        .where(inArray(t.agentRuns.id, runIds));
+        .where(inArray(t.agentRuns.id, costRunIds));
       for (const r of runRows) {
         runById.set(r.id, { model: r.model, status: r.status, tokensIn: r.tokensIn, tokensOut: r.tokensOut });
+      }
+    }
+    // Sum per PR — computeRunCost itself returns null for a non-'done' run
+    // or one missing model/token data, so only genuinely successful runs
+    // with estimable cost contribute. A PR with no contributing run keeps
+    // cost `null` (never `0`), same as the unreviewed-PR case.
+    const costByPr = new Map<string, number>();
+    for (const rv of allReviewRows) {
+      if (!rv.runId) continue;
+      const run = runById.get(rv.runId);
+      if (!run) continue;
+      const cost = computeRunCost((m, i, o) => container.priceBook.estimate(m, i, o), run);
+      if (cost == null) continue;
+      costByPr.set(rv.prId, (costByPr.get(rv.prId) ?? 0) + cost);
+    }
+
+    // FINDINGS severity breakdown for that same latest review, for the list's
+    // Findings column. Same batch pattern again: one IN-query against the
+    // latest review ids already collected, grouped in JS with rollupSeverities.
+    const latestReviewIds = [...latestReviewByPr.values()].map((v) => v.id);
+    const findingRowsByPr = new Map<string, { severity: string }[]>();
+    if (latestReviewIds.length > 0) {
+      const findingRows = await container.db
+        .select({ prId: t.reviews.prId, severity: t.findings.severity })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+        .where(inArray(t.findings.reviewId, latestReviewIds));
+      for (const fr of findingRows) {
+        const arr = findingRowsByPr.get(fr.prId) ?? [];
+        arr.push({ severity: fr.severity });
+        findingRowsByPr.set(fr.prId, arr);
       }
     }
 
@@ -180,12 +218,15 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
-        cost: review?.runId
-          ? computeRunCost(
-              (m, i, o) => container.priceBook.estimate(m, i, o),
-              runById.get(review.runId) ?? { model: null, status: null, tokensIn: null, tokensOut: null },
-            )
-          : null,
+        cost: costByPr.get(r.id) ?? null,
+        findings_by_severity: (() => {
+          const counts = rollupSeverities(findingRowsByPr.get(r.id) ?? []);
+          return {
+            CRITICAL: counts.critical,
+            WARNING: counts.warning,
+            SUGGESTION: counts.suggestion,
+          };
+        })(),
       };
     });
   });

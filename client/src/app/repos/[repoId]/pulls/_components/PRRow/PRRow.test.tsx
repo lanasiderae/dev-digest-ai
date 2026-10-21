@@ -1,15 +1,23 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { PrMeta } from "@/lib/types";
 import messages from "../../../../../../../messages/en/prReview.json";
-import { PRRow } from "./PRRow";
 
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn() }),
+}));
+vi.mock("../FindingsPopover", () => ({
+  FindingsPopover: () => <div data-testid="findings-popover" />,
 }));
 
-afterEach(cleanup);
+import { PRRow } from "./PRRow";
+
+afterEach(() => {
+  cleanup();
+  push.mockClear();
+});
 
 function pr(o: Partial<PrMeta>): PrMeta {
   return {
@@ -52,5 +60,31 @@ describe("PRRow — cost cell", () => {
     // cell's own "unreviewed" fallback (em dash, —) — assert the cost one.
     expect(screen.getByText("–")).toBeInTheDocument();
     expect(screen.queryByText(/\$0\.00/)).not.toBeInTheDocument();
+  });
+});
+
+describe("PRRow — findings cell", () => {
+  it("shows a severity badge per non-zero count and omits zero counts", () => {
+    renderRow(pr({ findings_by_severity: { CRITICAL: 2, WARNING: 0, SUGGESTION: 1 } }));
+    const trigger = screen.getByRole("button", { name: /\d/ });
+    expect(trigger.textContent).toBe("21");
+  });
+
+  it("renders no findings trigger for a PR with zero findings", () => {
+    renderRow(pr({ findings_by_severity: { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 } }));
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("hovering the findings cell opens the popover without navigating to the PR", () => {
+    renderRow(pr({ findings_by_severity: { CRITICAL: 1, WARNING: 0, SUGGESTION: 0 } }));
+    fireEvent.mouseEnter(screen.getByRole("button"));
+    expect(screen.getByTestId("findings-popover")).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("clicking the findings cell does not navigate to the PR either", () => {
+    renderRow(pr({ findings_by_severity: { CRITICAL: 1, WARNING: 0, SUGGESTION: 0 } }));
+    fireEvent.click(screen.getByRole("button"));
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,8 @@
 ---
-name: engineering-review
+name: engineering-insights
 description: Captures non-obvious engineering insights in the touched package's INSIGHTS.md (server, client, reviewer-core, e2e). Use when a reusable gotcha, working approach, dead-end, codebase pattern, recurring error/fix, or open question surfaces, and again at session wrap-up. Reads existing findings first, avoids duplicates, writes only actionable file-grounded entries, and is strictly append-only.
 ---
-# Engineering Review
+# Engineering Insights
 
 ## Qualification
 

@@ -2,14 +2,15 @@
 
 ## Overview
 
-Next.js 15 (App Router) + React 19 studio UI over the Fastify API: import
-repos, browse pull requests, run/read AI reviews, author agents.
+TypeScript, Next.js 15 (App Router) + React 19 studio UI over the Fastify
+API: import repos, browse pull requests, run/read AI reviews, author agents.
 
 ## Commands
 
 - `pnpm dev` — web app on `:3000`.
 - `pnpm test` — vitest + jsdom, `fetch` mocked; no API or browser needed.
 - `pnpm typecheck`.
+- `pnpm lint` — flat config at `eslint.config.mjs`.
 
 ## Conventions
 
@@ -48,7 +49,10 @@ repos, browse pull requests, run/read AI reviews, author agents.
 - `../TESTING.md` — read before any test change.
 - `../e2e/README.md` — read before claiming a UI change is "tested end to
   end"; component tests alone don't cover that.
-- `client/docs/`, `client/specs/` — deeper design notes / formal specs;
-  currently empty placeholders, read when populated.
+- `client/docs/ui-architecture.md` — read before changing anything about
+  Server/Client Component boundaries, data fetching, or adding a new
+  overlay/popover.
+- `client/specs/pages.md` — read before adding a route or changing what
+  data an existing page depends on.
 - `../.claude/rules/` — always-applied project rules; authoritative over
   this file if it ever contains anything.

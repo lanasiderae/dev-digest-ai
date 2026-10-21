@@ -8,6 +8,8 @@
   per-call LLM pricing (e.g. $0.0013) — down to `$0.00`, indistinguishable
   from "free" or "no data". Use a precision tier instead: `< $0.01` → 4
   decimals, else 2. See `client/src/lib/format-cost.ts`.
+- **2026-10-20** — Precise evidence for the entry above: the current tiered
+  implementation is `client/src/lib/format-cost.ts:6-11`.
 
 ## Codebase Patterns
 
@@ -19,3 +21,6 @@
   specific component actually renders before asserting on it. Evidence:
   `client/src/lib/format-cost.ts`,
   `client/src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.tsx`.
+- **2026-10-20** — Precise evidence for the entry above: the en dash is
+  `client/src/lib/format-cost.ts:7`; the em dash is
+  `client/src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.tsx:55`.
