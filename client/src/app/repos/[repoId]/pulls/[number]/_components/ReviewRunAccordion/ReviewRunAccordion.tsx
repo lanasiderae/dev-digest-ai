@@ -6,8 +6,10 @@
 "use client";
 
 import React from "react";
-import { Icon, Badge } from "@devdigest/ui";
+import { Icon, Badge, SeverityBadge } from "@devdigest/ui";
 import type { ReviewRecord, Verdict } from "@devdigest/shared";
+import { formatCost } from "@/lib/format-cost";
+import { SEVERITY_ORDER, severityCounts } from "@/lib/severity";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
@@ -53,7 +55,7 @@ export function ReviewRunAccordion({
   }, [targetRunId, targetNonce, review.run_id]);
   const del = useDeleteReview(prId);
   const findings = review.findings;
-  const blockers = findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
+  const counts = severityCounts(findings);
   const verdictColor = review.verdict ? VERDICT_COLOR[review.verdict] ?? "var(--text-muted)" : "var(--text-muted)";
 
   return (
@@ -93,16 +95,20 @@ export function ReviewRunAccordion({
             {review.verdict.replace("_", " ")}
           </Badge>
         )}
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          {findings.length} finding{findings.length === 1 ? "" : "s"}
-          {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {SEVERITY_ORDER.filter((sev) => counts[sev] > 0).map((sev) => (
+            <SeverityBadge key={sev} severity={sev} count={counts[sev]} />
+          ))}
+        </div>
         <span style={{ flex: 1 }} />
         {review.score != null && (
           <Badge mono color="var(--text-secondary)">
             {review.score}
           </Badge>
         )}
+        <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          {formatCost(review.cost)}
+        </span>
         <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
           {formatWhen(review.created_at)}
         </span>
@@ -141,8 +147,7 @@ export function ReviewRunAccordion({
                 verdict={review.verdict as Verdict}
                 summary={review.summary}
                 score={review.score}
-                findingsCount={findings.length}
-                blockers={blockers}
+                severityCounts={counts}
                 agentName={review.agent_name}
               />
             </div>

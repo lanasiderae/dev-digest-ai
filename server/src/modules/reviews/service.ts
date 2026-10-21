@@ -6,7 +6,7 @@ import { ReviewRepository } from './repository.js';
 import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
-import { reviewToDto } from './helpers.js';
+import { reviewToDto, computeRunCost } from './helpers.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -68,7 +68,16 @@ export class ReviewService {
 
   /** All runs for a PR (any status), newest first — the run history (incl. failures). */
   async listRuns(workspaceId: string, prId: string) {
-    return this.repo.listRunsForPull(workspaceId, prId);
+    const rows = await this.repo.listRunsForPull(workspaceId, prId);
+    return rows.map((r) => ({
+      ...r,
+      cost: computeRunCost((m, i, o) => this.container.priceBook.estimate(m, i, o), {
+        status: r.status,
+        model: r.model,
+        tokensIn: r.tokens_in,
+        tokensOut: r.tokens_out,
+      }),
+    }));
   }
 
   /** Delete one run from the history (+ its trace). */
@@ -168,12 +177,29 @@ export class ReviewService {
         if (a) names.set(review.agentId, a.name);
       }
     }
-    return rows.map(({ review, findings }) =>
-      reviewToDto(review, findings, review.agentId ? names.get(review.agentId) : null),
-    );
+    const runIds = rows.map((r) => r.review.runId).filter((id): id is string => id != null);
+    const runInfo = await this.repo.tokensForRuns(runIds);
+    return rows.map(({ review, findings }) => {
+      const dto = reviewToDto(review, findings, review.agentId ? names.get(review.agentId) : null);
+      const info = review.runId ? runInfo.get(review.runId) : undefined;
+      return {
+        ...dto,
+        cost: info ? computeRunCost((m, i, o) => this.container.priceBook.estimate(m, i, o), info) : null,
+      };
+    });
   }
 
   async getRunTrace(runId: string): Promise<RunTrace | undefined> {
-    return this.repo.getRunTrace(runId);
+    const trace = await this.repo.getRunTrace(runId);
+    if (!trace) return trace;
+    const cost = computeRunCost((m, i, o) => this.container.priceBook.estimate(m, i, o), {
+      // RunTrace has no status field of its own; the executor's 0/0 sentinel
+      // on failure/cancel is the only "incomplete" signal available here.
+      status: trace.stats.tokens_in === 0 && trace.stats.tokens_out === 0 ? 'incomplete' : 'done',
+      model: trace.config.model,
+      tokensIn: trace.stats.tokens_in,
+      tokensOut: trace.stats.tokens_out,
+    });
+    return { ...trace, stats: { ...trace.stats, cost_usd: cost } };
   }
 }

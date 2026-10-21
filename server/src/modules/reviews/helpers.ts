@@ -26,6 +26,7 @@ export interface ReviewDto {
   summary: string | null;
   score: number | null;
   model: string | null;
+  cost: number | null;
   grounding?: string | null;
   created_at: string;
   findings: ReviewDtoFinding[];
@@ -52,6 +53,22 @@ export function findingRowToDto(row: FindingRow): ReviewDtoFinding {
   };
 }
 
+/**
+ * A run's cost is only knowable once it settled successfully with real token
+ * counts — failed/cancelled runs persist tokensIn/tokensOut as 0 (see
+ * run-executor.ts's catch block), which must read as "no data" (null), never
+ * a misleading $0.00. `estimate` is injected (rather than importing
+ * PriceBook/container here) so this stays a pure, container-free helper.
+ */
+export function computeRunCost(
+  estimate: (model: string, tokensIn: number, tokensOut: number) => number | null,
+  run: { status: string | null; model: string | null; tokensIn: number | null; tokensOut: number | null },
+): number | null {
+  if (run.status !== 'done') return null;
+  if (!run.model || run.tokensIn == null || run.tokensOut == null) return null;
+  return estimate(run.model, run.tokensIn, run.tokensOut);
+}
+
 export function reviewToDto(
   review: ReviewRow,
   findings: FindingRow[],
@@ -68,6 +85,8 @@ export function reviewToDto(
     summary: review.summary,
     score: review.score,
     model: review.model,
+    // Set by the service (needs a run→tokens lookup this pure helper can't do).
+    cost: null,
     created_at: review.createdAt.toISOString(),
     findings: findings.map(findingRowToDto),
   };

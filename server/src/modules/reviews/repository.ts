@@ -82,6 +82,13 @@ export class ReviewRepository {
     return runRepo.listRunsForPull(this.db, workspaceId, prId);
   }
 
+  /** Batch lookup of token/model/status info behind a set of run ids (for cost). */
+  tokensForRuns(
+    runIds: string[],
+  ): Promise<Map<string, { model: string | null; status: string | null; tokensIn: number | null; tokensOut: number | null }>> {
+    return runRepo.tokensForRuns(this.db, runIds);
+  }
+
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
   deleteAgentRun(workspaceId: string, runId: string): Promise<boolean> {
     return runRepo.deleteAgentRun(this.db, workspaceId, runId);

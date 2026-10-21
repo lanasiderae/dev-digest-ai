@@ -2,8 +2,11 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import { Badge, Icon, CircularScore, SeverityBadge, type IconName } from "@devdigest/ui";
+import type { RunSummary, PrCommit, FindingRecord } from "@devdigest/shared";
+import { formatCost } from "@/lib/format-cost";
+import { SEVERITY_ORDER, severityCounts } from "@/lib/severity";
+import { RunFindingsPopover } from "../RunFindingsPopover";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -77,6 +80,64 @@ type TimelineItem =
   | { kind: "run"; ts: number; run: RunSummary }
   | { kind: "commit"; ts: number; commit: PrCommit };
 
+/** Severity badge cluster for one run's findings, click-to-expand into
+   RunFindingsPopover. Falls back to nothing when `findings` is empty (a
+   clean run has nothing to show here). */
+function RunFindingsCluster({
+  findings,
+  headSha,
+  repoFullName,
+  open,
+  onToggle,
+  onClose,
+}: {
+  findings: FindingRecord[];
+  headSha?: string | null;
+  repoFullName?: string | null;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  const counts = severityCounts(findings);
+  const total = counts.CRITICAL + counts.WARNING + counts.SUGGESTION;
+  if (total === 0) return null;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle();
+          }
+        }}
+        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+      >
+        {SEVERITY_ORDER.filter((sev) => counts[sev] > 0).map((sev) => (
+          <SeverityBadge key={sev} severity={sev} count={counts[sev]} compact />
+        ))}
+      </div>
+      {open && (
+        <RunFindingsPopover
+          findings={findings}
+          headSha={headSha}
+          repoFullName={repoFullName}
+          onClose={onClose}
+        />
+      )}
+    </div>
+  );
+}
+
 /** Epoch ms for sorting; unparseable / missing timestamps sort last. */
 function tsOf(s: string | null | undefined): number {
   if (!s) return 0;
@@ -87,12 +148,22 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  findingsByRunId = {},
+  headSha,
+  repoFullName,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** This run's actual findings, when known (from the PR's persisted
+     reviews) — enables the severity-badge cluster + click popover. A run
+     missing from this map (e.g. no linked review) falls back to the plain
+     finding/blocker count text. */
+  findingsByRunId?: Record<string, FindingRecord[]>;
+  headSha?: string | null;
+  repoFullName?: string | null;
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -100,6 +171,7 @@ export function RunHistory({
   onDelete?: (runId: string) => void;
 }) {
   const t = useTranslations("prReview");
+  const [openFindingsRunId, setOpenFindingsRunId] = React.useState<string | null>(null);
   if (runs.length === 0 && commits.length === 0) return null;
 
   const items: TimelineItem[] = [
@@ -188,15 +260,32 @@ export function RunHistory({
                   {r.error}
                 </div>
               )}
-              {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
-                </div>
-              )}
+              {settled &&
+                (findingsByRunId[r.run_id] ? (
+                  <RunFindingsCluster
+                    findings={findingsByRunId[r.run_id]!}
+                    headSha={headSha}
+                    repoFullName={repoFullName}
+                    open={openFindingsRunId === r.run_id}
+                    onToggle={() =>
+                      setOpenFindingsRunId((id) => (id === r.run_id ? null : r.run_id))
+                    }
+                    onClose={() => setOpenFindingsRunId(null)}
+                  />
+                ) : (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                    {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                    {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                  </div>
+                ))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
+              {settled && (
+                <span className="tnum" style={{ fontWeight: 600 }}>
+                  {((r.tokens_in ?? 0) + (r.tokens_out ?? 0)).toLocaleString()} tok · {formatCost(r.cost)}
+                </span>
+              )}
             </div>
             <button
               type="button"

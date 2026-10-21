@@ -31,6 +31,7 @@ export const ReviewRecord = z.object({
   summary: z.string().nullable(),
   score: z.number().int().nullable(),
   model: z.string().nullable(),
+  cost: z.number().nullable(),
   grounding: z.string().nullish(),
   created_at: z.string(),
   findings: z.array(FindingRecord),

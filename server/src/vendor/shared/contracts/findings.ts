@@ -11,6 +11,14 @@ import { z } from 'zod';
 export const Severity = z.enum(['CRITICAL', 'WARNING', 'SUGGESTION']);
 export type Severity = z.infer<typeof Severity>;
 
+/** Per-severity counts — e.g. the PR list's Findings column badge cluster. */
+export const SeverityCounts = z.object({
+  CRITICAL: z.number().int().min(0),
+  WARNING: z.number().int().min(0),
+  SUGGESTION: z.number().int().min(0),
+});
+export type SeverityCounts = z.infer<typeof SeverityCounts>;
+
 export const FindingCategory = z.enum(['bug', 'security', 'perf', 'style', 'test']);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 
