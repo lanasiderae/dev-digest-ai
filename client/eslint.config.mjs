@@ -1,6 +1,6 @@
 // Flat ESLint config (ESLint 9+). Requires `eslint` + `typescript-eslint` +
 // `eslint-plugin-react-hooks` as devDependencies — not committed here
-// (client/package.json is git skip-worktree; see client/CLAUDE.md), so
+// (client/package.json is git skip-worktree; see client/AGENTS.md), so
 // install them locally first: `pnpm add -D eslint typescript-eslint
 // eslint-plugin-react-hooks`.
 import tseslint from "typescript-eslint";

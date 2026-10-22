@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers, wrapUntrusted } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -85,8 +85,16 @@ export class ReviewRunExecutor {
             error: msg,
           })
           .catch(() => undefined);
+        // Skill resolution doesn't depend on the diff, so it's still worth
+        // reflecting in the trace even on a pre-diff-load failure.
+        const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
+          () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+        );
         await this.repo
-          .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed'))
+          .saveRunTrace(
+            runId,
+            this.traceFromBuffer(runId, pull, agent, '0/0 passed', 0, resolvedSkills.wrapped),
+          )
           .catch(() => undefined);
         this.container.runBus.complete(runId);
       }
@@ -152,6 +160,15 @@ export class ReviewRunExecutor {
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
 
+    // Resolved OUTSIDE the try so it's available to the catch block's trace
+    // too — skill resolution doesn't depend on anything that can fail below.
+    const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
+      () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+    );
+    if (resolvedSkills.names.length > 0) {
+      runLog.info(`Skills: ${resolvedSkills.names.length} skill(s) attached to prompt`);
+    }
+
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
       // key is missing — caught below and persisted as a failed run.)
@@ -200,6 +217,13 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Enabled, ordered linked-skill bodies — each already wrapUntrusted()
+        // wrapped above (defense-in-depth; reviewer-core itself is untouched).
+        // Omitted when the agent has no enabled linked skills.
+        ...(resolvedSkills.wrapped.length ? { skills: resolvedSkills.wrapped } : {}),
+        // Plain skill names, for sanitizeMatchedSkills() to validate a
+        // model-reported matched_skill against — never put into the prompt.
+        ...(resolvedSkills.names.length ? { skillNames: resolvedSkills.names } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -308,7 +332,10 @@ export class ReviewRunExecutor {
         })
         .catch(() => undefined);
       await this.repo
-        .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start))
+        .saveRunTrace(
+          runId,
+          this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, resolvedSkills.wrapped),
+        )
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
@@ -413,6 +440,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     grounding: string,
     durationMs = 0,
+    skills: string[] = [],
   ): RunTrace {
     return {
       config: {
@@ -424,7 +452,16 @@ export class ReviewRunExecutor {
         source: 'local',
       },
       stats: { duration_ms: durationMs, tokens_in: 0, tokens_out: 0, cost_usd: null, findings: 0, grounding },
-      prompt_assembly: { system: agent.systemPrompt, skills: null, memory: null, specs: null, user: '' },
+      prompt_assembly: {
+        system: agent.systemPrompt,
+        // Joined the same way assemblePrompt joins its skillsBlock, so a
+        // failed/pre-work-failed run's trace is representative of what WOULD
+        // have been sent.
+        skills: skills.length > 0 ? skills.join('\n\n') : null,
+        memory: null,
+        specs: null,
+        user: '',
+      },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],
@@ -432,4 +469,27 @@ export class ReviewRunExecutor {
       log: this.container.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
     };
   }
+
+  /**
+   * Resolve an agent's ENABLED, ORDERED linked skills into wrapUntrusted()-
+   * wrapped bodies for the prompt, plus their plain names (for
+   * sanitizeMatchedSkills() downstream). Reads through `this.agents`
+   * (container.agentsRepo, which already owns `agent_skills`) — this module
+   * never queries `agent_skills`/`skills` directly. Returns empty arrays
+   * when there's nothing to add, so callers can follow the existing "omit
+   * when empty" contract used for callers/repoMap/prDescription.
+   */
+  private async resolveAgentSkills(agentId: string): Promise<ResolvedSkills> {
+    const links = await this.agents.linkedSkills(agentId);
+    const enabled = links.filter((l) => l.skill.enabled);
+    return {
+      wrapped: enabled.map((l) => wrapUntrusted(l.skill.name, l.skill.body)),
+      names: enabled.map((l) => l.skill.name),
+    };
+  }
+}
+
+interface ResolvedSkills {
+  wrapped: string[];
+  names: string[];
 }

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -232,5 +232,36 @@ export class AgentsRepository {
     await this.db
       .insert(t.agentSkills)
       .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+  }
+
+  /** How many skills each given agent has linked (own table, no cross-module
+   *  read needed — agent ids are already workspace-scoped by the caller). */
+  async agentSkillCounts(agentIds: string[]): Promise<Record<string, number>> {
+    if (agentIds.length === 0) return {};
+    const rows = await this.db
+      .select({ agentId: t.agentSkills.agentId, n: count() })
+      .from(t.agentSkills)
+      .where(inArray(t.agentSkills.agentId, agentIds))
+      .groupBy(t.agentSkills.agentId);
+    return Object.fromEntries(rows.map((r) => [r.agentId, Number(r.n)]));
+  }
+
+  /**
+   * How many of this workspace's agents link each given skill id — read
+   * through by `SkillsService` (via `container.agentsRepo`) to annotate the
+   * skill list/detail with a real "used by N agents" count, the same
+   * cross-module repository-read pattern `assertSkillsInWorkspace` already
+   * uses in the other direction. Skill ids with no links are simply absent
+   * from the returned map (callers default to 0).
+   */
+  async skillAgentCounts(workspaceId: string, skillIds: string[]): Promise<Record<string, number>> {
+    if (skillIds.length === 0) return {};
+    const rows = await this.db
+      .select({ skillId: t.agentSkills.skillId, n: count() })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
+      .where(and(eq(t.agents.workspaceId, workspaceId), inArray(t.agentSkills.skillId, skillIds)))
+      .groupBy(t.agentSkills.skillId);
+    return Object.fromEntries(rows.map((r) => [r.skillId, Number(r.n)]));
   }
 }

@@ -1,7 +1,7 @@
 # client UI architecture
 
 Server/Client Component boundaries and the data-fetching pattern. Deeper
-than `client/README.md` (a route map) and `client/CLAUDE.md` (a short agent
+than `client/README.md` (a route map) and `client/AGENTS.md` (a short agent
 brief) — this explains *why* the app is shaped this way.
 
 ## Server/Client Component boundary: almost everything is Client
@@ -37,8 +37,8 @@ Every data read/write goes through a hook in `src/lib/hooks/*`
 re-exported from `index.ts`), each wrapping `src/lib/api.ts`'s typed
 `api.get`/`api.post`/… against `NEXT_PUBLIC_API_BASE` (default
 `http://localhost:3001`). A component never calls `fetch` directly — see
-`client/CLAUDE.md`'s Conventions. This is what lets component tests mock
-`fetch` once at the boundary (`client/CLAUDE.md` Gotchas) rather than
+`client/AGENTS.md`'s Conventions. This is what lets component tests mock
+`fetch` once at the boundary (`client/AGENTS.md` Gotchas) rather than
 mocking each component's own data access individually.
 
 Two closely-related but distinct patterns live side by side in
@@ -82,6 +82,6 @@ the same edit, and diff them afterward.
 
 New user-facing copy goes in `messages/<locale>/*.json` (currently only
 `en/`), consumed via `useTranslations("<namespace>")` — never a hardcoded
-string in JSX (`client/CLAUDE.md` Conventions). Message keys are nested
-camelCase, namespaced by feature/section — see root `CLAUDE.md`'s Naming
+string in JSX (`client/AGENTS.md` Conventions). Message keys are nested
+camelCase, namespaced by feature/section — see root `AGENTS.md`'s Naming
 conventions.

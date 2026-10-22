@@ -7,7 +7,7 @@
 
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Skeleton, ErrorState } from "@devdigest/ui";
+import { Skeleton, ErrorState, ConfirmModal } from "@devdigest/ui";
 import { AppShell } from "../../../../../components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
@@ -21,6 +21,7 @@ import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } 
 import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
 import { ApiError } from "../../../../../lib/api";
 import { githubPrUrl } from "../../../../../lib/github-urls";
+import { usePageTitle } from "../../../../../lib/use-page-title";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {
@@ -37,6 +38,7 @@ export default function PRDetailPage() {
   const { data: pr, isLoading: detailLoading, isError, error, refetch } = usePullDetail(prId);
 
   const isLoading = pullsLoading || (prId != null && detailLoading);
+  usePageTitle(pr ? `#${pr.number} ${pr.title}` : null);
   const { data: reviews, refetch: refetchReviews } = usePrReviews(prId);
 
   // Live run tracking is SERVER-SOURCED (agent_runs status='running'): survives
@@ -68,11 +70,12 @@ export default function PRDetailPage() {
   const setTab = (t: string) => setParam("tab", t);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
-  const runs = reviews ?? [];
+  const runs = React.useMemo(() => reviews ?? [], [reviews]);
   const allFindings: FindingRecord[] = React.useMemo(
     () => runs.flatMap((r) => r.findings),
-    [reviews],
+    [runs],
   );
+  const [pendingDeleteRunId, setPendingDeleteRunId] = React.useState<string | null>(null);
   const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
   const findingsCount = allFindings.length;
 
@@ -149,10 +152,7 @@ export default function PRDetailPage() {
             headSha={pr.head_sha}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
-            onDelete={(id) => {
-              if (window.confirm("Delete this run from history? (its logs are removed too)"))
-                deleteRun.mutate(id);
-            }}
+            onDelete={(id) => setPendingDeleteRunId(id)}
             onRunDone={() => {
               invalidateActiveRuns();
               invalidateRunHistory();
@@ -178,6 +178,19 @@ export default function PRDetailPage() {
           findings={runs.find((r) => r.run_id === traceRunId)?.findings ?? []}
           agentName={runs.find((r) => r.run_id === traceRunId)?.agent_name ?? null}
           onClose={() => setParam("trace", null)}
+        />
+      )}
+
+      {pendingDeleteRunId && (
+        <ConfirmModal
+          title="Delete this run?"
+          body="This run and its logs will be removed from history. This cannot be undone."
+          pending={deleteRun.isPending}
+          onCancel={() => setPendingDeleteRunId(null)}
+          onConfirm={() => {
+            deleteRun.mutate(pendingDeleteRunId);
+            setPendingDeleteRunId(null);
+          }}
         />
       )}
     </AppShell>

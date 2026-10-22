@@ -1,7 +1,7 @@
 # reviewer-core pipeline architecture
 
 How `diff → prompt → LLM → grounded findings` is actually built. Deeper than
-`reviewer-core/README.md` (a map) and `reviewer-core/CLAUDE.md` (a short
+`reviewer-core/README.md` (a map) and `reviewer-core/AGENTS.md` (a short
 agent brief) — this explains the *why* behind the pipeline's shape.
 
 ## The entry point is pure

@@ -87,6 +87,12 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
 
   const skillsBlock =
     parts.skills && parts.skills.length > 0 ? parts.skills.join('\n\n') : undefined;
+  // Token count of the skills block ONLY (not the whole prompt — that's
+  // already tracked as stats.tokens_in/out). Plain chars/4 heuristic, same
+  // formula as server/src/adapters/tokenizer's `approxTokens` — not imported
+  // across the package boundary since reviewer-core must stay free of
+  // server adapters, and the formula itself is the whole implementation.
+  const skillsTokens = skillsBlock ? Math.ceil(skillsBlock.length / 4) : undefined;
   const memoryBlock =
     parts.memory && parts.memory.length > 0
       ? parts.memory.map((m) => `- ${m}`).join('\n')
@@ -106,7 +112,13 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
   }
-  if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
+  if (skillsBlock) {
+    userSections.push(
+      `## Skills / rules\n${skillsBlock}\n\nWhen a finding is based on one of the rules ` +
+        "above, set that finding's matched_skill to the skill's exact name (its " +
+        '`source="..."` label); otherwise leave matched_skill null.',
+    );
+  }
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
   if (parts.repoMap && parts.repoMap.trim().length > 0) {
     userSections.push(`## Repo skeleton\n${wrapUntrusted('repo-map', parts.repoMap)}`);
@@ -129,6 +141,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   const assembly: PromptAssembly = {
     system,
     skills: skillsBlock ?? null,
+    skills_tokens: skillsTokens ?? null,
     memory: memoryBlock ?? null,
     specs: specsBlock ?? null,
     callers: parts.callers ?? null,

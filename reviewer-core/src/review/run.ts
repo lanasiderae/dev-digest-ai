@@ -9,6 +9,7 @@ import type {
 import { Review as ReviewSchema } from '@devdigest/shared';
 import { assemblePrompt } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
+import { sanitizeMatchedSkills } from '../skill-attribution.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
 
 /**
@@ -54,6 +55,13 @@ export interface ReviewInput {
   strategy?: ReviewStrategy;
   /** Resolved skill bodies (NOT slugs). */
   skills?: string[];
+  /**
+   * Plain names of the skills resolved into `skills` above — used only to
+   * sanitize a model-reported `matched_skill` (never put into the prompt
+   * itself; the names already appear there via each skill's `wrapUntrusted`
+   * `source="..."` label).
+   */
+  skillNames?: string[];
   /** Curated memory items. */
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */
@@ -201,11 +209,16 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   }
   emit('result', `Citation grounding: ${grounding}`);
 
+  // Hygiene, not a grounding decision: clear a matched_skill the model
+  // invented for a skill that wasn't actually linked/enabled this run. Every
+  // finding is kept either way.
+  const kept = sanitizeMatchedSkills(ground.kept, input.skillNames ?? []);
+
   // Score is derived from the findings that SURVIVED grounding (not the model's
   // self-reported number, and not the pre-grounding set) so the score, the
   // findings list, and the deterministic event always agree.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: { ...merged, findings: kept, score: scoreFromFindings(kept) },
     grounding,
     dropped: ground.dropped,
     mode,

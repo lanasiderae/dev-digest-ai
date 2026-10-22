@@ -10,6 +10,7 @@ import type {
 } from '@devdigest/shared';
 import { AgentsRepository } from './repository.js';
 import { toAgentDto, toAgentVersionDto } from './helpers.js';
+import { NotFoundError } from '../../platform/errors.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -57,12 +58,15 @@ export class AgentsService {
 
   async list(workspaceId: string): Promise<Agent[]> {
     const rows = await this.repo.list(workspaceId);
-    return rows.map(toAgentDto);
+    const counts = await this.repo.agentSkillCounts(rows.map((r) => r.id));
+    return rows.map((r) => ({ ...toAgentDto(r), skill_count: counts[r.id] ?? 0 }));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toAgentDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.agentSkillCounts([row.id]);
+    return { ...toAgentDto(row), skill_count: counts[row.id] ?? 0 };
   }
 
   /** Delete an agent (and its versions/skill-links, via cascade). */
@@ -152,6 +156,7 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
+    await this.assertSkillsInWorkspace(workspaceId, skillIds);
     await this.repo.setSkills(agentId, skillIds);
     return this.skillLinks(agentId);
   }
@@ -165,10 +170,23 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
+    await this.assertSkillsInWorkspace(workspaceId, [skillId]);
     const existing = await this.repo.linkedSkills(agentId);
     const resolvedOrder = order ?? existing.length;
     await this.repo.linkSkill(agentId, skillId, resolvedOrder);
     return this.skillLinks(agentId);
+  }
+
+  /**
+   * Guard against linking an agent to another workspace's skill id. Reads
+   * through container.skillsRepo (owned by the skills module) rather than
+   * duplicating skill ownership logic here.
+   */
+  private async assertSkillsInWorkspace(workspaceId: string, skillIds: string[]): Promise<void> {
+    for (const skillId of skillIds) {
+      const skill = await this.container.skillsRepo.getById(workspaceId, skillId);
+      if (!skill) throw new NotFoundError(`Skill ${skillId} not found`);
+    }
   }
 
   /**

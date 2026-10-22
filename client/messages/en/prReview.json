@@ -2,6 +2,7 @@
   "finding": {
     "accepted": "accepted",
     "dismissed": "dismissed",
+    "viaSkill": "via {skill}",
     "suggestedFix": "Suggested fix",
     "accept": "Accept",
     "dismiss": "Reject",

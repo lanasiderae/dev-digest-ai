@@ -1,0 +1,1 @@
+ALTER TABLE "conventions" ADD COLUMN "rejected" boolean DEFAULT false NOT NULL;

@@ -12,6 +12,11 @@ function encPath(file: string): string {
     .join("/");
 }
 
+/** https://github.com/{owner}/{repo} */
+export function githubRepoUrl(repoFullName: string): string {
+  return `${HOST}/${repoFullName}`;
+}
+
 /** https://github.com/{owner}/{repo}/pull/{number} */
 export function githubPrUrl(repoFullName: string, number: number): string {
   return `${HOST}/${repoFullName}/pull/${number}`;

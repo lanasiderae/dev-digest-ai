@@ -30,8 +30,8 @@ a full-file-kind finding needs its file to actually be part of this diff.
 single-pass or map-reduce mode — grounding is not duplicated per chunk and
 not skippable per strategy.
 
-**Never relax this to make a review "look right"** — per `server/CLAUDE.md`
-and `reviewer-core/CLAUDE.md`'s Do-not-touch sections, this is the
+**Never relax this to make a review "look right"** — per `server/AGENTS.md`
+and `reviewer-core/AGENTS.md`'s Do-not-touch sections, this is the
 product's core trustworthiness mechanism, not a tunable quality knob.
 
 ## 2. The prompt-injection guard (`src/prompt.ts`)
@@ -61,7 +61,7 @@ sequence already present in the wrapped content is escaped
 close-tag and smuggle itself out of the delimited block.
 
 **Never loosen this to make a test pass** — same standing as the grounding
-gate; see `reviewer-core/CLAUDE.md` Do not touch.
+gate; see `reviewer-core/AGENTS.md` Do not touch.
 
 ## What this spec does not cover
 

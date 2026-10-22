@@ -2,21 +2,34 @@
 
 ## Open Questions
 
-- **2026-09-29** — `client/CLAUDE.md` documents its `pnpm-workspace.yaml` as
+- **2026-09-29** — `client/AGENTS.md` documents its `pnpm-workspace.yaml` as
   just a `pnpm.allowBuilds` allowlist (not a real workspace); `server/`'s
   `pnpm-workspace.yaml` has the same pattern (`allowBuilds` for
-  `cpu-features`, `esbuild`, `protobufjs`, `ssh2`) but `server/CLAUDE.md`'s
-  Gotchas section has no equivalent note → should `server/CLAUDE.md` gain the
+  `cpu-features`, `esbuild`, `protobufjs`, `ssh2`) but `server/AGENTS.md`'s
+  Gotchas section has no equivalent note → should `server/AGENTS.md` gain the
   same clarifying line, so the file isn't mistaken for stray monorepo config?
-  Evidence: `server/pnpm-workspace.yaml`, `client/CLAUDE.md` Gotchas section.
+  Evidence: `server/pnpm-workspace.yaml`, `client/AGENTS.md` Gotchas section.
 - **2026-10-20** — Precise evidence for the entry above:
   `server/pnpm-workspace.yaml:1-5` (the `allowBuilds` list); the existing
-  clarifying note is `client/CLAUDE.md:41-43`.
+  clarifying note is `client/AGENTS.md:41-43`.
+- **2026-10-22** — `server/src/adapters/mocks.ts`'s `MockLLMOptions.structuredBySchema`
+  doc comment anticipates a "conventions 2-step dialogue: 'ConventionFileSelection'
+  then 'ConventionExtraction'" — but no code anywhere implements a
+  `ConventionFileSelection` call (confirmed: that string appears nowhere else
+  in the repo). The conventions module built in this session uses
+  **code-based** sample selection (config files + `repoIntel.getConventionSamples`,
+  no LLM) and a **single** structured-output call named `'ConventionExtraction'`,
+  per the course's own explicit spec for the feature. Worth resolving: should
+  that mock comment be updated/removed so it stops implying a 2-step design,
+  or was a 2-step flow actually intended for a later lesson? Evidence:
+  `server/src/adapters/mocks.ts` (`MockLLMOptions.structuredBySchema` doc
+  comment), `server/src/modules/conventions/service.ts`,
+  `server/src/modules/conventions/constants.ts` (`EXTRACTION_SCHEMA_NAME`).
 
 ## Codebase Patterns
 
 - **2026-09-29** — Not every GET route's response is Zod-validated despite
-  `server/CLAUDE.md`'s "schema-first... one definition drives both request
+  `server/AGENTS.md`'s "schema-first... one definition drives both request
   validation and response serialization" convention: `/repos/:id/pulls`,
   `/pulls/:id/runs`, `/pulls/:id/reviews`, and `/runs/:id/trace` only declare
   `schema: { params: IdParams }` — no `response` schema — so their handlers'
@@ -51,7 +64,7 @@
   `server/src/modules/index.ts:24-33`, with the "ADD A MODULE" procedure
   (and why registration is static, not autoloaded) at
   `server/src/modules/index.ts:15-18`; the same vocabulary is stated as a
-  repo-wide naming convention at `CLAUDE.md:99-103`.
+  repo-wide naming convention at `AGENTS.md:99-103`.
 - **2026-10-21** — `GET /repos/:id/pulls` derives its three review columns
   from ONE newest-first `reviews` query but applies three different "which
   reviews count" rules, which is easy to break by reusing the wrong map:
@@ -76,3 +89,57 @@
   `.github/workflows/server-integration.yml:65`, vs.
   `.github/workflows/client.yml:49`,
   `.github/workflows/reviewer-core.yml:49`.
+- **2026-10-22** — Root `CLAUDE.md`'s "Tests: co-located `*.test.ts(x)` next
+  to the file under test" convention does NOT hold for `server/` in
+  practice: every server test (unit and `.it.test.ts`) lives under
+  `server/test/<feature>-<aspect>.test.ts`, never beside the module it
+  covers — `find server/src/modules -name "*.test.ts"` returns nothing,
+  while `server/test/` has ~28 files. `client/` and `reviewer-core/` DO
+  colocate. A new server module's tests belong in `server/test/`, following
+  that directory's `<feature>-<aspect>` naming, not next to
+  `routes.ts`/`service.ts`. Evidence: `server/test/skills-crud.it.test.ts`,
+  `server/test/repo-intel-resync.test.ts`,
+  `server/test/conventions-extract.test.ts`.
+- **2026-10-21** — `container.agentsRepo`-style DI overrides work for a
+  single plain function too, not just a class adapter: `skillsUrlFetch`
+  (SSRF-guarded URL fetch for skill import) is one function on
+  `ContainerOverrides`, defaulting to the real implementation in a method on
+  `Container`, with no adapter interface/class needed. This made it testable
+  (integration tests inject a stub returning fixed content) without a real
+  network/DNS round trip, for a feature with exactly one implementation and
+  one call site — reach for this before building a full adapter class.
+  Evidence: `server/src/platform/container.ts` (`ContainerOverrides.skillsUrlFetch`,
+  `Container.skillsUrlFetch`), `server/src/modules/skills/service.ts`
+  (`importFromUrl`), `server/test/skills-import.it.test.ts`.
+
+## Tool & Library Notes
+
+- **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
+  bodyLimit })`) does NOT automatically raise the ceiling for a route that
+  needs a larger body (e.g. a file-upload endpoint) — set a per-route
+  `bodyLimit` and/or `@fastify/multipart`'s own `limits.fileSize` on that
+  route/plugin registration instead of raising the global default for every
+  route. Evidence: `server/src/app.ts` (`bodyLimit: 1_048_576` on the
+  Fastify instance), `server/src/modules/skills/routes.ts` (`@fastify/multipart`
+  registered with its own `limits.fileSize`).
+- **2026-10-21** — `yauzl` validates each entry's `fileName` itself (rejects
+  zip-slip/absolute paths) during `eachEntry()` iteration, BEFORE any
+  app-level path-safety check gets a chance to run — don't assume your own
+  check is the first line of defense, and wrap whatever `eachEntry()` throws
+  into your own error type so an unsafe archive maps to a clean 4xx instead
+  of an uncaught 500. Evidence: `server/src/modules/skills/import/archive.ts`
+  (`isPathSafe` is redundant-but-kept defense-in-depth; the actual rejection
+  for a zip-slip fixture comes from yauzl itself — see the "rejects a
+  zip-slip path" test in `server/test/skills-import-archive.test.ts`, which
+  has to build its malicious fixture by patching raw bytes because `yazl`,
+  yauzl's sibling writer, also refuses to write an unsafe path).
+- **2026-10-21** — `yauzl`'s `eachEntry()` yields each zip entry's declared
+  `uncompressedSize` and `externalFileAttributes` (Unix mode bits, only
+  meaningful when `entry.versionMadeBy >>> 8 === 3`) from central-directory
+  metadata BEFORE you call `openReadStreamPromise` — this is what makes
+  "reject an oversized or executable entry without ever inflating it"
+  possible (zip-bomb defense). Prefer the promise-based API
+  (`yauzl.fromBufferPromise`, `zipfile.eachEntry()` as an async iterator,
+  `zipfile.openReadStreamPromise`) over the callback API shown in most
+  yauzl examples — much less boilerplate. Evidence:
+  `server/src/modules/skills/import/archive.ts`.

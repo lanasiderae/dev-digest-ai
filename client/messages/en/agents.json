@@ -89,9 +89,20 @@
   },
   "skills": {
     "title": "Skills",
-    "enabledCount": "{linked} of {total} enabled",
+    "enabledCount": "{linked} of {total} linked skills are enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach, drag to reorder."
+  },
+  "skillsTab": {
+    "attach": "Attach",
+    "detach": "Detach",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "noMatch": "No skills match your filter.",
+    "empty": "No skills yet — create or import one on the Skills page first.",
+    "goToSkills": "Go to Skills",
+    "linkedDisabledBadge": "linked, disabled",
+    "loadError": "Could not load skills for this agent."
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

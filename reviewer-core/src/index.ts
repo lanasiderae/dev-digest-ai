@@ -22,6 +22,9 @@ export {
 // Citation grounding — the mandatory mechanical gate for diff findings.
 export { groundFindings, groundingSummary, type GroundingResult } from './grounding.js';
 
+// Skill-attribution hygiene (NOT a grounding gate — see file header).
+export { sanitizeMatchedSkills } from './skill-attribution.js';
+
 // Structured-output helpers (Zod → JSON Schema + parse-with-repair).
 export {
   toJsonSchema,

@@ -6,7 +6,7 @@
 "use client";
 
 import React from "react";
-import { Icon, Badge, SeverityBadge } from "@devdigest/ui";
+import { Icon, Badge, SeverityBadge, ConfirmModal } from "@devdigest/ui";
 import type { ReviewRecord, Verdict } from "@devdigest/shared";
 import { formatCost } from "@/lib/format-cost";
 import { SEVERITY_ORDER, severityCounts } from "@/lib/severity";
@@ -51,9 +51,9 @@ export function ReviewRunAccordion({
       setOpen(true);
       rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetRunId, targetNonce, review.run_id]);
   const del = useDeleteReview(prId);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
   const findings = review.findings;
   const counts = severityCounts(findings);
   const verdictColor = review.verdict ? VERDICT_COLOR[review.verdict] ?? "var(--text-muted)" : "var(--text-muted)";
@@ -115,9 +115,7 @@ export function ReviewRunAccordion({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (window.confirm(`Delete this "${review.agent_name ?? "agent"}" review run and its findings?`)) {
-              del.mutate(review.id);
-            }
+            setConfirmDelete(true);
           }}
           disabled={del.isPending}
           title="Delete this review run"
@@ -159,6 +157,19 @@ export function ReviewRunAccordion({
             headSha={headSha}
           />
         </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title="Delete this review run?"
+          body={`This "${review.agent_name ?? "agent"}" run and its findings will be removed. This cannot be undone.`}
+          pending={del.isPending}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            del.mutate(review.id);
+            setConfirmDelete(false);
+          }}
+        />
       )}
     </div>
   );

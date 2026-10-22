@@ -1,6 +1,6 @@
 // Flat ESLint config (ESLint 9+). Requires `eslint` + `typescript-eslint` as
 // devDependencies — not committed here (e2e/package.json is git
-// skip-worktree; see e2e/CLAUDE.md), so install them locally first:
+// skip-worktree; see e2e/AGENTS.md), so install them locally first:
 // `pnpm add -D eslint typescript-eslint`.
 import tseslint from "typescript-eslint";
 

@@ -39,4 +39,8 @@ export const conventions = pgTable('conventions', {
   evidenceSnippet: text('evidence_snippet'),
   confidence: doublePrecision('confidence'),
   accepted: boolean('accepted').notNull().default(false),
+  // Explicit third state, distinct from "not yet reviewed" (accepted=false,
+  // rejected=false): a user decision, same as accepted=true, so a re-scan
+  // preserves it instead of wiping it — see ConventionsRepository.replacePending.
+  rejected: boolean('rejected').notNull().default(false),
 });

@@ -11,7 +11,10 @@ for that). Keep this in sync when a route's data dependency changes.
 | `/repos/:repoId/pulls` | `PullsPage` (PR list) | `usePulls(repoId)` — see `server/src/modules/pulls/routes.ts`'s `GET /repos/:id/pulls` contract. The three review-derived columns each have their own scope: `score` is the single latest review's, `findings_by_severity`/`findings_by_agent` sum each AGENT's latest review, and `cost` sums every successful run ever — see `server/specs/review-flow.md`. |
 | `/repos/:repoId/pulls/:number` | `PRDetailPage` | Resolves `:number` → the PR's internal uuid via the (cached) `usePulls(repoId)` list first (every other PR API is keyed by that uuid, not the GitHub number), then `usePullDetail(prId)`, `usePrReviews(prId)`, `usePrActiveRuns(prId)`, `usePrRuns(prId)`. Tab state (`?tab=`) and the trace drawer (`?trace=`) both live in the URL query string. |
 | `/agents` | `AgentsListView` | `useAgents()`. |
-| `/agents/:id` | Agent editor | `useAgents()` (left list) + `useAgent(id)` (detail); tab state in `?tab=` (currently only `config` is valid). |
+| `/agents/:id` | Agent editor | `useAgents()` (left list) + `useAgent(id)` (detail); tab state in `?tab=` (`config` or `skills`). The Skills tab additionally uses `useSkills()` + `useAgentSkills(id)`/`useSetAgentSkills()`. |
+| `/skills` | `SkillsListView` | `useSkills()`. |
+| `/skills/:id` | Skill detail/editor | `useSkills()` (left list) + `useSkill(id)` (detail); version history via `useSkillVersions(id)` (`GET /skills/:id/versions`), not fetched on this page today. |
+| `/repos/:repoId/conventions` | `ConventionsView` | `useConventions(repoId)` (`GET /repos/:id/conventions`); `useExtractConventions(repoId)` (`POST /repos/:id/conventions/extract` — synchronous, the response IS the fresh candidate list) drives the scan button; `useUpdateConvention(repoId)` (`PATCH /conventions/:id`) drives accept/reject. "Create skill" opens the shared `CreateSkillModal` (from `/skills`) prefilled by combining every accepted candidate via `useCreateSkill()`. |
 | `/settings/:section` | `SettingsView` | Section-specific; see `_components/SettingsView` for the panel-to-section mapping. |
 
 ## Contracts that span routes

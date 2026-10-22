@@ -24,6 +24,8 @@ import { estimateCost } from '../adapters/llm/pricing.js';
 import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
+import { SkillsRepository } from '../modules/skills/repository.js';
+import { fetchSkillUrl, type UrlImportResult } from '../modules/skills/import/url.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -51,6 +53,9 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Skill URL-import fetcher — tests inject a stub to avoid a real network/DNS
+   *  round trip; production uses the real SSRF-guarded `fetchSkillUrl`. */
+  skillsUrlFetch?: (url: string) => Promise<UrlImportResult>;
 }
 
 export class Container {
@@ -71,6 +76,7 @@ export class Container {
   // runs). Constructed here, in the composition root, so consuming modules use
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
+  private _skillsRepo?: SkillsRepository;
   private _reviewRepo?: ReviewRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
@@ -94,6 +100,15 @@ export class Container {
 
   get agentsRepo(): AgentsRepository {
     return (this._agentsRepo ??= new AgentsRepository(this.db));
+  }
+
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new SkillsRepository(this.db));
+  }
+
+  /** Resolve a skill-import URL (SSRF-guarded fetch by default, overridable in tests). */
+  skillsUrlFetch(url: string): Promise<UrlImportResult> {
+    return (this.overrides.skillsUrlFetch ?? fetchSkillUrl)(url);
   }
 
   get reviewRepo(): ReviewRepository {

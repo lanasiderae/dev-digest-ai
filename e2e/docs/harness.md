@@ -1,7 +1,7 @@
 # e2e harness architecture
 
 How the flow-based runner actually works. Deeper than `e2e/README.md` (a
-how-to-run guide) and `e2e/CLAUDE.md` (a short agent brief). Not to be
+how-to-run guide) and `e2e/AGENTS.md` (a short agent brief). Not to be
 confused with `e2e/specs/` — that folder holds the executable `*.flow.json`
 flow specs themselves (the "what"); this explains the runner that executes
 them (the "how").
@@ -50,7 +50,7 @@ flow's remaining steps — it does **not** abort the whole run; every
 subsequent flow file still executes (see `e2e/INSIGHTS.md`). This ordering
 is load-bearing, not cosmetic: flows `02`/`04`/`05` assume the seeded demo
 repo (`acme/payments-api`) is the first/only repo in the list (per
-`e2e/CLAUDE.md`'s Gotchas), which only holds if nothing earlier in the
+`e2e/AGENTS.md`'s Gotchas), which only holds if nothing earlier in the
 lexical sequence added another repo. Running a single flow file in
 isolation, or against a dev DB with other imported repos, can fail for
 reasons that have nothing to do with the flow itself — prefer the hermetic
@@ -62,7 +62,7 @@ Postgres every run, specifically to make this ordering assumption safe.
 Locators in a flow are deterministic only — `--url`, `--text`,
 `find role|text|label` — never `agent-browser`'s AI-driven `chat` command,
 which would break the no-LLM/no-API-key/determinism guarantee this whole
-suite exists to provide (`e2e/CLAUDE.md` Conventions). Flows also target
+suite exists to provide (`e2e/AGENTS.md` Conventions). Flows also target
 read-only seeded data (`acme/payments-api`, PR #482, the seeded agents) —
 nothing in `e2e/specs/` should trigger a real model call.
 
@@ -70,7 +70,7 @@ nothing in `e2e/specs/` should trigger a real model call.
 
 On a step failure, the runner best-effort captures a screenshot to
 `e2e/test-results/<flow-id>-fail.png` before moving on (git-ignored locally,
-uploaded as a CI artifact by `e2e-web.yml` — see `e2e/CLAUDE.md` Gotchas).
+uploaded as a CI artifact by `e2e-web.yml` — see `e2e/AGENTS.md` Gotchas).
 The screenshot capture itself is wrapped in `.catch(() => {})` — a failed
 screenshot attempt must never mask the original step failure it was trying
 to document.

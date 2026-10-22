@@ -8,15 +8,18 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 |-------|-------|-------------|
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Dependency direction and layer placement inside server/src/modules/<name>/: domain vs. application vs. infrastructure, repository interfaces, Drizzle/Zod boundary placement |
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
 | [next-best-practices](next-best-practices/SKILL.md) | Frontend | Next.js App Router, RSC boundaries, data fetching, optimization |
 | [react-best-practices](react-best-practices/SKILL.md) | Frontend | React anti-patterns, state management, hooks rules |
+| [frontend-ui-architecture](frontend-ui-architecture/SKILL.md) | Frontend | Code architecture: folder structure, colocation vs centralization, business-logic layering, naming |
 | [react-testing-library](react-testing-library/SKILL.md) | Frontend | General-purpose React Testing Library guide with Vitest |
 | [zod](zod/SKILL.md) | Full-stack | Zod schema validation, parsing, error handling, type inference |
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Capture session findings/patterns/decisions into the touched package's INSIGHTS.md |
+| [pr-self-review](pr-self-review/SKILL.md) | Workflow (Skill Dispatcher) | Pre-PR gate: matches changed files against this catalog, runs the matched skills, blocks the PR on any CRITICAL finding |
 
 ## What Are Skills?
 

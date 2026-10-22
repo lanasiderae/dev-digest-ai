@@ -12,7 +12,7 @@ architecture.md` for the latter.
 (`modules/reviews/routes.ts`). Review triggering is **manual only** — no
 code path auto-triggers a review on PR import or poll (`POST
 /repos/:id/poll` explicitly returns `reviewTriggered: false`, see root
-`CLAUDE.md`/`INSIGHTS.md`).
+`AGENTS.md`/`INSIGHTS.md`).
 
 ## Contract: the response returns before the review finishes
 
@@ -76,7 +76,7 @@ computes it on read from `{model, tokensIn, tokensOut, status}` via
   unpriced. A "no data" cost must never be displayed as "free".
 - `GET /repos/:id/pulls`' list `cost` field is the **sum** of
   `computeRunCost` over every successful run behind every review ever run
-  on that PR (not just the latest — see `server/CLAUDE.md`/root
+  on that PR (not just the latest — see `server/AGENTS.md`/root
   `INSIGHTS.md`'s commit-d45ab0d note); a PR with no successful run returns
   `cost: null`.
 - `GET /pulls/:id/reviews` and the Trace drawer's Stats both compute cost
@@ -105,7 +105,7 @@ reviews count:
 ## Contract: the grounding gate is structural, not advisory
 
 `REPO_INTEL_ENABLED`, the grounding gate, and the prompt-injection guard are
-safety/quality mechanisms, not optional flags (`server/CLAUDE.md`). A
+safety/quality mechanisms, not optional flags (`server/AGENTS.md`). A
 finding that fails grounding is **dropped**, not flagged-but-kept — the
 `dropped` list exists only for the trace/logs ("never go silent" — see
 `reviewer-core/specs/review-engine.md` for the exact grounding rule). Score

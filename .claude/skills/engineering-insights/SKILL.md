@@ -111,9 +111,9 @@ session summary.
 2. Assign each candidate to its target `INSIGHTS.md`.
 3. For each target with candidates, read:
    - the complete target `INSIGHTS.md`, if it exists;
-   - that package's `CLAUDE.md`;
+   - that package's `AGENTS.md`;
    - relevant package docs.
-   For root candidates, read relevant root `CLAUDE.md`, `README.md`, and
+   For root candidates, read relevant root `AGENTS.md`, `README.md`, and
    repo-wide docs.
 4. Drop candidates that fail qualification or are already documented.
 5. If nothing survives, make no changes and report that nothing qualified.

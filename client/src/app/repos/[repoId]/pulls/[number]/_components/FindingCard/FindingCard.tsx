@@ -63,6 +63,9 @@ export function FindingCard({
             <CategoryTag category={f.category as Category} />
             {accepted && <span style={s.acceptedTag}>{t("finding.accepted")}</span>}
             {dismissed && <span style={s.dismissedTag}>{t("finding.dismissed")}</span>}
+            {f.matched_skill && (
+              <span style={s.skillTag}>{t("finding.viaSkill", { skill: f.matched_skill })}</span>
+            )}
           </div>
           <div style={s.metaRow}>
             <MonoLink href={fileHref}>

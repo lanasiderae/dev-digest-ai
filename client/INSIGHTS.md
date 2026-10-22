@@ -1,5 +1,19 @@
 # INSIGHTS.md
 
+## What Works
+
+- **2026-10-22** — To reuse a create-form modal across two different entry
+  points with different prefilled content (e.g. a blank "+ Add Skill" create
+  vs. the Conventions page's "Create skill from accepted candidates"), add
+  one optional `initial` prop that seeds the form's `useState` initializers
+  and gets passed through on submit, rather than building a second modal
+  component or forking the form logic. The modal defaults to today's blank
+  behavior when `initial` is omitted, so the original call site needs no
+  changes. Evidence: `client/src/app/skills/_components/SkillsListView/_components/CreateSkillModal/CreateSkillModal.tsx`
+  (`initial?: { name?, description?, type?, body?, source?, evidenceFiles? }`),
+  used blank from `SkillsListView.tsx` and prefilled from
+  `client/src/app/repos/[repoId]/conventions/_components/ConventionsView/ConventionsView.tsx`.
+
 ## What Doesn't Work
 
 - **2026-09-29** — Don't format LLM run cost with a flat `.toFixed(2)`: the
@@ -36,3 +50,27 @@
   instead. Evidence:
   `client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:102`,
   `client/src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsCell.tsx:27`.
+
+## Tool & Library Notes
+
+- **2026-10-21** — RTL's `getByDisplayValue` is unreliable for a controlled
+  `<textarea>` whose value contains a newline in this setup (it reported
+  "unable to find" even though the textarea visibly held the exact text) —
+  use `container.querySelector('textarea')` + `expect(...).toHaveValue(...)`
+  instead of `getByDisplayValue` whenever the value is multiline. Evidence:
+  `client/src/app/skills/[id]/_components/SkillDetailPanel/SkillDetailPanel.test.tsx`
+  (the working `container.querySelector("textarea")` form, after
+  `getByDisplayValue("# Rule\nFlag secrets.")` failed to find the same
+  element).
+
+## Recurring Errors & Fixes
+
+- **2026-10-21** — A component test fails with `Error: invariant expected
+  app router to be mounted` the moment the component under test (or a child
+  it renders) calls `next/navigation`'s `useRouter()` — add
+  `vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(),
+  replace: vi.fn() }) }))` to that test file. Easy to miss when copying a
+  sibling component's test as a template if the sibling happens not to call
+  `useRouter` (e.g. `ConfigTab` doesn't, but a new tab added alongside it
+  that links elsewhere will). Evidence:
+  `client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/SkillsTab.test.tsx`.
