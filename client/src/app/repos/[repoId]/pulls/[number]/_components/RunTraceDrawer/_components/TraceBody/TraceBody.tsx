@@ -4,7 +4,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge } from "@devdigest/ui";
+import { Badge, LiveLogStream, type LogLine } from "@devdigest/ui";
 import type { RunTrace, FindingRecord } from "@devdigest/shared";
 import { formatCost } from "@/lib/format-cost";
 import { PROMPT_COLORS } from "../../constants";
@@ -74,7 +74,12 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
       <TraceSection icon="FileText" title={t("trace.promptAssembly")} defaultOpen={false}>
         <PromptBlock label={t("trace.prompt.system")} text={trace.prompt_assembly.system} color={PROMPT_COLORS.system} />
         {trace.prompt_assembly.skills != null && (
-          <PromptBlock label={t("trace.prompt.skills")} text={trace.prompt_assembly.skills} color={PROMPT_COLORS.skills} />
+          <PromptBlock
+            label={t("trace.prompt.skills")}
+            text={trace.prompt_assembly.skills}
+            color={PROMPT_COLORS.skills}
+            tokens={trace.prompt_assembly.skills_tokens}
+          />
         )}
         {trace.prompt_assembly.memory != null && (
           <PromptBlock label={t("trace.prompt.memory")} text={trace.prompt_assembly.memory} color={PROMPT_COLORS.memory} />
@@ -101,6 +106,13 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
         ) : (
           trace.tool_calls.map((tc, i) => <ToolCallRow key={i} tc={tc} />)
         )}
+      </TraceSection>
+
+      <TraceSection icon="Activity" title={t("trace.runLog")}>
+        <LiveLogStream
+          log={trace.log.map((l): LogLine => ({ t: l.t, k: l.kind, m: l.msg }))}
+          height={260}
+        />
       </TraceSection>
 
       <TraceSection icon="Code" title={t("trace.rawOutput")} defaultOpen={false}>

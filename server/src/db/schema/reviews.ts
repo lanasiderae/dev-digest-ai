@@ -41,6 +41,7 @@ export const findings = pgTable('findings', {
   confidence: doublePrecision('confidence').notNull(),
   kind: text('kind').notNull().default('finding'),
   trifectaComponents: jsonb('trifecta_components').$type<string[]>(),
+  matchedSkill: text('matched_skill'),
   acceptedAt: timestamp('accepted_at', { withTimezone: true }),
   dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
 });

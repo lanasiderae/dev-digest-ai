@@ -1,5 +1,19 @@
 # INSIGHTS.md
 
+## What Works
+
+- **2026-10-22** — To reuse a create-form modal across two different entry
+  points with different prefilled content (e.g. a blank "+ Add Skill" create
+  vs. the Conventions page's "Create skill from accepted candidates"), add
+  one optional `initial` prop that seeds the form's `useState` initializers
+  and gets passed through on submit, rather than building a second modal
+  component or forking the form logic. The modal defaults to today's blank
+  behavior when `initial` is omitted, so the original call site needs no
+  changes. Evidence: `client/src/app/skills/_components/SkillsListView/_components/CreateSkillModal/CreateSkillModal.tsx`
+  (`initial?: { name?, description?, type?, body?, source?, evidenceFiles? }`),
+  used blank from `SkillsListView.tsx` and prefilled from
+  `client/src/app/repos/[repoId]/conventions/_components/ConventionsView/ConventionsView.tsx`.
+
 ## What Doesn't Work
 
 - **2026-09-29** — Don't format LLM run cost with a flat `.toFixed(2)`: the

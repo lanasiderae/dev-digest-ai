@@ -36,6 +36,7 @@ const CreateSkillBody = z.object({
   body: z.string().min(1),
   source: z.enum(['manual', 'imported_url', 'extracted', 'community']).optional(),
   enabled: z.boolean().optional(),
+  evidence_files: z.array(z.string()).optional(),
 });
 
 const UpdateSkillBody = z.object({

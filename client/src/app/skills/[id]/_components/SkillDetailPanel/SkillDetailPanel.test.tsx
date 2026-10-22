@@ -51,6 +51,36 @@ describe("SkillDetailPanel", () => {
     expect(screen.queryByText(/untrusted source/i)).not.toBeInTheDocument();
   });
 
+  it("does not show the untrusted notice for a non-manual skill once vetted and enabled", () => {
+    renderWithProviders({ ...SKILL, source: "imported_url", enabled: true });
+    expect(screen.queryByText(/untrusted source/i)).not.toBeInTheDocument();
+  });
+
+  it("flipping Enabled on the Config tab persists immediately and clears the notice, without Save", async () => {
+    const disabledImported: Skill = { ...SKILL, source: "imported_url", enabled: false };
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ...disabledImported, enabled: true }), { status: 200 }),
+    );
+    renderWithProviders(disabledImported);
+
+    expect(screen.getByText(/untrusted source/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Config" }));
+    fireEvent.click(screen.getByRole("switch"));
+
+    // Notice clears immediately from the local toggle — no Save click involved.
+    expect(screen.queryByText(/untrusted source/i)).not.toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`/skills/${SKILL.id}`),
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
+    const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body).toEqual({ enabled: true });
+  });
+
   it("defaults to the Preview tab and switches to Config on click", () => {
     const { container } = renderWithProviders();
     expect(screen.getByText("Flag secrets.")).toBeInTheDocument();

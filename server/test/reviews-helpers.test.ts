@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { taskLine, computeRunCost } from '../src/modules/reviews/helpers.js';
+import { taskLine, computeRunCost, findingRowToDto } from '../src/modules/reviews/helpers.js';
+import type { FindingRow } from '../src/db/rows.js';
 
 /**
  * Unit coverage for the review task-line. The key invariant: our trusted
@@ -52,5 +53,39 @@ describe('computeRunCost', () => {
 
   it('passes through a null estimate (e.g. unknown model) unchanged', () => {
     expect(computeRunCost(nullEstimate, { status: 'done', model: 'unknown-model', tokensIn: 100, tokensOut: 50 })).toBeNull();
+  });
+});
+
+/**
+ * Unit coverage for the DB row → API DTO mapping's matched_skill field — the
+ * model-reported, sanitizeMatchedSkills()-checked skill attribution must
+ * survive the round trip through the `findings` table unchanged.
+ */
+describe('findingRowToDto', () => {
+  const ROW: FindingRow = {
+    id: 'f1',
+    reviewId: 'r1',
+    file: 'src/config.ts',
+    startLine: 11,
+    endLine: 11,
+    severity: 'CRITICAL',
+    category: 'security',
+    title: 'Hardcoded Stripe secret key',
+    rationale: 'sk_live in diff',
+    suggestion: null,
+    confidence: 0.95,
+    kind: 'finding',
+    trifectaComponents: null,
+    matchedSkill: 'secret-leakage-gate',
+    acceptedAt: null,
+    dismissedAt: null,
+  };
+
+  it('maps a persisted matched_skill through to the DTO', () => {
+    expect(findingRowToDto(ROW).matched_skill).toBe('secret-leakage-gate');
+  });
+
+  it('maps a null matched_skill to null, not undefined', () => {
+    expect(findingRowToDto({ ...ROW, matchedSkill: null }).matched_skill).toBeNull();
   });
 });

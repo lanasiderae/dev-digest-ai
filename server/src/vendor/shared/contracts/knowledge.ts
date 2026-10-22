@@ -163,6 +163,9 @@ export const ConventionCandidate = z.object({
   evidence_snippet: z.string(),
   confidence: z.number().min(0).max(1),
   accepted: z.boolean(),
+  // Explicit third state, distinct from "not yet reviewed": a user decision
+  // that survives a re-scan the same way `accepted` does.
+  rejected: z.boolean(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
 

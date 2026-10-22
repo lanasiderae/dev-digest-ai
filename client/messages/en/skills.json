@@ -25,6 +25,7 @@
   "create": {
     "title": "Create skill",
     "subtitle": "A skill is reusable review guidance an agent follows — its description is what tells an agent when to use it.",
+    "subtitleFromConventions": "This skill is being created from the conventions you approved on the repo scan — edit its name, description, and body below before saving.",
     "cancel": "Cancel",
     "create": "Create skill",
     "creating": "Creating…",

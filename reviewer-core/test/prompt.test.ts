@@ -64,3 +64,19 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — skills_tokens (per-block count, not whole-prompt)', () => {
+  it('is null when there are no linked skills', () => {
+    const { assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF' });
+    expect(assembly.skills).toBeNull();
+    expect(assembly.skills_tokens).toBeNull();
+  });
+
+  it('is ceil(skills-block length / 4), counting only the joined skills block', () => {
+    const skills = ['<untrusted source="a">rule A</untrusted>', '<untrusted source="b">rule B</untrusted>'];
+    const { assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF', skills });
+    const joined = skills.join('\n\n');
+    expect(assembly.skills).toBe(joined);
+    expect(assembly.skills_tokens).toBe(Math.ceil(joined.length / 4));
+  });
+});

@@ -1,0 +1,1 @@
+ALTER TABLE "findings" ADD COLUMN "matched_skill" text;

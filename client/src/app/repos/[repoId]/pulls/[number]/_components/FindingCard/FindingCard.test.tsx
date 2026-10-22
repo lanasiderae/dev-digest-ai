@@ -57,4 +57,14 @@ describe("FindingCard (smoke, both themes)", () => {
     fireEvent.click(screen.getByText("Reject"));
     expect(onAction).toHaveBeenCalledWith("dismiss");
   });
+
+  it("shows a 'via <skill>' tag when matched_skill is set", () => {
+    renderWithIntl(<FindingCard f={{ ...FINDING, matched_skill: "secret-leakage-gate" }} />);
+    expect(screen.getByText("via secret-leakage-gate")).toBeInTheDocument();
+  });
+
+  it("omits the skill tag when matched_skill is null", () => {
+    renderWithIntl(<FindingCard f={FINDING} />);
+    expect(screen.queryByText(/^via /)).not.toBeInTheDocument();
+  });
 });

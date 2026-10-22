@@ -25,10 +25,24 @@ const DIFF = `diff --git a/src/config.ts b/src/config.ts
    redisUrl: x,`;
 
 const REVIEW_FIXTURE: Review = {
-  verdict: 'approve',
-  summary: 'Looks fine.',
-  score: 90,
-  findings: [],
+  verdict: 'request_changes',
+  summary: 'Hardcoded secret.',
+  score: 60,
+  findings: [
+    {
+      id: 'f1',
+      severity: 'CRITICAL',
+      category: 'security',
+      title: 'Hardcoded Stripe secret key',
+      file: 'src/config.ts',
+      start_line: 11,
+      end_line: 11,
+      rationale: 'sk_live in diff',
+      confidence: 0.95,
+      kind: 'finding',
+      matched_skill: 'secret-leakage-gate',
+    },
+  ],
 };
 
 /**
@@ -154,6 +168,19 @@ d('Review run resolves enabled linked skills into the prompt (Testcontainers pg)
     expect(trace.prompt_assembly.skills).toContain('secret-leakage-gate');
     expect(trace.prompt_assembly.skills).toContain('Flag any hardcoded API key or secret.');
     expect(trace.prompt_assembly.skills).not.toContain('UNVETTED CONTENT THAT MUST NEVER REACH THE PROMPT.');
+
+    // The persisted run log (surfaced in the trace drawer's "Run log"
+    // section, not just the live SSE stream) records how many skills were
+    // actually resolved into the prompt — only the one enabled skill counts.
+    expect(trace.log.some((l: { msg: string }) => l.msg === 'Skills: 1 skill(s) attached to prompt')).toBe(
+      true,
+    );
+
+    // The model-reported matched_skill, naming an actually-enabled linked
+    // skill, survives sanitizeMatchedSkills() and persists on the finding.
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr!.id}/reviews` })).json();
+    const finding = reviews[0].findings[0];
+    expect(finding.matched_skill).toBe('secret-leakage-gate');
 
     await app.close();
   });

@@ -111,6 +111,9 @@ export function useSetAgentSkills() {
       qc.invalidateQueries({ queryKey: ["agent-skills", agentId] });
       qc.invalidateQueries({ queryKey: ["agents"] });
       qc.invalidateQueries({ queryKey: ["agent", agentId] });
+      // Attaching/detaching changes every affected skill's agent_count — the
+      // skills list (and any skill detail read from it) must refetch too.
+      qc.invalidateQueries({ queryKey: ["skills"] });
     },
   });
 }

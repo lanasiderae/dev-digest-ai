@@ -87,11 +87,13 @@ export class ReviewRunExecutor {
           .catch(() => undefined);
         // Skill resolution doesn't depend on the diff, so it's still worth
         // reflecting in the trace even on a pre-diff-load failure.
-        const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(() => []);
+        const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
+          () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+        );
         await this.repo
           .saveRunTrace(
             runId,
-            this.traceFromBuffer(runId, pull, agent, '0/0 passed', 0, resolvedSkills),
+            this.traceFromBuffer(runId, pull, agent, '0/0 passed', 0, resolvedSkills.wrapped),
           )
           .catch(() => undefined);
         this.container.runBus.complete(runId);
@@ -160,7 +162,12 @@ export class ReviewRunExecutor {
 
     // Resolved OUTSIDE the try so it's available to the catch block's trace
     // too — skill resolution doesn't depend on anything that can fail below.
-    const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(() => []);
+    const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
+      () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+    );
+    if (resolvedSkills.names.length > 0) {
+      runLog.info(`Skills: ${resolvedSkills.names.length} skill(s) attached to prompt`);
+    }
 
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
@@ -213,7 +220,10 @@ export class ReviewRunExecutor {
         // Enabled, ordered linked-skill bodies — each already wrapUntrusted()
         // wrapped above (defense-in-depth; reviewer-core itself is untouched).
         // Omitted when the agent has no enabled linked skills.
-        ...(resolvedSkills.length ? { skills: resolvedSkills } : {}),
+        ...(resolvedSkills.wrapped.length ? { skills: resolvedSkills.wrapped } : {}),
+        // Plain skill names, for sanitizeMatchedSkills() to validate a
+        // model-reported matched_skill against — never put into the prompt.
+        ...(resolvedSkills.names.length ? { skillNames: resolvedSkills.names } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -324,7 +334,7 @@ export class ReviewRunExecutor {
       await this.repo
         .saveRunTrace(
           runId,
-          this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, resolvedSkills),
+          this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, resolvedSkills.wrapped),
         )
         .catch(() => undefined);
       this.container.runBus.complete(runId);
@@ -462,16 +472,24 @@ export class ReviewRunExecutor {
 
   /**
    * Resolve an agent's ENABLED, ORDERED linked skills into wrapUntrusted()-
-   * wrapped bodies for the prompt. Reads through `this.agents`
+   * wrapped bodies for the prompt, plus their plain names (for
+   * sanitizeMatchedSkills() downstream). Reads through `this.agents`
    * (container.agentsRepo, which already owns `agent_skills`) — this module
-   * never queries `agent_skills`/`skills` directly. Returns [] when there's
-   * nothing to add, so callers can follow the existing "omit when empty"
-   * contract used for callers/repoMap/prDescription.
+   * never queries `agent_skills`/`skills` directly. Returns empty arrays
+   * when there's nothing to add, so callers can follow the existing "omit
+   * when empty" contract used for callers/repoMap/prDescription.
    */
-  private async resolveAgentSkills(agentId: string): Promise<string[]> {
+  private async resolveAgentSkills(agentId: string): Promise<ResolvedSkills> {
     const links = await this.agents.linkedSkills(agentId);
-    return links
-      .filter((l) => l.skill.enabled)
-      .map((l) => wrapUntrusted(l.skill.name, l.skill.body));
+    const enabled = links.filter((l) => l.skill.enabled);
+    return {
+      wrapped: enabled.map((l) => wrapUntrusted(l.skill.name, l.skill.body)),
+      names: enabled.map((l) => l.skill.name),
+    };
   }
+}
+
+interface ResolvedSkills {
+  wrapped: string[];
+  names: string[];
 }

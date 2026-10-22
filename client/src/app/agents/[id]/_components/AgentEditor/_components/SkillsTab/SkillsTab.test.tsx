@@ -84,7 +84,7 @@ describe("SkillsTab", () => {
   it("shows enabledCount counting only linked skills whose own enabled flag is true", () => {
     renderWithIntl();
     // Linked: a, b, d. Of those, a and b are themselves enabled=true; d is not.
-    expect(screen.getByText("2 of 3 enabled")).toBeInTheDocument();
+    expect(screen.getByText("2 of 3 linked skills are enabled")).toBeInTheDocument();
   });
 
   it("attaching an unlinked skill appends it to the end of the ordered id list", () => {
@@ -124,5 +124,24 @@ describe("SkillsTab", () => {
     expect(screen.getAllByText("linked, disabled")).toHaveLength(1);
     const cRow = screen.getByText("skill-c").closest("div")!;
     expect(cRow).not.toHaveTextContent("linked, disabled");
+  });
+
+  it("a linked-but-disabled skill is not draggable, and its move buttons are no-ops", () => {
+    renderWithIntl();
+    // Row order: a, b, d (linked, in saved order), then c (unlinked). 'd' is
+    // linked AND disabled — it must stay inert until vetted, same as it's
+    // excluded from the prompt until enabled.
+    const dRow = screen.getByText("skill-d").closest("div")!;
+    expect(dRow).toHaveAttribute("draggable", "false");
+
+    const moveUpButtons = screen.getAllByRole("button", { name: "Move up" });
+    fireEvent.click(moveUpButtons[2]!); // 'd' is the 3rd row
+    expect(setSkillsMutate).not.toHaveBeenCalled();
+  });
+
+  it("a linked AND enabled skill stays draggable", () => {
+    renderWithIntl();
+    const bRow = screen.getByText("skill-b").closest("div")!;
+    expect(bRow).toHaveAttribute("draggable", "true");
   });
 });

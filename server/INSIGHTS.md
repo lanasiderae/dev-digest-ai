@@ -12,6 +12,19 @@
 - **2026-10-20** — Precise evidence for the entry above:
   `server/pnpm-workspace.yaml:1-5` (the `allowBuilds` list); the existing
   clarifying note is `client/AGENTS.md:41-43`.
+- **2026-10-22** — `server/src/adapters/mocks.ts`'s `MockLLMOptions.structuredBySchema`
+  doc comment anticipates a "conventions 2-step dialogue: 'ConventionFileSelection'
+  then 'ConventionExtraction'" — but no code anywhere implements a
+  `ConventionFileSelection` call (confirmed: that string appears nowhere else
+  in the repo). The conventions module built in this session uses
+  **code-based** sample selection (config files + `repoIntel.getConventionSamples`,
+  no LLM) and a **single** structured-output call named `'ConventionExtraction'`,
+  per the course's own explicit spec for the feature. Worth resolving: should
+  that mock comment be updated/removed so it stops implying a 2-step design,
+  or was a 2-step flow actually intended for a later lesson? Evidence:
+  `server/src/adapters/mocks.ts` (`MockLLMOptions.structuredBySchema` doc
+  comment), `server/src/modules/conventions/service.ts`,
+  `server/src/modules/conventions/constants.ts` (`EXTRACTION_SCHEMA_NAME`).
 
 ## Codebase Patterns
 
@@ -76,6 +89,17 @@
   `.github/workflows/server-integration.yml:65`, vs.
   `.github/workflows/client.yml:49`,
   `.github/workflows/reviewer-core.yml:49`.
+- **2026-10-22** — Root `CLAUDE.md`'s "Tests: co-located `*.test.ts(x)` next
+  to the file under test" convention does NOT hold for `server/` in
+  practice: every server test (unit and `.it.test.ts`) lives under
+  `server/test/<feature>-<aspect>.test.ts`, never beside the module it
+  covers — `find server/src/modules -name "*.test.ts"` returns nothing,
+  while `server/test/` has ~28 files. `client/` and `reviewer-core/` DO
+  colocate. A new server module's tests belong in `server/test/`, following
+  that directory's `<feature>-<aspect>` naming, not next to
+  `routes.ts`/`service.ts`. Evidence: `server/test/skills-crud.it.test.ts`,
+  `server/test/repo-intel-resync.test.ts`,
+  `server/test/conventions-extract.test.ts`.
 - **2026-10-21** — `container.agentsRepo`-style DI overrides work for a
   single plain function too, not just a class adapter: `skillsUrlFetch`
   (SSRF-guarded URL fetch for skill import) is one function on

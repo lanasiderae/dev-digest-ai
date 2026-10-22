@@ -37,8 +37,17 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const [enabled, setEnabled] = React.useState(skill.enabled);
 
   const typeOptions = TYPE_OPTIONS.map((v) => ({ value: v, label: t(`listItem.type.${v}`) }));
-  const untrusted = skill.source !== "manual";
+  const untrusted = skill.source !== "manual" && !enabled;
   const bodyChanged = body !== skill.body;
+
+  // Enabled toggles immediately — like the list-view toggle — rather than
+  // waiting on the rest of the draft form's explicit Save, since flipping a
+  // vetted skill on/off is a standalone action, not part of editing its
+  // content.
+  const toggleEnabled = (next: boolean) => {
+    setEnabled(next);
+    update.mutate({ id: skill.id, patch: { enabled: next } });
+  };
 
   const save = () =>
     update.mutate({
@@ -111,7 +120,7 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
               <h3 style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("preview.configTitle")}</h3>
               <label style={s.enabledLabel}>
                 {enabled ? t("preview.enabled") : t("preview.disabled")}
-                <Toggle on={enabled} onChange={setEnabled} size={16} />
+                <Toggle on={enabled} onChange={toggleEnabled} size={16} />
               </label>
             </div>
             <FormField label={t("create.fields.name")} required>

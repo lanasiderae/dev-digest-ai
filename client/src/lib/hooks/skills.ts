@@ -45,6 +45,7 @@ export interface CreateSkillInput {
   body: string;
   source?: SkillSource;
   enabled?: boolean;
+  evidence_files?: string[];
 }
 
 export function useCreateSkill() {
@@ -79,6 +80,9 @@ export function useDeleteSkill() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.removeQueries({ queryKey: ["skill", id] });
+      // Deleting a skill cascades its agent_skills links server-side —
+      // whichever agents had it linked need their skill_count refetched.
+      qc.invalidateQueries({ queryKey: ["agents"] });
     },
   });
 }

@@ -14,6 +14,7 @@ for that). Keep this in sync when a route's data dependency changes.
 | `/agents/:id` | Agent editor | `useAgents()` (left list) + `useAgent(id)` (detail); tab state in `?tab=` (`config` or `skills`). The Skills tab additionally uses `useSkills()` + `useAgentSkills(id)`/`useSetAgentSkills()`. |
 | `/skills` | `SkillsListView` | `useSkills()`. |
 | `/skills/:id` | Skill detail/editor | `useSkills()` (left list) + `useSkill(id)` (detail); version history via `useSkillVersions(id)` (`GET /skills/:id/versions`), not fetched on this page today. |
+| `/repos/:repoId/conventions` | `ConventionsView` | `useConventions(repoId)` (`GET /repos/:id/conventions`); `useExtractConventions(repoId)` (`POST /repos/:id/conventions/extract` — synchronous, the response IS the fresh candidate list) drives the scan button; `useUpdateConvention(repoId)` (`PATCH /conventions/:id`) drives accept/reject. "Create skill" opens the shared `CreateSkillModal` (from `/skills`) prefilled by combining every accepted candidate via `useCreateSkill()`. |
 | `/settings/:section` | `SettingsView` | Section-specific; see `_components/SettingsView` for the panel-to-section mapping. |
 
 ## Contracts that span routes

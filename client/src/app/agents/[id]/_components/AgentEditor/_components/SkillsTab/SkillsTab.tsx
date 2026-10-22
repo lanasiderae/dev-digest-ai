@@ -94,21 +94,26 @@ export function SkillsTab({ agent }: { agent: Agent }) {
 
       {filtered.map(({ skill, linked }) => {
         const idx = linkedIds.indexOf(skill.id);
+        // Only a linked AND enabled (vetted) skill may be drag-reordered —
+        // a linked-but-disabled skill shows the "needs vetting" badge below
+        // and must stay inert until it's vetted, same as it's excluded from
+        // the prompt until then.
+        const draggableRow = linked && skill.enabled;
         return (
           <div
             key={skill.id}
             style={s.row(dragId === skill.id)}
-            draggable={linked}
-            onDragStart={() => linked && setDragId(skill.id)}
-            onDragOver={(e) => linked && dragId && e.preventDefault()}
+            draggable={draggableRow}
+            onDragStart={() => draggableRow && setDragId(skill.id)}
+            onDragOver={(e) => draggableRow && dragId && e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              if (linked && dragId) apply(reorderLinkedId(linkedIds, dragId, skill.id));
+              if (draggableRow && dragId) apply(reorderLinkedId(linkedIds, dragId, skill.id));
               setDragId(null);
             }}
             onDragEnd={() => setDragId(null)}
           >
-            {linked ? (
+            {draggableRow ? (
               <Icon.GripVertical size={14} style={{ color: "var(--text-muted)", cursor: "grab" }} />
             ) : (
               <span style={{ width: 14 }} />
@@ -132,13 +137,13 @@ export function SkillsTab({ agent }: { agent: Agent }) {
                 icon="ArrowUp"
                 label={t("skillsTab.moveUp")}
                 size={22}
-                onClick={() => linked && apply(moveLinkedId(linkedIds, skill.id, "up"))}
+                onClick={() => draggableRow && apply(moveLinkedId(linkedIds, skill.id, "up"))}
               />
               <IconBtn
                 icon="ArrowDown"
                 label={t("skillsTab.moveDown")}
                 size={22}
-                onClick={() => linked && apply(moveLinkedId(linkedIds, skill.id, "down"))}
+                onClick={() => draggableRow && apply(moveLinkedId(linkedIds, skill.id, "down"))}
               />
             </div>
             {linked && <span className="tnum" style={{ fontSize: 11, color: "var(--text-muted)" }}>#{idx + 1}</span>}

@@ -47,6 +47,11 @@ export const s = {
     fontWeight: 600,
     color: "var(--text-muted)",
   } satisfies CSSProperties,
+  skillTag: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
   metaRow: {
     display: "flex",
     alignItems: "center",
