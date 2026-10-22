@@ -1,5 +1,6 @@
 import type { Skill, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
 import type { SkillRow, SkillVersionRow } from '../../db/rows.js';
+import { detectInjectionPatterns } from './injection-scan.js';
 
 /**
  * Pure helpers for the skills module — DB row ⇄ DTO mapping and the
@@ -18,6 +19,7 @@ export function toSkillDto(row: SkillRow): Skill {
     enabled: row.enabled,
     version: row.version,
     evidence_files: row.evidenceFiles ?? null,
+    injection_detected: detectInjectionPatterns(row.body).length > 0,
   };
 }
 

@@ -5,7 +5,7 @@
 "use client";
 
 import React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, EmptyState, ErrorState, Skeleton } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
@@ -27,6 +27,7 @@ export function ConventionsView() {
   const t = useTranslations("conventions");
   const params = useParams<{ repoId: string }>();
   const repoId = params.repoId;
+  const router = useRouter();
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
   const { data: candidates, isLoading, isError, error, refetch } = useConventions(repoId);
@@ -77,6 +78,7 @@ export function ConventionsView() {
           onCreated={(skillId) => {
             setCreatingSkill(false);
             void linkToDefaultAgent(skillId);
+            router.push(`/skills/${skillId}`);
           }}
           initial={buildSkillDraft(repoName, accepted)}
         />
@@ -103,15 +105,27 @@ export function ConventionsView() {
             {list.length > 0 ? t("page.candidateCount", { count: list.length }) : t("page.subtitle")}
           </p>
         </div>
-        <Button
-          kind="primary"
-          icon="RefreshCw"
-          loading={extract.isPending}
-          disabled={extract.isPending}
-          onClick={() => extract.mutate()}
-        >
-          {extract.isPending ? t("page.scanning") : list.length > 0 ? t("page.rescan") : t("page.runExtraction")}
-        </Button>
+        {list.length > 0 ? (
+          <Button
+            kind="primary"
+            icon="RefreshCw"
+            loading={extract.isPending}
+            disabled={extract.isPending}
+            onClick={() => extract.mutate()}
+          >
+            {extract.isPending ? t("page.scanning") : t("page.rescan")}
+          </Button>
+        ) : (
+          <Button
+            kind="primary"
+            icon="RefreshCw"
+            loading={extract.isPending}
+            disabled={extract.isPending}
+            onClick={() => extract.mutate()}
+          >
+            {extract.isPending ? t("page.scanning") : t("page.runExtraction")}
+          </Button>
+        )}
       </div>
 
       {extract.isError && (

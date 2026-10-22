@@ -108,7 +108,7 @@ d('Conventions CRUD + re-scan (Testcontainers pg)', () => {
     await app.close();
   });
 
-  it('a rejected candidate survives a GET after reload and is excluded from the accepted set', async () => {
+  it('a rejected candidate does not reappear in GET after a reload', async () => {
     const app = await makeApp();
     const [row] = await pg.handle.db
       .insert(t.conventions)
@@ -125,9 +125,7 @@ d('Conventions CRUD + re-scan (Testcontainers pg)', () => {
       .returning();
 
     const list = await app.inject({ method: 'GET', url: `/repos/${repoId}/conventions` });
-    expect(list.json()).toContainEqual(
-      expect.objectContaining({ id: row!.id, accepted: false, rejected: true }),
-    );
+    expect(list.json()).not.toContainEqual(expect.objectContaining({ id: row!.id }));
     await app.close();
   });
 

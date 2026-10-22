@@ -18,6 +18,7 @@ const SKILL: Skill = {
   enabled: true,
   version: 1,
   evidence_files: null,
+  injection_detected: false,
 };
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -37,6 +38,18 @@ describe("SkillCard (smoke)", () => {
     expect(screen.getByText("secret-leakage-gate")).toBeInTheDocument();
     expect(screen.getByText("security")).toBeInTheDocument();
     expect(screen.getByText("Flags hardcoded secrets.")).toBeInTheDocument();
+  });
+
+  it("shows the full name in a hover tooltip (no click) for a truncated long name", () => {
+    const longName = "an-extremely-long-skill-name-that-gets-truncated-in-the-list";
+    renderWithIntl(<SkillCard skill={{ ...SKILL, name: longName }} />);
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getAllByText(longName)[0]!.parentElement!);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(longName);
+
+    fireEvent.mouseLeave(screen.getAllByText(longName)[0]!.parentElement!);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("shows the source/version line and a real agent count", () => {
@@ -88,6 +101,26 @@ describe("SkillCard (smoke)", () => {
     renderWithIntl(<SkillCard skill={SKILL} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete skill" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/skills/${SKILL.id}`),
+        expect.objectContaining({ method: "DELETE" }),
+      ),
+    );
+  });
+
+  it("a disabled skill can still be deleted — the delete button isn't dimmed/blocked by the disabled state", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    renderWithIntl(<SkillCard skill={{ ...SKILL, enabled: false }} />);
+
+    const deleteButton = screen.getByRole("button", { name: "Delete skill" });
+    expect(deleteButton).not.toBeDisabled();
+
+    fireEvent.click(deleteButton);
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() =>

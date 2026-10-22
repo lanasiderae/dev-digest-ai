@@ -4,6 +4,7 @@ import { SkillsRepository } from './repository.js';
 import { toSkillDto, toSkillVersionDto } from './helpers.js';
 import { extractSkillArchive, type ArchiveImportResult } from './import/archive.js';
 import type { UrlImportResult } from './import/url.js';
+import { detectInjectionPatterns } from './injection-scan.js';
 
 /**
  * Skills service. Business logic for skill CRUD + import ingestion.
@@ -63,11 +64,16 @@ export class SkillsService {
    * or bypass can't sneak an enabled import through: every source other than
    * 'manual' is forced to enabled=false regardless of what the request body
    * says. Only 'manual' (create-from-scratch, or omitted) honors a
-   * client-supplied `enabled`, defaulting to true.
+   * client-supplied `enabled`, defaulting to true — UNLESS the body itself
+   * matches a known prompt-injection pattern, which always forces
+   * enabled=false regardless of source (see `injection-scan.ts`): a skill
+   * body is concatenated into a TRUSTED agent system prompt, so a malicious
+   * one must never be enabled by construction, manual source or not.
    */
   async create(workspaceId: string, input: CreateSkillInput): Promise<Skill> {
     const source = input.source ?? 'manual';
-    const enabled = source === 'manual' ? (input.enabled ?? true) : false;
+    const flagged = detectInjectionPatterns(input.body).length > 0;
+    const enabled = !flagged && source === 'manual' ? (input.enabled ?? true) : false;
     const row = await this.repo.insert({
       workspaceId,
       name: input.name,
@@ -81,12 +87,32 @@ export class SkillsService {
     return toSkillDto(row);
   }
 
+  /**
+   * Same injection gate as `create` applies on every update: a body that's
+   * flagged (the patched one, or the existing one when body isn't part of
+   * this patch) can never end up enabled.
+   *
+   * `source` is never touched here, even when a non-manual skill is
+   * explicitly enabled (vetted) — it's permanent provenance ("was this
+   * written by hand, imported, or auto-extracted?"), not a vetting flag.
+   * The "needs vetting" / untrusted-source UI keys off `source !== 'manual'
+   * && !enabled`, so it still clears while enabled and reappears if the
+   * skill is disabled again — which correctly reflects that it's still a
+   * non-manual skill, not a bug.
+   */
   async update(
     workspaceId: string,
     id: string,
     patch: UpdateSkillInput,
   ): Promise<Skill | undefined> {
-    const row = await this.repo.update(workspaceId, id, patch);
+    const existing = await this.repo.getById(workspaceId, id);
+    if (!existing) return undefined;
+
+    const effectiveBody = patch.body ?? existing.body;
+    const flagged = detectInjectionPatterns(effectiveBody).length > 0;
+    const gatedPatch: UpdateSkillInput = flagged ? { ...patch, enabled: false } : patch;
+
+    const row = await this.repo.update(workspaceId, id, gatedPatch);
     return row ? toSkillDto(row) : undefined;
   }
 

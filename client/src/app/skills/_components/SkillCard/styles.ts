@@ -2,16 +2,19 @@ import type { CSSProperties } from "react";
 
 /** Co-located styles for SkillCard (mirrors AgentCard's layout). */
 export const s = {
-  card: (active: boolean, enabled: boolean): CSSProperties => ({
+  card: (active: boolean): CSSProperties => ({
     padding: 14,
     borderRadius: 8,
     cursor: "pointer",
     border: "1px solid " + (active ? "var(--border-strong)" : "var(--border)"),
     background: active ? "var(--bg-hover)" : "var(--bg-elevated)",
-    opacity: enabled ? 1 : 0.6,
     marginBottom: 10,
   }),
   headerRow: { display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
+  // Dims the body (description/badges/stats) for a disabled skill, WITHOUT
+  // dimming the header row — the Toggle and delete button must stay at full
+  // opacity so a disabled skill never looks unclickable/undeletable.
+  body: (enabled: boolean): CSSProperties => ({ opacity: enabled ? 1 : 0.6 }),
   iconBox: {
     width: 26,
     height: 26,

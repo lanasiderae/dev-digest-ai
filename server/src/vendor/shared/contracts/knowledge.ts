@@ -132,6 +132,11 @@ export const Skill = z.object({
   // SkillsService via container.agentsRepo, not stored on the skills table.
   // Optional: absent on hand-built fixtures (tests, local component state).
   agent_count: z.number().int().optional(),
+  // Computed from `body` on every read (injection-scan.ts), not a stored
+  // column — a flagged skill is also always `enabled: false` (service-level
+  // gate), but the client needs this to explain WHY and to re-check an
+  // unsaved draft body before the user even hits Save.
+  injection_detected: z.boolean(),
 });
 export type Skill = z.infer<typeof Skill>;
 

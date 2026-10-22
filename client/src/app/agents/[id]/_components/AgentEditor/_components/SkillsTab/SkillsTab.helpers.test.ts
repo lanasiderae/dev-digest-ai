@@ -13,6 +13,7 @@ function skill(id: string, name: string): Skill {
     enabled: true,
     version: 1,
     evidence_files: null,
+    injection_detected: false,
   };
 }
 

@@ -5,7 +5,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon, Badge, Toggle, ConfirmModal } from "@devdigest/ui";
+import { Icon, Badge, Toggle, ConfirmModal, Tooltip } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useDeleteSkill } from "../../../../lib/hooks/skills";
 import { typeColor } from "./helpers";
@@ -29,12 +29,14 @@ export function SkillCard({
   const needsVetting = skill.source !== "manual" && !skill.enabled;
 
   return (
-    <div onClick={onClick} style={s.card(!!active, skill.enabled)}>
+    <div onClick={onClick} style={s.card(!!active)}>
       <div style={s.headerRow}>
-        <div style={s.iconBox}>
+        <div style={{ ...s.iconBox, ...s.body(skill.enabled) }}>
           <Icon.Sparkles size={15} />
         </div>
-        <span style={s.name}>{skill.name}</span>
+        <Tooltip label={skill.name} style={{ flex: 1 }}>
+          <span style={{ ...s.name, ...s.body(skill.enabled) }}>{skill.name}</span>
+        </Tooltip>
         {onToggle && (
           <div onClick={(e) => e.stopPropagation()}>
             <Toggle on={skill.enabled} onChange={onToggle} size={14} />
@@ -60,28 +62,30 @@ export function SkillCard({
           <Icon.Trash size={14} style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined} />
         </button>
       </div>
-      <div style={s.description}>{skill.description}</div>
-      <div style={s.metaRow}>
-        <span className="mono" style={s.typeChip(color)}>
-          {t(`listItem.type.${skill.type}`)}
-        </span>
-        {skill.source !== "manual" && (
-          <Badge color="var(--text-secondary)">{t(`listItem.source.${skill.source}`)}</Badge>
-        )}
-        {needsVetting && (
-          <span title={t("listItem.vettingTitle")}>
-            <Badge color="var(--warn)" icon="AlertTriangle">
-              {t("listItem.needsVetting")}
-            </Badge>
+      <div style={s.body(skill.enabled)}>
+        <div style={s.description}>{skill.description}</div>
+        <div style={s.metaRow}>
+          <span className="mono" style={s.typeChip(color)}>
+            {t(`listItem.type.${skill.type}`)}
           </span>
-        )}
-      </div>
-      <div style={s.versionLine}>
-        {t("listItem.versionLine", { source: t(`listItem.source.${skill.source}`), version: skill.version })}
-      </div>
-      <div style={s.statsRow}>
-        <Icon.Cpu size={12} />
-        <span>{t("listItem.agentCount", { count: skill.agent_count ?? 0 })}</span>
+          {skill.source !== "manual" && (
+            <Badge color="var(--text-secondary)">{t(`listItem.source.${skill.source}`)}</Badge>
+          )}
+          {needsVetting && (
+            <span title={t("listItem.vettingTitle")}>
+              <Badge color="var(--warn)" icon="AlertTriangle">
+                {t("listItem.needsVetting")}
+              </Badge>
+            </span>
+          )}
+        </div>
+        <div style={s.versionLine}>
+          {t("listItem.versionLine", { source: t(`listItem.source.${skill.source}`), version: skill.version })}
+        </div>
+        <div style={s.statsRow}>
+          <Icon.Cpu size={12} />
+          <span>{t("listItem.agentCount", { count: skill.agent_count ?? 0 })}</span>
+        </div>
       </div>
 
       {confirmDelete && (

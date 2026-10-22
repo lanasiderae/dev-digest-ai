@@ -19,6 +19,7 @@ import {
 } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
 import { useUpdateSkill } from "../../../../../lib/hooks/skills";
+import { detectInjectionPatterns } from "../../../../../lib/injection-scan";
 import { SkillVersionsTab } from "./_components/SkillVersionsTab";
 import { TYPE_OPTIONS } from "./constants";
 import { s } from "./styles";
@@ -39,6 +40,11 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const typeOptions = TYPE_OPTIONS.map((v) => ({ value: v, label: t(`listItem.type.${v}`) }));
   const untrusted = skill.source !== "manual" && !enabled;
   const bodyChanged = body !== skill.body;
+  // Live re-scan of the DRAFT body (not just the persisted one) — the server
+  // enforces the real gate on save/enable regardless, but re-checking here
+  // means the banner/toggle clear the instant the user fixes the text,
+  // before they've even hit Save.
+  const injectionFlagged = detectInjectionPatterns(body).length > 0;
 
   // Enabled toggles immediately — like the list-view toggle — rather than
   // waiting on the rest of the draft form's explicit Save, since flipping a
@@ -77,16 +83,28 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
           {skill.enabled ? t("preview.enabled") : t("preview.disabled")}
         </Badge>
         <Badge mono>{t("preview.version", { version: skill.version })}</Badge>
+        {skill.injection_detected && (
+          <Badge color="var(--crit)" icon="AlertOctagon">
+            {t("preview.injectionBadge")}
+          </Badge>
+        )}
         <Button kind="ghost" size="sm" icon="Play" disabled title={t("preview.runOnEvalsDisabledHint")}>
           {t("preview.runOnEvals")}
         </Button>
       </div>
 
-      {untrusted && (
-        <div style={s.notice}>
-          <Icon.AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1, color: "var(--warn)" }} />
-          <span>{t("preview.untrustedNotice")}</span>
+      {injectionFlagged ? (
+        <div style={s.injectionBanner}>
+          <Icon.AlertOctagon size={16} style={{ flexShrink: 0, marginTop: 1, color: "var(--crit)" }} />
+          <span>{t("preview.injectionBanner")}</span>
         </div>
+      ) : (
+        untrusted && (
+          <div style={s.notice}>
+            <Icon.AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1, color: "var(--warn)" }} />
+            <span>{t("preview.untrustedNotice")}</span>
+          </div>
+        )
       )}
 
       <Tabs
@@ -118,9 +136,12 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
           <>
             <div style={s.header}>
               <h3 style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("preview.configTitle")}</h3>
-              <label style={s.enabledLabel}>
+              <label
+                style={s.enabledLabel}
+                title={injectionFlagged ? t("preview.injectionDisabledHint") : undefined}
+              >
                 {enabled ? t("preview.enabled") : t("preview.disabled")}
-                <Toggle on={enabled} onChange={toggleEnabled} size={16} />
+                <Toggle on={enabled && !injectionFlagged} onChange={toggleEnabled} disabled={injectionFlagged} size={16} />
               </label>
             </div>
             <FormField label={t("create.fields.name")} required>

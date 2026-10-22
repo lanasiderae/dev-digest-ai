@@ -44,3 +44,52 @@ export const EXTRACTION_SCHEMA_NAME = 'ConventionExtraction';
  * kind of outlier without false-failing a normal, slightly-slow response.
  */
 export const EXTRACTION_TIMEOUT_MS = 60_000;
+
+/**
+ * Fallback sampling for repos repo-intel doesn't index (anything outside
+ * `.ts/.tsx/.js/.jsx/.mjs/.cjs` — see `repo-intel/constants.ts`'s
+ * `SUPPORTED_EXT`). For those repos `getConventionSamples` and the JS/TS
+ * `CONFIG_FILENAMES` check both come back empty, so without this, extraction
+ * silently returns zero candidates for e.g. a Terraform or Go repo. Kept
+ * local (not imported from `repo-intel/constants.ts`) since conventions only
+ * reads repo-intel through its facade, per `repo-intel/README.md`.
+ */
+export const FALLBACK_EXCLUDED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  'out',
+  'vendor',
+  '.git',
+  '.terraform',
+  '.venv',
+  '__pycache__',
+  'target',
+]);
+
+/** Extensions sampled by the fallback walk — common source/config formats
+ *  across non-JS ecosystems (infra-as-code, Go, Python, …). */
+export const FALLBACK_SAMPLE_EXT = new Set([
+  '.tf',
+  '.tfvars',
+  '.hcl',
+  '.go',
+  '.py',
+  '.rb',
+  '.java',
+  '.kt',
+  '.rs',
+  '.yml',
+  '.yaml',
+  '.sh',
+]);
+
+/** Extensionless filenames worth sampling as fallback evidence. */
+export const FALLBACK_SAMPLE_FILENAMES = new Set(['Makefile', 'Dockerfile']);
+
+/** Safety cap on how many fallback-walk candidates we collect before sorting
+ *  and taking the top `RANKED_SAMPLE_SIZE` — keeps a huge repo's walk bounded
+ *  without needing repo-intel's full file-count/size machinery. */
+export const FALLBACK_WALK_CAP = 200;

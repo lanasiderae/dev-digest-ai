@@ -16,6 +16,7 @@ import { EXTRACTION_SCHEMA_NAME } from '../src/modules/conventions/constants.js'
 import type { Container } from '../src/platform/container.js';
 
 let clonePath: string;
+let tfClonePath: string;
 
 beforeAll(async () => {
   clonePath = await mkdtemp(join(tmpdir(), 'conventions-test-'));
@@ -24,10 +25,18 @@ beforeAll(async () => {
     ['export async function getUser(id: string) {', '  return await db.users.find(id);', '}'].join('\n'),
     'utf8',
   );
+
+  tfClonePath = await mkdtemp(join(tmpdir(), 'conventions-test-tf-'));
+  await writeFile(
+    join(tfClonePath, 'main.tf'),
+    ['resource "aws_s3_bucket" "b" {', '  bucket = var.bucket_name', '}'].join('\n'),
+    'utf8',
+  );
 });
 
 afterAll(async () => {
   await rm(clonePath, { recursive: true, force: true });
+  await rm(tfClonePath, { recursive: true, force: true });
 });
 
 function makeService(opts: {
@@ -130,6 +139,28 @@ describe('ConventionsService.extract', () => {
 
     expect(result).toHaveLength(0);
     expect(inserted).toHaveLength(0);
+  });
+
+  it('falls back to sampling non-JS/TS files when repo-intel has nothing ranked (e.g. a Terraform repo)', async () => {
+    const { service, inserted } = makeService({
+      clonePathOverride: tfClonePath,
+      rankedPaths: [],
+      structured: {
+        candidates: [
+          {
+            category: 'style',
+            rule: 'Use snake_case for resource names',
+            evidence: { file: 'main.tf', line: 1 },
+            confidence: 0.8,
+          },
+        ],
+      },
+    });
+
+    const result = await service.extract('ws1', 'repo1');
+
+    expect(result).toHaveLength(1);
+    expect(inserted[0]!.evidencePath).toBe('main.tf');
   });
 
   it('throws when the repo has no clone yet', async () => {

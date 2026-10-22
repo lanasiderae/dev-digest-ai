@@ -2,9 +2,10 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, Modal, FormField, TextInput, SelectInput, Textarea } from "@devdigest/ui";
+import { Button, Modal, FormField, TextInput, SelectInput, Textarea, Icon } from "@devdigest/ui";
 import type { SkillSource, SkillType } from "@devdigest/shared";
 import { useCreateSkill } from "../../../../../../lib/hooks/skills";
+import { detectInjectionPatterns } from "../../../../../../lib/injection-scan";
 import { DEFAULT_TYPE, MODAL_WIDTH, TYPE_OPTIONS } from "./constants";
 import { s } from "./styles";
 
@@ -56,6 +57,7 @@ export function CreateSkillModal({
   };
 
   const canSubmit = name.trim().length > 0 && description.trim().length > 0 && body.trim().length > 0;
+  const injectionFlagged = detectInjectionPatterns(body).length > 0;
 
   return (
     <Modal
@@ -75,6 +77,12 @@ export function CreateSkillModal({
       }
     >
       <div style={s.body}>
+        {injectionFlagged && (
+          <div style={s.injectionBanner}>
+            <Icon.AlertOctagon size={16} style={{ flexShrink: 0, marginTop: 1, color: "var(--crit)" }} />
+            <span>{t("preview.injectionBanner")}</span>
+          </div>
+        )}
         <FormField label={t("create.fields.name")} required>
           <TextInput value={name} onChange={setName} placeholder={t("create.fields.namePlaceholder")} />
         </FormField>
