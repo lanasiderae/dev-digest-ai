@@ -128,6 +128,10 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  // Real count of this workspace's agents that link the skill — computed by
+  // SkillsService via container.agentsRepo, not stored on the skills table.
+  // Optional: absent on hand-built fixtures (tests, local component state).
+  agent_count: z.number().int().optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -139,6 +143,17 @@ export const CommunitySkill = z.object({
   desc: z.string(),
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
+
+// A skill's immutable body snapshot (skill_versions). Unlike AgentVersion
+// (which snapshots a jsonb config blob), skill_versions.body is a plain text
+// column — so there's no *VersionConfig wrapper here, just the body string.
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
 
 // ---- Conventions ----
 export const ConventionCandidate = z.object({
@@ -188,6 +203,10 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  // Real count of linked skills — computed by AgentsService via
+  // AgentsRepository.agentSkillCounts, not stored on the agents table.
+  // Optional: absent on hand-built fixtures (tests, local component state).
+  skill_count: z.number().int().optional(),
 });
 export type Agent = z.infer<typeof Agent>;
 

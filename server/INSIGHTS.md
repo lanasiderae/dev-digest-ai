@@ -76,3 +76,46 @@
   `.github/workflows/server-integration.yml:65`, vs.
   `.github/workflows/client.yml:49`,
   `.github/workflows/reviewer-core.yml:49`.
+- **2026-10-21** — `container.agentsRepo`-style DI overrides work for a
+  single plain function too, not just a class adapter: `skillsUrlFetch`
+  (SSRF-guarded URL fetch for skill import) is one function on
+  `ContainerOverrides`, defaulting to the real implementation in a method on
+  `Container`, with no adapter interface/class needed. This made it testable
+  (integration tests inject a stub returning fixed content) without a real
+  network/DNS round trip, for a feature with exactly one implementation and
+  one call site — reach for this before building a full adapter class.
+  Evidence: `server/src/platform/container.ts` (`ContainerOverrides.skillsUrlFetch`,
+  `Container.skillsUrlFetch`), `server/src/modules/skills/service.ts`
+  (`importFromUrl`), `server/test/skills-import.it.test.ts`.
+
+## Tool & Library Notes
+
+- **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
+  bodyLimit })`) does NOT automatically raise the ceiling for a route that
+  needs a larger body (e.g. a file-upload endpoint) — set a per-route
+  `bodyLimit` and/or `@fastify/multipart`'s own `limits.fileSize` on that
+  route/plugin registration instead of raising the global default for every
+  route. Evidence: `server/src/app.ts` (`bodyLimit: 1_048_576` on the
+  Fastify instance), `server/src/modules/skills/routes.ts` (`@fastify/multipart`
+  registered with its own `limits.fileSize`).
+- **2026-10-21** — `yauzl` validates each entry's `fileName` itself (rejects
+  zip-slip/absolute paths) during `eachEntry()` iteration, BEFORE any
+  app-level path-safety check gets a chance to run — don't assume your own
+  check is the first line of defense, and wrap whatever `eachEntry()` throws
+  into your own error type so an unsafe archive maps to a clean 4xx instead
+  of an uncaught 500. Evidence: `server/src/modules/skills/import/archive.ts`
+  (`isPathSafe` is redundant-but-kept defense-in-depth; the actual rejection
+  for a zip-slip fixture comes from yauzl itself — see the "rejects a
+  zip-slip path" test in `server/test/skills-import-archive.test.ts`, which
+  has to build its malicious fixture by patching raw bytes because `yazl`,
+  yauzl's sibling writer, also refuses to write an unsafe path).
+- **2026-10-21** — `yauzl`'s `eachEntry()` yields each zip entry's declared
+  `uncompressedSize` and `externalFileAttributes` (Unix mode bits, only
+  meaningful when `entry.versionMadeBy >>> 8 === 3`) from central-directory
+  metadata BEFORE you call `openReadStreamPromise` — this is what makes
+  "reject an oversized or executable entry without ever inflating it"
+  possible (zip-bomb defense). Prefer the promise-based API
+  (`yauzl.fromBufferPromise`, `zipfile.eachEntry()` as an async iterator,
+  `zipfile.openReadStreamPromise`) over the callback API shown in most
+  yauzl examples — much less boilerplate. Evidence:
+  `server/src/modules/skills/import/archive.ts`.

@@ -1,0 +1,42 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  header: { marginBottom: 4 } satisfies CSSProperties,
+  h3: { fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
+  hint: { fontSize: 13, color: "var(--text-secondary)", margin: "6px 0 16px" } satisfies CSSProperties,
+  row: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    padding: "12px 16px",
+    borderRadius: 9,
+    border: "1px solid var(--border)",
+    background: "var(--bg-elevated)",
+    marginBottom: 8,
+  } satisfies CSSProperties,
+  rowMain: { flex: 1, minWidth: 0 } satisfies CSSProperties,
+  rowTitle: { fontSize: 13.5, fontWeight: 600 } satisfies CSSProperties,
+  rowDate: { fontSize: 12, color: "var(--text-muted)", marginTop: 2 } satisfies CSSProperties,
+  rowActions: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } satisfies CSSProperties,
+  diffBox: {
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 7,
+    border: "1px solid var(--border)",
+    background: "var(--code-bg)",
+    maxHeight: 320,
+    overflow: "auto",
+    fontFamily: "var(--font-mono)",
+    fontSize: 12.5,
+  } satisfies CSSProperties,
+  diffLine: (type: "same" | "add" | "del"): CSSProperties => ({
+    display: "flex",
+    gap: 10,
+    padding: "1px 10px",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    background: type === "add" ? "var(--code-add)" : type === "del" ? "var(--code-del)" : "transparent",
+    color: type === "add" ? "var(--code-add-text)" : type === "del" ? "var(--code-del-text)" : "var(--text-secondary)",
+  }),
+  diffGutter: { color: "var(--text-muted)", userSelect: "none", flexShrink: 0, width: 12 } satisfies CSSProperties,
+} as const;

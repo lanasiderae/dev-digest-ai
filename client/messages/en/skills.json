@@ -7,6 +7,7 @@
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "menu": {
+      "createNew": "Create new skill",
       "fromFile": "Import from file",
       "fromUrl": "Import from URL",
       "community": "Search community skills…"
@@ -19,6 +20,23 @@
     "selectPrompt": {
       "title": "Select a skill",
       "body": "Pick a skill on the left to preview its body."
+    }
+  },
+  "create": {
+    "title": "Create skill",
+    "subtitle": "A skill is reusable review guidance an agent follows — its description is what tells an agent when to use it.",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "pr-quality-rubric",
+      "description": "Description",
+      "descriptionPlaceholder": "Use this skill when reviewing pull requests for test coverage and documentation.",
+      "descriptionHint": "The description is this skill's interface — it's how an agent decides when the skill applies. Write it as a direct instruction (\"Use this when…\", \"Flag any…\", \"Always check…\"), not a vague summary.",
+      "type": "Type",
+      "body": "Skill body (Markdown)",
+      "bodyPlaceholder": "# Rule\nDescribe the rule…"
     }
   },
   "detail": {
@@ -49,7 +67,23 @@
     "bodyPlaceholder": "# Rule\nDescribe the rule…",
     "importing": "Importing…",
     "import": "Import skill",
-    "success": "Imported \"{name}\" (stored as untrusted data)."
+    "success": "Imported \"{name}\" (stored as untrusted data). Disabled until you vet + enable it."
+  },
+  "archive": {
+    "label": "Skill archive (.zip)",
+    "hint": "SKILL.md at the archive root, or the single Markdown file if there's exactly one. Executable or script files anywhere in the archive are rejected outright.",
+    "dropPlaceholder": "Drop a .zip file here, or click to choose one",
+    "importing": "Extracting…",
+    "import": "Import skill",
+    "tooLarge": "Archive is too large.",
+    "tooManyEntries": "Archive has too many entries.",
+    "executableRejected": "Archive rejected: contains an executable or script file.",
+    "pathTraversalRejected": "Archive rejected: contains an unsafe file path.",
+    "ambiguous": {
+      "title": "Multiple Markdown files found",
+      "body": "Pick the one that is this skill's content."
+    },
+    "success": "Imported \"{name}\" from the archive (stored as untrusted data). Disabled until you vet + enable it."
   },
   "url": {
     "label": "Skill URL",
@@ -60,6 +94,7 @@
     "success": "Imported \"{name}\". Disabled until you vet + enable it."
   },
   "community": {
+    "comingSoon": "Community skill search is coming soon — this is a preview of the catalog browser.",
     "searchPlaceholder": "Search community skills (e.g. security)…",
     "allLanguages": "All languages",
     "loadError": "Could not load community skills",
@@ -74,6 +109,8 @@
   "listItem": {
     "needsVetting": "needs vetting",
     "vettingTitle": "Untrusted source — vet before enabling",
+    "versionLine": "{source} · v{version}",
+    "agentCount": "{count, plural, one {# agent} other {# agents}}",
     "type": {
       "rubric": "rubric",
       "convention": "convention",
@@ -92,10 +129,32 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
     "edit": "Edit",
     "untrustedNotice": "This skill came from an untrusted source. Its body is stored as data (delimiter-wrapped) and must be vetted before it is enabled for an agent.",
     "bodyLabel": "Skill body (Markdown)",
     "bodyHint": "Saving a changed body creates a new immutable version.",
-    "version": "v{version}"
+    "version": "v{version}",
+    "tabConfig": "Config",
+    "tabPreview": "Preview",
+    "tabVersions": "Versions",
+    "runOnEvals": "Run on evals",
+    "runOnEvalsDisabledHint": "Eval pipeline isn't built yet in this course.",
+    "configTitle": "Configuration"
+  },
+  "versions": {
+    "title": "Version history",
+    "count": "{count} versions",
+    "hint": "Every save snapshots the body so eval runs stay reproducible against the exact text they scored.",
+    "version": "v{version}",
+    "current": "Current",
+    "diff": "Diff",
+    "restore": "Restore",
+    "diffLoading": "Loading diff…",
+    "restoreTitle": "Restore v{version}?",
+    "restoreBody": "This replaces the current body with v{version}'s content. Nothing is lost — it creates a new version on top of the current one, same as any other save.",
+    "restoreConfirm": "Restore",
+    "loadError": "Could not load version history."
   }
 }
