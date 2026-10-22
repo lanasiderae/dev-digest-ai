@@ -1,5 +1,3 @@
-# CLAUDE.md
-
 ## Overview
 
 Course-starter for an agentic PR-reviewer (import a PR → AI agent review →
@@ -14,7 +12,7 @@ grounded findings). Four standalone packages, no workspace, all TypeScript:
   validation).
 - `e2e/` (`@devdigest/e2e`) — deterministic browser flows, driven by the
   `agent-browser` CDP CLI (a separate global tool, not an npm dependency —
-  see `e2e/CLAUDE.md`).
+  see `e2e/AGENTS.md`).
 
 Sharing is via tsconfig path aliases, not publishing. Only Postgres
 (pgvector) runs in Docker.
@@ -49,14 +47,14 @@ Other top-level folders (not packages — no `package.json`, nothing to
   - `cd e2e && npm run typecheck && npm run lint` — flows are
     `./scripts/e2e.sh` (hermetic), not part of typecheck.
 - Anything beyond the above is in each package's own
-  `CLAUDE.md`/`README.md` — don't assume a script name without checking
+  `AGENTS.md`/`README.md` — don't assume a script name without checking
   there first.
 
 ## Workflow
 
 Non-trivial changes in this repo follow five phases:
 
-1. **Initiation** — read this file, the relevant package's `CLAUDE.md`, and
+1. **Initiation** — read this file, the relevant package's `AGENTS.md`, and
    anything its "Reference" section points at (`README.md`, `docs/`,
    `specs/`) before touching code in that package.
 2. **Planning** — for anything beyond a trivial/isolated fix, work out the
@@ -64,9 +62,9 @@ Non-trivial changes in this repo follow five phases:
    before editing; use plan mode for anything that benefits from sign-off
    first.
 3. **Implementation** — make the change, following this file's Conventions
-   and Naming conventions sections and the target package's own `CLAUDE.md`.
+   and Naming conventions sections and the target package's own `AGENTS.md`.
 4. **Validation** — run that package's test/typecheck/lint commands (see
-   "Commands" above and each package's own `CLAUDE.md`), plus a manual check
+   "Commands" above and each package's own `AGENTS.md`), plus a manual check
    for anything UI-facing; don't report a change done on edited-but-unrun
    code.
 5. **Completion** — record any reusable, non-obvious finding from the work
@@ -114,7 +112,7 @@ Non-trivial changes in this repo follow five phases:
   `panel.hideLowConfidence`, `timeline.openTrace`).
 - **Tests**: co-located `*.test.ts(x)` next to the file under test; server
   integration tests are additionally suffixed `*.it.test.ts` (required, not
-  just a convention — see `server/CLAUDE.md` Gotchas: CI/local test splits
+  just a convention — see `server/AGENTS.md` Gotchas: CI/local test splits
   depend on this exact suffix).
 
 ## Do not touch
@@ -135,7 +133,7 @@ Non-trivial changes in this repo follow five phases:
   (`server-unit.yml`/`server-integration.yml`) invokes
   `pnpm exec vitest run --exclude '**/*.it.test.ts'` and
   `pnpm exec vitest run .it.test` as two separate jobs instead (see
-  `server/CLAUDE.md`/`TESTING.md`) — this is a `server`-specific split, not
+  `server/AGENTS.md`/`TESTING.md`) — this is a `server`-specific split, not
   a repo-wide pattern (client/reviewer-core's CI does just run their plain
   `test` script).
 - Lock files (`client/pnpm-lock.yaml`, `server/pnpm-lock.yaml`,
@@ -168,17 +166,17 @@ Non-trivial changes in this repo follow five phases:
 - `TESTING.md` — read before writing or running any test, in any package.
 - `docs/agent-prompts/README.md` — read before creating or editing an agent
   system prompt.
-- `server/CLAUDE.md`, `client/CLAUDE.md`, `reviewer-core/CLAUDE.md`,
-  `e2e/CLAUDE.md` (+ each package's own `README.md`) — read before working
+- `server/AGENTS.md`, `client/AGENTS.md`, `reviewer-core/AGENTS.md`,
+  `e2e/AGENTS.md` (+ each package's own `README.md`) — read before working
   inside that package.
 - `e2e/specs/*.flow.json` — read before adding or changing an e2e flow.
 - `.claude/rules/` — always-applied project rules (distinct from
   `.claude/skills/`, which loads on-demand); currently empty. Read it before
   any task — once a rule file exists there, it is authoritative over every
-  `CLAUDE.md` in this repo and must never be overridden here.
+  `AGENTS.md` in this repo and must never be overridden here.
 - Each package's `docs/` (deeper design notes) and `specs/` (formal specs
   written before implementation) — read when relevant to the change; see
-  each package's own CLAUDE.md Reference section for the specific files
+  each package's own AGENTS.md Reference section for the specific files
   (`server/docs/architecture.md`, `server/specs/review-flow.md`,
   `client/docs/ui-architecture.md`, `client/specs/pages.md`,
   `reviewer-core/docs/pipeline.md`, `reviewer-core/specs/review-engine.md`,

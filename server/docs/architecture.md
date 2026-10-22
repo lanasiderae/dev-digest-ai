@@ -2,7 +2,7 @@
 
 How the Fastify API is composed: the request/DI flow, the adapter interfaces
 behind the container, and how a module is registered. Deeper than
-`server/README.md` (a map) and `server/CLAUDE.md` (a short agent brief) —
+`server/README.md` (a map) and `server/AGENTS.md` (a short agent brief) —
 this explains *why* the pieces are shaped this way.
 
 ## Composition root: `buildApp()`
@@ -14,7 +14,7 @@ this explains *why* the pieces are shaped this way.
 2. Register the Zod type provider (`fastify-type-provider-zod`) as the
    validator/serializer compiler — this is what lets a route's `schema:
    { params, body, response }` double as both request validation and
-   response serialization (see "Route validation" in `server/CLAUDE.md`).
+   response serialization (see "Route validation" in `server/AGENTS.md`).
 3. Construct one `Container` (below) per app instance and decorate the
    Fastify instance with it (`app.container`), so every route handler reads
    `req.server.container.<adapter>`.
@@ -68,7 +68,7 @@ type, never the concrete class, so `ContainerOverrides` (passed into
 `buildApp({ overrides })`) can swap in a mock for any of them — this is
 exactly what `server/src/adapters/mocks.ts` (`MockLLMProvider`,
 `MockGitHubClient`, `MockGitClient`, …) plugs into for tests, per
-`server/CLAUDE.md`'s "never real network calls or keys in unit tests" rule.
+`server/AGENTS.md`'s "never real network calls or keys in unit tests" rule.
 
 ### Adapter directories (`server/src/adapters/*`)
 
@@ -82,7 +82,7 @@ backend:
 | `git/` | `GitClient` | `simple-git` against `server/clones/**` |
 | `codeindex/` | `CodeIndex` | ripgrep over the git working tree |
 | `embedder/` | `Embedder` | OpenAI embeddings |
-| `secrets/` | `SecretsProvider` | `~/.devdigest/secrets.json` (the one read chokepoint — see `server/CLAUDE.md` Do not touch) |
+| `secrets/` | `SecretsProvider` | `~/.devdigest/secrets.json` (the one read chokepoint — see `server/AGENTS.md` Do not touch) |
 | `auth/` | `AuthProvider` | local no-auth (single-user course app) |
 | `depgraph/` | `DepGraph` | dependency-cruiser, for repo-intel's import graph |
 | `tokenizer/` | `Tokenizer` | `js-tiktoken`, for repo-map token budgeting |

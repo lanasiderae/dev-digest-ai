@@ -1,7 +1,7 @@
 # INSIGHTS.md
 
-Notes from reviewing this repo's `CLAUDE.md` documentation set. Not
-authoritative project docs — see root `CLAUDE.md` and `.claude/rules/` for
+Notes from reviewing this repo's `AGENTS.md` documentation set. Not
+authoritative project docs — see root `AGENTS.md` and `.claude/rules/` for
 that; this is a working log of findings and open decisions.
 
 ## What Doesn't Work
@@ -10,8 +10,8 @@ that; this is a working log of findings and open decisions.
   skip-worktree indicator: `H` is the standard "cached" tag shown for every
   normal tracked file (always capital, regardless of skip-worktree state)
   — the real skip-worktree indicator is a capital `S`. Misreading `H` as
-  "skip-worktree" led to an incorrect root `CLAUDE.md` claim (repeated
-  across `client`/`server`/`reviewer-core`/`e2e` `CLAUDE.md` and
+  "skip-worktree" led to an incorrect root `AGENTS.md` claim (repeated
+  across `client`/`server`/`reviewer-core`/`e2e` `AGENTS.md` and
   `TESTING.md`) that every package's `package.json` was skip-worktree, and
   a whole tooling decision built on it (avoiding real `package.json`
   `"lint"` scripts in favor of undocumented `npx eslint .` + "install
@@ -21,9 +21,9 @@ that; this is a working log of findings and open decisions.
   `package.json` files or `skills-lock.json` actually have the bit set.
 - **2026-10-21** — `file:line` anchors for the entry above, since it only
   cited commands: the corrected state (real committed `lint` scripts, no
-  `npx eslint .` caveat) is documented at `server/CLAUDE.md:20-21`,
-  `client/CLAUDE.md:13`, `reviewer-core/CLAUDE.md:15-16`, and
-  `e2e/CLAUDE.md:16-17`; the scripts themselves are each package's
+  `npx eslint .` caveat) is documented at `server/AGENTS.md:20-21`,
+  `client/AGENTS.md:13`, `reviewer-core/AGENTS.md:15-16`, and
+  `e2e/AGENTS.md:16-17`; the scripts themselves are each package's
   `package.json` `"lint": "eslint ."`.
 
 ## Codebase Patterns
@@ -32,23 +32,23 @@ that; this is a working log of findings and open decisions.
   `package.json`; it's plain `.ts` hand-copied into `client/src/vendor/shared`,
   not a real shared package → treat root `README.md`'s "one schema, every
   package" framing as aspirational, not enforced — a contract change must be
-  applied to both copies by hand, and `client/CLAUDE.md` already warns about
+  applied to both copies by hand, and `client/AGENTS.md` already warns about
   this. `diff -rq server/src/vendor/shared client/src/vendor/shared` shows 5
   files already differ. Evidence: `server/src/vendor/shared/`,
   `client/src/vendor/shared/`.
-- **2026-09-29** — Neither root `CLAUDE.md`'s `## Commands` section nor
+- **2026-09-29** — Neither root `AGENTS.md`'s `## Commands` section nor
   `TESTING.md`'s "Running locally" steps mention `./scripts/e2e.sh` — both
   only describe running e2e against the manually-started dev stack
-  (`./scripts/dev.sh` + `cd e2e && npm test`). `e2e/CLAUDE.md` marks
+  (`./scripts/dev.sh` + `cd e2e && npm test`). `e2e/AGENTS.md` marks
   `./scripts/e2e.sh` (isolated Postgres/ports, doesn't touch the dev DB) as
   the *recommended* way to run e2e; a session following only root-level docs
   would default to the non-hermetic path and risk the exact
-  multiple-imported-repos pitfall `e2e/CLAUDE.md`'s Gotchas section warns
-  about. Evidence: `scripts/e2e.sh`, `e2e/CLAUDE.md` Commands section,
+  multiple-imported-repos pitfall `e2e/AGENTS.md`'s Gotchas section warns
+  about. Evidence: `scripts/e2e.sh`, `e2e/AGENTS.md` Commands section,
   `TESTING.md:71-75`.
 - **2026-09-29** — A "remove X, keep Y infra" commit can leave a fully-wired
   computation path dangling with no persistence/UI consumer — a different
-  shape of course scaffolding than root `CLAUDE.md`'s Gotchas note about
+  shape of course scaffolding than root `AGENTS.md`'s Gotchas note about
   never-implemented empty routes/tables. Commit `d45ab0d` ("remove per-PR/run
   cost, keep model pricing") deleted `agent_runs.cost_usd` and every UI/contract
   cost field while deliberately keeping `PriceBook`/`estimateCost` and
@@ -76,8 +76,8 @@ that; this is a working log of findings and open decisions.
   cited whole files/directories only: the aspirational "one schema, every
   package" framing is `README.md:47` (the architecture diagram edge) and
   `README.md:18` (the package table); the rule that actually holds —
-  hand-sync, no shared package — is `client/CLAUDE.md:25-27`, enforced as a
-  do-not-touch at `client/CLAUDE.md:34-36`. Confirmed again this session:
+  hand-sync, no shared package — is `client/AGENTS.md:25-27`, enforced as a
+  do-not-touch at `client/AGENTS.md:34-36`. Confirmed again this session:
   adding `PrFindingsByAgent` to `PrMeta` required the identical edit in both
   `server/src/vendor/shared/contracts/platform.ts:167-174` and
   `client/src/vendor/shared/contracts/platform.ts:167-174` (`cp` + `diff`
@@ -86,4 +86,4 @@ that; this is a working log of findings and open decisions.
   entry (2026-09-29, second entry in this section): `scripts/e2e.sh` is 166
   lines (the whole file is the
   hermetic-runner script, no single-line anchor); the "recommended" framing
-  is `e2e/CLAUDE.md:10-11`.
+  is `e2e/AGENTS.md:10-11`.

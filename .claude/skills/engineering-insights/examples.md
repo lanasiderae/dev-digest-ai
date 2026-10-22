@@ -26,7 +26,7 @@ Useful:
 > A test importing `test/helpers/pg.ts` but not named `*.it.test.ts` lands
 > in the unit CI lane and silently never runs against real Postgres — no
 > failure, no warning. Always suffix `.it.test.ts` for DB-backed tests (see
-> `server/CLAUDE.md` Gotchas).
+> `server/AGENTS.md` Gotchas).
 
 ## Codebase Patterns — `server/INSIGHTS.md`
 
@@ -82,7 +82,7 @@ Vague:
 
 Useful:
 > `REPO_INTEL_ENABLED` degrades silently to diff-only context when a repo
-> isn't indexed yet (by design, per `server/CLAUDE.md`) — open question:
+> isn't indexed yet (by design, per `server/AGENTS.md`) — open question:
 > should the review UI surface *that* a review ran diff-only, so a reviewer
 > doesn't mistake missing repo-intel context for the agent having checked
 > and found nothing?

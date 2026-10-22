@@ -52,7 +52,7 @@ findings). It is the client's only backend.
   design. `GITHUB_TOKEN` is canonical; `GITHUB_PAT` is an accepted fallback,
   not a separate source of truth.
 - The `INJECTION_GUARD` / grounding gate wiring in the review pipeline —
-  don't relax it to make a review "pass"; see reviewer-core's `CLAUDE.md`.
+  don't relax it to make a review "pass"; see reviewer-core's `AGENTS.md`.
 
 ## Gotchas
 

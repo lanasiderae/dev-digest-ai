@@ -2,21 +2,21 @@
 
 ## Open Questions
 
-- **2026-09-29** — `client/CLAUDE.md` documents its `pnpm-workspace.yaml` as
+- **2026-09-29** — `client/AGENTS.md` documents its `pnpm-workspace.yaml` as
   just a `pnpm.allowBuilds` allowlist (not a real workspace); `server/`'s
   `pnpm-workspace.yaml` has the same pattern (`allowBuilds` for
-  `cpu-features`, `esbuild`, `protobufjs`, `ssh2`) but `server/CLAUDE.md`'s
-  Gotchas section has no equivalent note → should `server/CLAUDE.md` gain the
+  `cpu-features`, `esbuild`, `protobufjs`, `ssh2`) but `server/AGENTS.md`'s
+  Gotchas section has no equivalent note → should `server/AGENTS.md` gain the
   same clarifying line, so the file isn't mistaken for stray monorepo config?
-  Evidence: `server/pnpm-workspace.yaml`, `client/CLAUDE.md` Gotchas section.
+  Evidence: `server/pnpm-workspace.yaml`, `client/AGENTS.md` Gotchas section.
 - **2026-10-20** — Precise evidence for the entry above:
   `server/pnpm-workspace.yaml:1-5` (the `allowBuilds` list); the existing
-  clarifying note is `client/CLAUDE.md:41-43`.
+  clarifying note is `client/AGENTS.md:41-43`.
 
 ## Codebase Patterns
 
 - **2026-09-29** — Not every GET route's response is Zod-validated despite
-  `server/CLAUDE.md`'s "schema-first... one definition drives both request
+  `server/AGENTS.md`'s "schema-first... one definition drives both request
   validation and response serialization" convention: `/repos/:id/pulls`,
   `/pulls/:id/runs`, `/pulls/:id/reviews`, and `/runs/:id/trace` only declare
   `schema: { params: IdParams }` — no `response` schema — so their handlers'
@@ -51,7 +51,7 @@
   `server/src/modules/index.ts:24-33`, with the "ADD A MODULE" procedure
   (and why registration is static, not autoloaded) at
   `server/src/modules/index.ts:15-18`; the same vocabulary is stated as a
-  repo-wide naming convention at `CLAUDE.md:99-103`.
+  repo-wide naming convention at `AGENTS.md:99-103`.
 - **2026-10-21** — `GET /repos/:id/pulls` derives its three review columns
   from ONE newest-first `reviews` query but applies three different "which
   reviews count" rules, which is easy to break by reusing the wrong map:

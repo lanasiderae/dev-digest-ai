@@ -1,6 +1,6 @@
 // Flat ESLint config (ESLint 9+). Requires `eslint` + `typescript-eslint` as
 // devDependencies — not committed here (reviewer-core/package.json is git
-// skip-worktree; see reviewer-core/CLAUDE.md), so install them locally
+// skip-worktree; see reviewer-core/AGENTS.md), so install them locally
 // first: `pnpm add -D eslint typescript-eslint`.
 import tseslint from "typescript-eslint";
 

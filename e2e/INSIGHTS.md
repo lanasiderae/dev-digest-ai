@@ -13,7 +13,7 @@
   (`readdirSync(...).filter(...).sort()`), and a step failure only `break`s
   that flow's own remaining steps — it does NOT abort the whole run;
   subsequent flow files still execute. This ordering is load-bearing, not
-  cosmetic: the existing Gotchas note in `e2e/CLAUDE.md` that flows
+  cosmetic: the existing Gotchas note in `e2e/AGENTS.md` that flows
   `02`/`04`/`05` assume the seeded repo is the first/only one depends on
   earlier flows having already run in this same lexical order. Evidence:
   `e2e/run.ts:54-56,76,88`.
