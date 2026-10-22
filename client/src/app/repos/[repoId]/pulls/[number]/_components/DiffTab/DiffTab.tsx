@@ -10,7 +10,7 @@ import type { PrFile } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { OrderToggle, type DiffOrder } from "./_components/OrderToggle";
 import { RoleGroup } from "./_components/RoleGroup";
-import { latestFindingsByPath, mergeSmartOrder } from "./helpers";
+import { latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
 import { s } from "./styles";
 
 interface DiffTabProps {
@@ -79,45 +79,24 @@ export function DiffTab({ prId, filesCount, files, canComment, repoFullName, hea
   // back to the original (GitHub) order (AC19 also reachable manually).
   const groups = React.useMemo(() => (smartDiff ? mergeSmartOrder(files, smartDiff) : null), [files, smartDiff]);
   const split = smartDiff?.split_suggestion;
+  const stats = React.useMemo(() => sumDiffStats(files), [files]);
 
   return (
     <section>
       <SectionLabel
         icon="Code"
         right={
-          commentCount > 0 ? (
-            <Button
-              kind="ghost"
-              size="sm"
-              icon={showComments ? "EyeOff" : "Eye"}
-              onClick={() => setShowComments((v) => !v)}
-            >
-              {showComments ? "Hide comments" : "Show comments"} ({commentCount})
-            </Button>
-          ) : undefined
-        }
-      >
-        Files changed · {filesCount} files
-      </SectionLabel>
-
-      {split?.too_big && (
-        <div role="note" style={s.notice}>
-          <div style={s.noticeTitle}>{t("smartDiff.largeTitle", { lines: split.total_lines })}</div>
-          <div style={s.noticeBody}>{t("smartDiff.largeBody")}</div>
-          <ul style={s.noticeList}>
-            {split.proposed_splits.map((p) => (
-              <li key={p.name}>
-                {p.name} ({t("smartDiff.filesCount", { count: p.files.length })})
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {(groups || openFindingCount > 0) && (
-        <div style={s.controls}>
-          <span style={s.hint}>{groups && order === "smart" ? t("smartDiff.groupedByRole") : ""}</span>
-          <span style={s.controlsRight}>
+          <span style={s.headerRight}>
+            {commentCount > 0 && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon={showComments ? "EyeOff" : "Eye"}
+                onClick={() => setShowComments((v) => !v)}
+              >
+                {showComments ? "Hide comments" : "Show comments"} ({commentCount})
+              </Button>
+            )}
             {groups && <OrderToggle order={order} onChange={setOrder} />}
             {openFindingCount > 0 && (
               <Button
@@ -132,6 +111,23 @@ export function DiffTab({ prId, filesCount, files, canComment, repoFullName, hea
               </Button>
             )}
           </span>
+        }
+      >
+        Files changed · {filesCount} files
+      </SectionLabel>
+
+      <div className="mono tnum" style={s.stats}>
+        {t("smartDiff.filesCount", { count: filesCount })} ·{" "}
+        <span style={{ color: "var(--code-add-text)" }}>+{stats.additions}</span>{" "}
+        <span style={{ color: "var(--code-del-text)" }}>−{stats.deletions}</span>
+      </div>
+
+      {/* Only Smart order groups files by role; Original order has nothing
+          for the split suggestion to act on, so the warning is scoped to
+          Smart order only. */}
+      {split?.too_big && order === "smart" && (
+        <div role="note" style={s.notice}>
+          <div style={s.noticeTitle}>{t("smartDiff.largeTitle", { lines: split.total_lines })}</div>
         </div>
       )}
 

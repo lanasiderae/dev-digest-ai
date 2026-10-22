@@ -41,6 +41,7 @@
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
     "outdatedTitle": "{count} comment(s) on older revisions",
-    "findingsOutsideDiff": "Findings outside the visible patch"
+    "findingsOutsideDiff": "Findings outside the visible patch",
+    "fileHasFindings": "This file has findings"
   }
 }

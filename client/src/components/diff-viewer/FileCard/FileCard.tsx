@@ -47,15 +47,25 @@ export function FileCard({
   file,
   commenting,
   findings,
+  scrollTo,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   findings?: DiffFindingApi;
+  /** Bumped (e.g. `Date.now()`) by a caller — e.g. "jump to findings" — to force
+   *  this card open and scroll it into view. Null/undefined does nothing. */
+  scrollTo?: number | null;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (scrollTo == null) return;
+    setOpen(true);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [scrollTo]);
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
   // Group this file's comments into threads, then split into ones we can anchor
@@ -83,14 +93,26 @@ export function FileCard({
     ? commenting.comments.filter((c) => c.path === file.path).length
     : 0;
 
+  // Mirrors DiffTab's `openFindingCount` semantics: dismissed findings don't
+  // count — this dot flags files still needing attention, not history.
+  const hasOpenFindings = !!findings && findings.forPath(file.path).some((f) => !f.dismissed_at);
+
   return (
-    <div style={s.fileCard}>
+    <div ref={rootRef} style={s.fileCard}>
       <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
         <Icon.ChevronRight size={13} style={chevronFor(open)} />
         <Icon.FileText size={14} style={s.fileIcon} />
         <span className="mono" style={s.filePath}>
           {file.path}
         </span>
+        {hasOpenFindings && (
+          <span
+            role="img"
+            aria-label={t("diffViewer.fileHasFindings")}
+            title={t("diffViewer.fileHasFindings")}
+            style={s.findingsDot}
+          />
+        )}
         <span className="mono tnum" style={s.fileStat}>
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>

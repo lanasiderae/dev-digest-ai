@@ -11,6 +11,7 @@ export const s = {
     borderRadius: 7,
     overflow: "hidden",
     background: "var(--bg-elevated)",
+    scrollMarginTop: 16,
   } satisfies CSSProperties,
   fileHeader: {
     display: "flex",
@@ -32,6 +33,13 @@ export const s = {
   fileStat: { fontSize: 12 } satisfies CSSProperties,
   addText: { color: "var(--code-add-text)" } satisfies CSSProperties,
   delText: { color: "var(--code-del-text)" } satisfies CSSProperties,
+  findingsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 99,
+    background: "var(--crit)",
+    flexShrink: 0,
+  } satisfies CSSProperties,
   fileBody: {
     borderTop: "1px solid var(--border)",
     padding: "8px 0",

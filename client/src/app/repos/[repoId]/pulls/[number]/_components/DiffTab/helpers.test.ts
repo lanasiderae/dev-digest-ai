@@ -1,10 +1,24 @@
 import { describe, it, expect } from "vitest";
 import type { FindingRecord, PrFile, ReviewRecord, SmartDiff } from "@/lib/types";
-import { filesWithFindingsCount, latestFindingsByPath, mergeSmartOrder } from "./helpers";
+import { filesWithFindingsCount, latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
 
 function prFile(path: string): PrFile {
   return { path, additions: 1, deletions: 0, patch: null };
 }
+
+describe("sumDiffStats", () => {
+  it("sums additions and deletions across all files", () => {
+    const files: PrFile[] = [
+      { path: "a.ts", additions: 13, deletions: 2, patch: null },
+      { path: "b.ts", additions: 5, deletions: 8, patch: null },
+    ];
+    expect(sumDiffStats(files)).toEqual({ additions: 18, deletions: 10 });
+  });
+
+  it("returns zeroes for an empty file list", () => {
+    expect(sumDiffStats([])).toEqual({ additions: 0, deletions: 0 });
+  });
+});
 
 describe("mergeSmartOrder", () => {
   it("returns every role in order, including empty ones", () => {

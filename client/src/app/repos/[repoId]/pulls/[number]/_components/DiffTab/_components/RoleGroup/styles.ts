@@ -13,10 +13,20 @@ export const s = {
     width: "100%",
     textAlign: "left",
   } satisfies CSSProperties,
+  roleDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 2,
+    flexShrink: 0,
+  } satisfies CSSProperties,
   label: {
     fontSize: 13,
     fontWeight: 600,
     color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  description: {
+    fontSize: 12,
+    color: "var(--text-muted)",
   } satisfies CSSProperties,
   count: {
     fontSize: 12,
@@ -29,13 +39,20 @@ export const s = {
     gap: 5,
     fontSize: 12,
     fontWeight: 600,
-    color: "var(--warn)",
+    color: "var(--crit)",
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
   } satisfies CSSProperties,
   findingsDot: {
     width: 6,
     height: 6,
     borderRadius: 99,
-    background: "var(--warn)",
+    background: "var(--crit)",
+  } satisfies CSSProperties,
+  sortIcon: {
+    color: "var(--text-muted)",
   } satisfies CSSProperties,
 } as const;
 

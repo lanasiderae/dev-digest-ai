@@ -16,10 +16,14 @@ export function DiffViewer({
   files,
   commenting,
   findings,
+  scrollTarget,
 }: {
   files: PrFile[];
   commenting?: DiffCommentApi;
   findings?: DiffFindingApi;
+  /** "Jump to findings" target: the file at this path is forced open and
+   *  scrolled into view whenever `nonce` changes. */
+  scrollTarget?: { path: string; nonce: number } | null;
 }) {
   const t = useTranslations("shell");
   if (!files || files.length === 0) {
@@ -28,7 +32,13 @@ export function DiffViewer({
   return (
     <div style={s.list}>
       {files.map((f, i) => (
-        <FileCard key={i} file={f} commenting={commenting} findings={findings} />
+        <FileCard
+          key={i}
+          file={f}
+          commenting={commenting}
+          findings={findings}
+          scrollTo={scrollTarget && scrollTarget.path === f.path ? scrollTarget.nonce : null}
+        />
       ))}
     </div>
   );

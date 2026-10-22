@@ -45,6 +45,14 @@ export function filesWithFindingsCount(group: MergedGroup): number {
   return group.files.filter((f) => group.flaggedPaths.has(f.path)).length;
 }
 
+/** Total additions/deletions across a PR's files, for the header stats line. */
+export function sumDiffStats(files: PrFile[]): { additions: number; deletions: number } {
+  return files.reduce(
+    (acc, f) => ({ additions: acc.additions + f.additions, deletions: acc.deletions + f.deletions }),
+    { additions: 0, deletions: 0 },
+  );
+}
+
 /**
  * Latest findings per file path — one review per agent (a re-run supersedes
  * that agent's earlier pass), newest first, `kind='review'` only. Dismissed
