@@ -141,6 +141,17 @@
   `groundFindings`. Evidence: `server/src/modules/pulls/routes.ts`
   (the smart-diff handler's `eq(t.findings.kind, 'finding')` filter).
 
+- **2026-10-22** — Blast Radius's caller-dedup must be scoped PER changed-symbol
+  group (`viaSymbol`), not globally across `result.callers`: the same
+  `file|symbol|line` caller location can legitimately appear under two
+  different changed symbols when one function calls both of them (e.g. a
+  caller invoking both `symA` and `symB` from the same line of its own body).
+  A dedup key of just `file|symbol|line` silently drops that caller from the
+  second group; the key must include `viaSymbol` as its first segment.
+  Evidence: `server/src/modules/blast/helpers.ts:44` (the four-part key),
+  `server/test/blast-grouping.test.ts` ("a caller row reaching two different
+  changed symbols from the same file/symbol/line survives in both groups").
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
