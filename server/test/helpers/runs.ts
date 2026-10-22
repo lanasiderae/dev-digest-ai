@@ -1,5 +1,5 @@
 import * as t from '../../src/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { PgFixture } from './pg.js';
 
 /**
@@ -10,6 +10,23 @@ import type { PgFixture } from './pg.js';
  * reaches a terminal status (done / failed / cancelled).
  */
 const TERMINAL = new Set(['done', 'failed', 'cancelled']);
+
+// Per review-flow.md, `agent_runs.status` is committed before the run's
+// `run_traces` document (ReviewRunExecutor persists them as two sequential
+// awaits, not one transaction) — so a run can be observably terminal here
+// for a brief window before its trace exists. A caller that immediately
+// fetches GET /runs/:id/trace after this resolves would otherwise race it
+// (intermittent "Cannot read properties of undefined" on CI, not locally,
+// since the window is normally sub-millisecond). Wait for both.
+async function tracesExist(
+  db: PgFixture['handle']['db'],
+  terminalRuns: Array<typeof t.agentRuns.$inferSelect>,
+): Promise<boolean> {
+  if (terminalRuns.length === 0) return true;
+  const ids = terminalRuns.map((r) => r.id);
+  const traces = await db.select({ runId: t.runTraces.runId }).from(t.runTraces).where(inArray(t.runTraces.runId, ids));
+  return traces.length >= ids.length;
+}
 
 export async function waitForPrRuns(
   db: PgFixture['handle']['db'],
@@ -27,7 +44,7 @@ export async function waitForPrRuns(
       expected != null
         ? terminal.length >= expected
         : runs.length > 0 && terminal.length === runs.length;
-    if (done) return runs;
+    if (done && (await tracesExist(db, terminal))) return runs;
     if (Date.now() - start > timeoutMs) return runs;
     await new Promise((r) => setTimeout(r, 25));
   }
