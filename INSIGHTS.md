@@ -114,3 +114,22 @@ that; this is a working log of findings and open decisions.
   has both but still has no `research_notes/`/`reports/`. Evidence:
   `.claude/skills/pr-self-review/README.md`,
   `.claude/skills/pr-self-review/examples.md`.
+- **2026-10-22** — Claude Code subagent definitions (`.claude/agents/*.md`)
+  need three repo-specific axes double-checked rather than assumed: skill
+  catalog names (this repo's `frontend-ui-architecture`, not
+  `frontend-architecture`), assumed tooling that doesn't exist here (no
+  dependency-cruiser config, no `pnpm arch:check`, no
+  `scripts/check-vendor-shared-sync.sh` — self-verification steps must cite
+  this repo's actual `AGENTS.md` Commands instead), and docs placement
+  (per-package `<pkg>/docs/README.md`+`<pkg>/specs/README.md` here, not a
+  root-level `docs/plans/`). Evidence: `.claude/agents/implementer.md`,
+  `.claude/agents/architecture-reviewer.md`, `.claude/agents/planner.md`.
+- **2026-10-22** — `.claude/agents/*.md` (Claude Code dev-workflow subagents)
+  and the in-app `agents` DB table / `docs/agent-prompts/*.md` (PR-review
+  agent system prompts, configured via Settings → Agents) are two unrelated
+  systems that share vocabulary — the new `.claude/agents/security-reviewer.md`
+  subagent even shares its exact name with the existing
+  `docs/agent-prompts/security-reviewer.md` reviewer-prompt file. A
+  disambiguation note was added to `.claude/agents/README.md` to head off
+  confusion. Evidence: `.claude/agents/README.md`,
+  `docs/agent-prompts/security-reviewer.md`.
