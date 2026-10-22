@@ -1,6 +1,6 @@
 /* RoleGroup — one smart-diff group: collapsible header (chevron, role label,
-   files-with-findings badge, "N files") over a DiffViewer of the group's
-   files. Docs/boilerplate start collapsed (AC15). */
+   open-findings badge, "N files") over a DiffViewer of the group's files.
+   Docs/boilerplate start collapsed (AC15). */
 "use client";
 
 import React from "react";
@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi, type DiffFindingApi } from "@/components/diff-viewer";
 import { COLLAPSED_BY_DEFAULT, ROLE_COLOR, ROLE_DESCRIPTION_KEY, ROLE_LABEL_KEY } from "../../constants";
-import { filesWithFindingsCount, type MergedGroup } from "../../helpers";
+import { type MergedGroup } from "../../helpers";
 import { s, chevronFor } from "./styles";
 
 export function RoleGroup({
@@ -24,11 +24,18 @@ export function RoleGroup({
   const isEmpty = group.files.length === 0;
   const [open, setOpen] = React.useState(!COLLAPSED_BY_DEFAULT.includes(group.role));
   const [scrollTarget, setScrollTarget] = React.useState<{ path: string; nonce: number } | null>(null);
-  const withFindings = filesWithFindingsCount(group);
+
+  // Total OPEN findings across this group's files, every severity included —
+  // matches what's actually rendered as finding cards (same semantics as
+  // DiffTab's own `openFindingCount`), not a count of distinct files.
+  const openFindings = React.useMemo(() => {
+    if (!findings) return 0;
+    return group.files.reduce((n, f) => n + findings.forPath(f.path).filter((x) => !x.dismissed_at).length, 0);
+  }, [group.files, findings]);
 
   const jumpToFindings = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const target = group.files.find((f) => group.flaggedPaths.has(f.path));
+    const target = findings && group.files.find((f) => findings.forPath(f.path).some((x) => !x.dismissed_at));
     if (!target) return;
     setOpen(true);
     setScrollTarget({ path: target.path, nonce: Date.now() });
@@ -51,16 +58,16 @@ export function RoleGroup({
         <span aria-hidden="true" style={{ ...s.roleDot, background: ROLE_COLOR[group.role] }} />
         <span style={s.label}>{t(ROLE_LABEL_KEY[group.role])}</span>
         <span style={s.description}>{t(ROLE_DESCRIPTION_KEY[group.role])}</span>
-        {withFindings > 0 && (
+        {openFindings > 0 && (
           <button
             type="button"
             onClick={jumpToFindings}
             style={s.findingsBadge}
             title={t("smartDiff.jumpToFindings")}
-            aria-label={t("smartDiff.findingsCount", { count: withFindings })}
+            aria-label={t("smartDiff.findingsCount", { count: openFindings })}
           >
             <span aria-hidden="true" style={s.findingsDot} />
-            {withFindings}
+            {openFindings}
           </button>
         )}
         <span style={s.count}>{t("smartDiff.filesCount", { count: group.files.length })}</span>

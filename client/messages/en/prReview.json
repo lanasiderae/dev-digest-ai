@@ -69,7 +69,7 @@
     "smartOrder": "Smart order",
     "originalOrder": "Original order",
     "orderToggleLabel": "Diff order",
-    "findingsCount": "{count} file(s) with findings",
+    "findingsCount": "{count} open finding(s)",
     "jumpToFindings": "Jump to findings",
     "hideFindings": "Hide findings ({count})",
     "showFindings": "Show findings ({count})"
