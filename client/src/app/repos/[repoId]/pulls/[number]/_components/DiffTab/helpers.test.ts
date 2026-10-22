@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { FindingRecord, PrFile, ReviewRecord, SmartDiff } from "@/lib/types";
-import { filesWithFindingsCount, latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
+import { filesWithFindingsCount, findingJumpTargets, latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
 
 function prFile(path: string): PrFile {
   return { path, additions: 1, deletions: 0, patch: null };
@@ -126,5 +126,43 @@ describe("latestFindingsByPath", () => {
   it("keeps dismissed findings (muted rendering happens downstream, not here)", () => {
     const r = review({ findings: [finding({ id: "d", dismissed_at: "2026-01-03T00:00:00Z" })] });
     expect(latestFindingsByPath([r]).get("a.ts")!.map((f) => f.id)).toEqual(["d"]);
+  });
+});
+
+describe("findingJumpTargets", () => {
+  function forPathFrom(byPath: Record<string, FindingRecord[]>) {
+    return (path: string) => byPath[path] ?? [];
+  }
+
+  it("orders targets by file order, then ascending line", () => {
+    const files = [prFile("a.ts"), prFile("b.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [finding({ id: "a2", start_line: 20 }), finding({ id: "a1", start_line: 5 })],
+      "b.ts": [finding({ id: "b1", start_line: 1 })],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([
+      { path: "a.ts", lineKey: "RIGHT:5" },
+      { path: "a.ts", lineKey: "RIGHT:20" },
+      { path: "b.ts", lineKey: "RIGHT:1" },
+    ]);
+  });
+
+  it("drops dismissed findings", () => {
+    const files = [prFile("a.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [finding({ id: "a1", dismissed_at: "2026-01-01T00:00:00Z" })],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([]);
+  });
+
+  it("dedupes multiple findings anchored to the same line into one stop", () => {
+    const files = [prFile("a.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [
+        finding({ id: "a1", start_line: 5 }),
+        finding({ id: "a2", start_line: 5 }),
+      ],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([{ path: "a.ts", lineKey: "RIGHT:5" }]);
   });
 });

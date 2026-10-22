@@ -43,6 +43,17 @@ function findingsForLine(ln: Line, matched: Map<string, FindingRecord[]>): Findi
   return out;
 }
 
+/** A "jump to findings" request: force this file open and scroll to it. */
+export interface FileCardScrollTarget {
+  /** The finding's anchor key (`${side}:${line}`, e.g. `RIGHT:42`) to scroll
+   *  to within this file. When it doesn't match a rendered line (a finding
+   *  outside the visible patch), falls back to scrolling the file into view. */
+  lineKey?: string;
+  /** Bumped (e.g. `Date.now()`) by the caller so a repeat click on the same
+   *  `lineKey` still re-triggers the scroll. */
+  nonce: number;
+}
+
 export function FileCard({
   file,
   commenting,
@@ -52,9 +63,10 @@ export function FileCard({
   file: PrFile;
   commenting?: DiffCommentApi;
   findings?: DiffFindingApi;
-  /** Bumped (e.g. `Date.now()`) by a caller — e.g. "jump to findings" — to force
-   *  this card open and scroll it into view. Null/undefined does nothing. */
-  scrollTo?: number | null;
+  /** Set by a caller — e.g. "jump to findings" — to force this card open and
+   *  scroll to a specific line (or the card itself). Null/undefined does
+   *  nothing. */
+  scrollTo?: FileCardScrollTarget | null;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -64,8 +76,16 @@ export function FileCard({
   React.useEffect(() => {
     if (scrollTo == null) return;
     setOpen(true);
-    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [scrollTo]);
+  // Runs again once `open` actually flips to true (lines are only in the DOM
+  // then), so a closed file's lines exist before we look for `lineKey`.
+  React.useEffect(() => {
+    if (scrollTo == null || !open) return;
+    const line = scrollTo.lineKey
+      ? rootRef.current?.querySelector<HTMLElement>(`[data-line-key="${scrollTo.lineKey}"]`)
+      : null;
+    (line ?? rootRef.current)?.scrollIntoView({ behavior: "smooth", block: line ? "center" : "start" });
+  }, [scrollTo, open]);
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
   // Group this file's comments into threads, then split into ones we can anchor

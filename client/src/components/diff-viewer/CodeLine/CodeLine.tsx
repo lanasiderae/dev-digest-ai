@@ -4,7 +4,7 @@
 
 import React from "react";
 import type { FindingRecord } from "../../../lib/types";
-import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
+import { commentTargetFor, lineKey, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { topSeverity, type DiffFindingApi } from "../findings";
 import { FindingPill } from "../FindingPill";
 import { type Line } from "../helpers";
@@ -43,10 +43,14 @@ export function CodeLine({
   const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "−" : "";
   const target = commenting?.canComment ? commentTargetFor(ln) : null;
   const showAdd = hover && !!target && !composing;
+  // Findings always anchor RIGHT (new-side line) — this is the key a
+  // "jump to findings" click looks up to scroll straight to this row.
+  const rightKey = ln.kind === "add" || ln.kind === "ctx" ? lineKey("RIGHT", ln.newNo) : null;
 
   return (
     <div
       style={cs.rowWrap}
+      data-line-key={rightKey ?? undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >

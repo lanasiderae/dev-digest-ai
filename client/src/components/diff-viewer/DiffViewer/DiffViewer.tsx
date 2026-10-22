@@ -10,7 +10,7 @@ import type { PrFile } from "@/lib/types";
 import { type DiffCommentApi } from "../comments";
 import { type DiffFindingApi } from "../findings";
 import { s } from "../styles";
-import { FileCard } from "../FileCard";
+import { FileCard, type FileCardScrollTarget } from "../FileCard";
 
 export function DiffViewer({
   files,
@@ -22,8 +22,8 @@ export function DiffViewer({
   commenting?: DiffCommentApi;
   findings?: DiffFindingApi;
   /** "Jump to findings" target: the file at this path is forced open and
-   *  scrolled into view whenever `nonce` changes. */
-  scrollTarget?: { path: string; nonce: number } | null;
+   *  scrolled to `lineKey` (or just into view) whenever `nonce` changes. */
+  scrollTarget?: ({ path: string } & FileCardScrollTarget) | null;
 }) {
   const t = useTranslations("shell");
   if (!files || files.length === 0) {
@@ -37,7 +37,11 @@ export function DiffViewer({
           file={f}
           commenting={commenting}
           findings={findings}
-          scrollTo={scrollTarget && scrollTarget.path === f.path ? scrollTarget.nonce : null}
+          scrollTo={
+            scrollTarget && scrollTarget.path === f.path
+              ? { lineKey: scrollTarget.lineKey, nonce: scrollTarget.nonce }
+              : null
+          }
         />
       ))}
     </div>

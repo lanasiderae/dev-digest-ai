@@ -1,5 +1,6 @@
 /* Pure helpers for the DiffTab (no React, no hooks). */
 import type { FindingRecord, PrFile, ReviewRecord, SmartDiff, SmartDiffRole } from "@/lib/types";
+import { keyForFinding } from "@/components/diff-viewer";
 import { FALLBACK_ROLE, ROLE_ORDER } from "./constants";
 
 /** A smart-diff group rebuilt from the PR's real files (which carry the patches). */
@@ -76,4 +77,36 @@ export function latestFindingsByPath(reviews: ReviewRecord[]): Map<string, Findi
     }
   }
   return byPath;
+}
+
+/** One "jump to findings" stop: a file + the line it should scroll to. */
+export interface FindingJumpTarget {
+  path: string;
+  lineKey: string;
+}
+
+/**
+ * Ordered, deduped list of a group's open-finding anchor points — file
+ * order, then ascending line — for the findings-badge's "jump between them"
+ * cycling (each click advances to the next one, wrapping at the end).
+ */
+export function findingJumpTargets(
+  files: PrFile[],
+  forPath: (path: string) => FindingRecord[],
+): FindingJumpTarget[] {
+  const out: FindingJumpTarget[] = [];
+  const seen = new Set<string>();
+  for (const file of files) {
+    const open = forPath(file.path)
+      .filter((f) => !f.dismissed_at)
+      .sort((a, b) => a.start_line - b.start_line);
+    for (const f of open) {
+      const lineKey = keyForFinding(f);
+      const dedupeKey = `${file.path}::${lineKey}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      out.push({ path: file.path, lineKey });
+    }
+  }
+  return out;
 }

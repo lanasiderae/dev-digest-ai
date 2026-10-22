@@ -85,6 +85,15 @@
   (the working `container.querySelector("textarea")` form, after
   `getByDisplayValue("# Rule\nFlag secrets.")` failed to find the same
   element).
+- **2026-10-22** — jsdom doesn't implement `Element.prototype.scrollIntoView`
+  (calling it throws `"... scrollIntoView is not a function"`) — several
+  "jump to X" affordances (`FileCard`, `RoleGroup`'s findings-badge cycling,
+  `ReviewRunAccordion`) call it unconditionally, so any test exercising that
+  path crashes unless stubbed. A global no-op stub was added to
+  `client/src/test/setup.ts` (mirroring the existing `ResizeObserver` stub),
+  which is what lets a test actually assert which element got scrolled into
+  view. Evidence: `client/src/test/setup.ts`,
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.test.tsx`.
 
 ## Recurring Errors & Fixes
 

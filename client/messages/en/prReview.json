@@ -71,6 +71,7 @@
     "orderToggleLabel": "Diff order",
     "findingsCount": "{count} open finding(s)",
     "jumpToFindings": "Jump to findings",
+    "jumpToFindingsStep": "Jump to finding ({current} of {total})",
     "hideFindings": "Hide findings ({count})",
     "showFindings": "Show findings ({count})"
   },
