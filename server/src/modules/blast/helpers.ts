@@ -14,7 +14,9 @@ import type { BlastResult } from '../repo-intel/types.js';
  * already sorts `callers` by `rank` DESC, so the most-important symbol leads
  * simply by preserving first-appearance order here — this function does no
  * re-sorting of its own. Within a group, callers keep their incoming order;
- * duplicates (same file|symbol|line) are dropped.
+ * duplicates (same viaSymbol|file|symbol|line) are dropped — keyed on
+ * viaSymbol too, since one call site can legitimately reach two different
+ * changed symbols and both attributions must survive.
  *
  * A changed symbol with zero callers gets NO `downstream` entry — it still
  * appears in `changed_symbols`. Callers render `downstream` as "there is
@@ -39,7 +41,7 @@ export function toBlastRadius(result: BlastResult): BlastRadius {
   const seen = new Set<string>();
 
   for (const row of result.callers) {
-    const key = `${row.file}|${row.symbol}|${row.line}`;
+    const key = `${row.viaSymbol}|${row.file}|${row.symbol}|${row.line}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -72,10 +74,12 @@ export function toBlastRadius(result: BlastResult): BlastRadius {
     };
   });
 
+  // Derived from `downstream` (post-dedup), not the raw `result.callers` —
+  // the summary must count exactly what the grouped payload actually shows.
   const counts = {
     symbols: changed_symbols.length,
-    callers: result.callers.length,
-    files: new Set(result.callers.map((c) => c.file)).size,
+    callers: downstream.reduce((sum, d) => sum + d.callers.length, 0),
+    files: new Set(downstream.flatMap((d) => d.callers.map((c) => c.file))).size,
     endpoints: new Set(downstream.flatMap((d) => d.endpoints_affected)).size,
     crons: new Set(downstream.flatMap((d) => d.crons_affected)).size,
   };

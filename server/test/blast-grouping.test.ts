@@ -98,6 +98,39 @@ describe('toBlastRadius', () => {
     expect(blast.downstream[0]!.callers.every((c) => c.file !== 'a.ts')).toBe(true);
   });
 
+  it('a caller row reaching two different changed symbols from the same file/symbol/line survives in both groups', () => {
+    const result: BlastResult = {
+      changedSymbols: [
+        { file: 'a.ts', name: 'symA', kind: 'function' },
+        { file: 'a.ts', name: 'symB', kind: 'function' },
+      ],
+      callers: [
+        { file: 'b.ts', symbol: 'caller', viaSymbol: 'symA', line: 1, rank: 0 },
+        { file: 'b.ts', symbol: 'caller', viaSymbol: 'symB', line: 1, rank: 0 },
+      ],
+      impactedEndpoints: [],
+    };
+    const blast = toBlastRadius(result);
+    const symA = blast.downstream.find((d) => d.symbol === 'symA')!;
+    const symB = blast.downstream.find((d) => d.symbol === 'symB')!;
+    expect(symA.callers).toEqual([{ name: 'caller', file: 'b.ts', line: 1 }]);
+    expect(symB.callers).toEqual([{ name: 'caller', file: 'b.ts', line: 1 }]);
+  });
+
+  it('summary counts reflect the deduped downstream payload, not the raw (pre-dedup) caller rows', () => {
+    const result: BlastResult = {
+      changedSymbols: [{ file: 'a.ts', name: 'symA', kind: 'function' }],
+      callers: [
+        { file: 'b.ts', symbol: 'caller', viaSymbol: 'symA', line: 1, rank: 0 },
+        { file: 'b.ts', symbol: 'caller', viaSymbol: 'symA', line: 1, rank: 0 }, // dup, dropped
+      ],
+      impactedEndpoints: [],
+    };
+    const blast = toBlastRadius(result);
+    expect(blast.downstream[0]!.callers).toHaveLength(1);
+    expect(blast.summary).toBe('1 changed symbol · 1 caller in 1 file');
+  });
+
   it('the output parses against the BlastRadius contract', () => {
     const result: BlastResult = {
       changedSymbols: [{ file: 'a.ts', name: 'symA', kind: 'function' }],
