@@ -1,6 +1,6 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
-import { join } from 'node:path';
-import { mkdir, readFile, access, rm } from 'node:fs/promises';
+import { join, resolve, dirname, basename, sep } from 'node:path';
+import { mkdir, readFile, access, rm, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import type {
   GitClient,
@@ -126,8 +126,35 @@ export class SimpleGitClient implements GitClient {
     }));
   }
 
+  /**
+   * `path` may originate from untrusted PR content (e.g. a spec path a PR
+   * description references) — reject anything that resolves outside the
+   * clone, including via a symlink, instead of trusting a caller-side regex.
+   */
   async readFile(repo: RepoRef, path: string): Promise<string> {
-    return readFile(join(this.clonePathFor(repo), path), 'utf8');
+    const root = resolve(this.clonePathFor(repo));
+    const target = resolve(root, path);
+    assertWithinRoot(root, target, path);
+    // Resolve symlinks on both sides — the clone dir itself may sit under a
+    // symlinked tmp/mount path, so comparing a resolved target against an
+    // unresolved root would false-positive on every read.
+    const realRoot = await realpath(root).catch(() => root);
+    // The target itself may not exist (that's a normal "file not found"
+    // case, left to the readFile() call below) — resolve its parent dir
+    // instead so the comparison stays apples-to-apples with realRoot.
+    const real = await realpath(target).catch(() =>
+      realpath(dirname(target))
+        .then((dir) => join(dir, basename(target)))
+        .catch(() => target),
+    );
+    assertWithinRoot(realRoot, real, path);
+    return readFile(target, 'utf8');
+  }
+}
+
+function assertWithinRoot(root: string, candidate: string, originalPath: string): void {
+  if (candidate !== root && !candidate.startsWith(root + sep)) {
+    throw new Error(`readFile: path escapes repo clone: ${originalPath}`);
   }
 }
 
