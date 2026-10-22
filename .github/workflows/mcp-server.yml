@@ -4,7 +4,13 @@
 # Uses npm (package-lock.json).
 #
 # server/src/vendor/shared/** is in the path filter because mcp-server
-# aliases @devdigest/shared to it at type-check time.
+# aliases @devdigest/shared to it at type-check time. That alias resolves
+# the bare `zod` import from vendor/shared's own file location, so
+# typecheck needs server/node_modules/zod on disk (see mcp-server/AGENTS.md
+# Gotchas — the explicit tsconfig `zod` path alias other packages use
+# trips a TS2589 here, so this package relies on ambient resolution
+# instead). Install server's deps (pnpm, its own package manager) before
+# typecheck, same pattern e2e-web.yml uses for reviewer-core's deps.
 name: mcp-server
 
 on:
@@ -37,6 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -44,6 +54,10 @@ jobs:
           cache-dependency-path: mcp-server/package-lock.json
 
       - run: npm ci
+
+      - name: Install server deps (zod, for the @devdigest/shared alias)
+        working-directory: server
+        run: pnpm install --frozen-lockfile
 
       - run: npm run typecheck
 
