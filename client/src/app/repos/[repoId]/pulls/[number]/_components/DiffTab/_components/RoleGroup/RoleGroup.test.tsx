@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord, PrFile } from "@devdigest/shared";
 import type { DiffFindingApi } from "@/components/diff-viewer";
@@ -50,7 +50,7 @@ const PATCH_A = "@@ -1,1 +1,1 @@\n+first line";
 const PATCH_B = "@@ -1,1 +1,1 @@\n+second line";
 
 describe("RoleGroup — jump to findings", () => {
-  it("scrolls directly to the finding's line, and cycles to the next one on repeat clicks", () => {
+  it("scrolls directly to the finding's line, and cycles to the next one on repeat clicks", async () => {
     const scrollSpy = vi.fn();
     Element.prototype.scrollIntoView = scrollSpy;
 
@@ -74,19 +74,20 @@ describe("RoleGroup — jump to findings", () => {
     const badge = screen.getByRole("button", { name: "2 open finding(s)" });
     fireEvent.click(badge);
 
-    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    // The scroll itself is deferred a frame (see FileCard's scroll effect).
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalledTimes(1));
     const firstTarget = scrollSpy.mock.instances[0] as unknown as HTMLElement;
     expect(firstTarget.getAttribute("data-line-key")).toBe("RIGHT:1");
     expect(firstTarget.textContent).toContain("first line");
 
     fireEvent.click(badge);
-    expect(scrollSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalledTimes(2));
     const secondTarget = scrollSpy.mock.instances[1] as unknown as HTMLElement;
     expect(secondTarget.textContent).toContain("second line");
 
     // Wraps back to the first finding after the last one.
     fireEvent.click(badge);
-    expect(scrollSpy).toHaveBeenCalledTimes(3);
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalledTimes(3));
     const thirdTarget = scrollSpy.mock.instances[2] as unknown as HTMLElement;
     expect(thirdTarget.textContent).toContain("first line");
   });

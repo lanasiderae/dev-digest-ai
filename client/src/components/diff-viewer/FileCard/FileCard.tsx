@@ -81,10 +81,17 @@ export function FileCard({
   // then), so a closed file's lines exist before we look for `lineKey`.
   React.useEffect(() => {
     if (scrollTo == null || !open) return;
-    const line = scrollTo.lineKey
-      ? rootRef.current?.querySelector<HTMLElement>(`[data-line-key="${scrollTo.lineKey}"]`)
-      : null;
-    (line ?? rootRef.current)?.scrollIntoView({ behavior: "smooth", block: line ? "center" : "start" });
+    // Deferred a frame: scrollIntoView() fires a synchronous `scroll` event,
+    // and calling it mid-commit trips Next's dev overlay into a flushSync-
+    // during-render warning (its own floating-position listener reacts to
+    // that scroll). A rAF lets this commit finish first.
+    const raf = requestAnimationFrame(() => {
+      const line = scrollTo.lineKey
+        ? rootRef.current?.querySelector<HTMLElement>(`[data-line-key="${scrollTo.lineKey}"]`)
+        : null;
+      (line ?? rootRef.current)?.scrollIntoView({ behavior: "smooth", block: line ? "center" : "start" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [scrollTo, open]);
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
