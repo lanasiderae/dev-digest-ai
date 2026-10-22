@@ -38,6 +38,10 @@ export function ConventionsView() {
 
   const repoName = activeRepo?.full_name ?? t("page.repoFallback");
   const list = candidates ?? [];
+  // Rejected candidates stay persisted (so a re-scan never re-proposes
+  // them), but they're hidden from the working list — rejecting one should
+  // visibly remove it, not just leave it sitting there dimmed.
+  const visibleList = list.filter((c) => !c.rejected);
   const accepted = list.filter((c) => c.accepted);
 
   // Link the new repo-conventions skill to an agent, same as #42 requires —
@@ -102,7 +106,9 @@ export function ConventionsView() {
             )}
           </h1>
           <p style={s.pageSubtitle}>
-            {list.length > 0 ? t("page.candidateCount", { count: list.length }) : t("page.subtitle")}
+            {visibleList.length > 0
+              ? t("page.candidateCount", { count: visibleList.length })
+              : t("page.subtitle")}
           </p>
         </div>
         {list.length > 0 ? (
@@ -135,10 +141,10 @@ export function ConventionsView() {
         </div>
       )}
 
-      {list.length > 0 && (
+      {visibleList.length > 0 && (
         <div style={s.toolbar}>
           <span style={s.acceptedCount}>
-            {t("page.acceptedOf", { accepted: accepted.length, total: list.length })}
+            {t("page.acceptedOf", { accepted: accepted.length, total: visibleList.length })}
           </span>
           <div style={s.toolbarActions}>
             <Button
@@ -176,7 +182,7 @@ export function ConventionsView() {
             onRetry={() => refetch()}
           />
         </div>
-      ) : list.length === 0 ? (
+      ) : visibleList.length === 0 ? (
         <div style={s.emptyWrap}>
           <EmptyState
             icon="ListChecks"
@@ -188,7 +194,7 @@ export function ConventionsView() {
         </div>
       ) : (
         <div style={s.list}>
-          {list.map((c) => (
+          {visibleList.map((c) => (
             <ConventionCard
               key={c.id}
               candidate={c}
