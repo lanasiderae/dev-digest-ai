@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Providers } from "../lib/providers";
 import { themeNoFlashScript } from "../lib/theme";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "DevDigest",
@@ -24,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           inject attributes like data-gr-ext-installed onto <body> before React
           hydrates. This suppresses ONLY this element's own attribute mismatch
           (one level deep) — real mismatches in descendants are still reported. */}
-      <body suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Suspense fallback={null}>
             <Providers>{children}</Providers>

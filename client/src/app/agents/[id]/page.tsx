@@ -11,6 +11,7 @@ import { AgentCard } from "../_components/AgentCard";
 import { AgentEditor } from "./_components/AgentEditor";
 import { useAgents, useAgent, useUpdateAgent } from "../../../lib/hooks/agents";
 import { ApiError } from "../../../lib/api";
+import { usePageTitle } from "../../../lib/use-page-title";
 
 const VALID_TABS = ["config"];
 
@@ -23,6 +24,7 @@ export default function AgentEditorPage() {
   const { data: agents } = useAgents();
   const { data: agent, isLoading, isError, error, refetch } = useAgent(id);
   const update = useUpdateAgent();
+  usePageTitle(agent?.name ?? null);
 
   const tab = VALID_TABS.includes(search.get("tab") ?? "") ? search.get("tab")! : "config";
   const setTab = (t: string) => {

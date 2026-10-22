@@ -1,16 +1,11 @@
 /* App global stylesheet.
    The design-system styles.css already does `@import "tailwindcss"` and defines
-   the @theme token layer + base resets, so we just re-export it here and add
-   web fonts. */
+   the @theme token layer + base resets, so we just re-export it here. Inter is
+   self-hosted via next/font/google in layout.tsx (applied as a class on
+   <body>, which wins over styles.css's `body { font-family: "Inter" }` on
+   specificity) rather than the old `@font-face { src: local("Inter") }`,
+   which only rendered Inter for users who happened to have it installed. */
 @import "../vendor/ui/styles.css";
-
-@font-face {
-  font-family: "Inter";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: local("Inter");
-}
 
 @keyframes ddToastIn {
   from {

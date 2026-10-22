@@ -87,3 +87,30 @@ that; this is a working log of findings and open decisions.
   lines (the whole file is the
   hermetic-runner script, no single-line anchor); the "recommended" framing
   is `e2e/AGENTS.md:10-11`.
+- **2026-10-21** — `.claude/skills/` has two distinct creation patterns, not
+  one: external-best-practice architecture skills
+  (`frontend-ui-architecture`, `onion-architecture`) follow an undocumented
+  `research_notes/` → `reports/` → `SKILL.md`+`README.md`+`examples.md`
+  triad, while internal process/meta skills that orchestrate other skills
+  or capture session state (`engineering-insights`, `pr-self-review`) skip
+  that triad entirely — single `SKILL.md`, no external topic to cite.
+  Deciding which pattern applies to a new skill request matters before
+  writing it. Evidence: `.claude/skills/engineering-insights/SKILL.md`
+  (single-file, no `README.md`/`examples.md`) vs.
+  `.claude/skills/onion-architecture/` (full triad plus
+  `research_notes/Onion Architecture/` and `reports/`).
+- **2026-10-21** — Correction to the entry directly above: "single
+  `SKILL.md`, no external topic to cite" overstates it for
+  `pr-self-review` specifically — on request it was given the same
+  `SKILL.md`+`README.md`+`examples.md` *file set* as
+  `onion-architecture`/`frontend-ui-architecture` (`README.md` documents
+  it has no `## Sources` table and is internally grounded instead;
+  `examples.md` is a worked dispatch walkthrough, not before/after code
+  snippets). The real dividing line between the two skill-creation
+  patterns is narrower than "file count": it's specifically whether
+  `research_notes/`+`reports/` exist upstream of the skill (external
+  research to cite) — not whether `README.md`/`examples.md` exist at all.
+  `engineering-insights` still has neither extra file; `pr-self-review`
+  has both but still has no `research_notes/`/`reports/`. Evidence:
+  `.claude/skills/pr-self-review/README.md`,
+  `.claude/skills/pr-self-review/examples.md`.
