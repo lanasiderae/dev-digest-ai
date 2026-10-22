@@ -61,6 +61,27 @@ export type ReviewRunResponse = z.infer<typeof ReviewRunResponse>;
 export const PrIntentRecord = Intent.extend({ pr_id: z.string() });
 export type PrIntentRecord = z.infer<typeof PrIntentRecord>;
 
+/**
+ * Why `GET /pulls/:id/intent` or a regenerate call returned no intent.
+ * `not_generated` is the normal first-load case (nothing persisted yet, UI
+ * should trigger generation); the rest are failure modes the classifier
+ * fails open on (AC11: never fabricate — say explicitly why it's missing).
+ */
+export const IntentUnavailableReason = z.enum([
+  'not_generated',
+  'provider_not_configured',
+  'timeout',
+  'generation_failed',
+]);
+export type IntentUnavailableReason = z.infer<typeof IntentUnavailableReason>;
+
+/** Response of `GET /pulls/:id/intent` and `POST /pulls/:id/intent/regenerate`. */
+export const PrIntentResponse = z.object({
+  intent: PrIntentRecord.nullable(),
+  unavailable_reason: IntentUnavailableReason.nullable(),
+});
+export type PrIntentResponse = z.infer<typeof PrIntentResponse>;
+
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;
 export type SmartDiffResponse = z.infer<typeof SmartDiffResponse>;

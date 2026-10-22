@@ -2,20 +2,24 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
-import { PrCommentInput } from '@devdigest/shared';
+import { PrCommentInput, SmartDiffResponse } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus, latestReviewPerAgent, rollupSeverities } from './status.js';
+import { buildSmartDiff, openFindingLinesByPath } from './helpers.js';
 import { computeRunCost } from '../reviews/helpers.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
- *   GET /repos/:id/pulls → list PRs for a repo (open + recently merged/closed,
- *                          synced from GitHub, persisted). `status` is GitHub's
- *                          merge state (open/merged/closed).
- *   GET /pulls/:id       → full PR detail (diff/files, commits, body, linked issue)
+ *   GET /repos/:id/pulls     → list PRs for a repo (open + recently merged/closed,
+ *                              synced from GitHub, persisted). `status` is GitHub's
+ *                              merge state (open/merged/closed).
+ *   GET /pulls/:id           → full PR detail (diff/files, commits, body, linked issue)
+ *   GET /pulls/:id/smart-diff → files grouped by role (core/tests/wiring/docs/
+ *                              boilerplate) with open-finding lines + split
+ *                              suggestion; DB-only, no model call (AC24).
  *
  * Import is idempotent (unique repo_id+number). Review trigger is MANUAL
  * and owned by A2 — this module only imports/reads.
@@ -370,6 +374,50 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       };
     }
   });
+
+  // ---- Smart Diff -----------------------------------------------------------
+  // Files grouped by role + open-finding lines, derived entirely from
+  // persisted data (pr_files + each agent's latest review's findings) — no
+  // GitHub call, no model call. Available before the first review runs (the
+  // grouping itself needs none); finding_lines are simply empty until one does.
+  app.get(
+    '/pulls/:id/smart-diff',
+    { schema: { params: IdParams, response: { 200: SmartDiffResponse } } },
+    async (req): Promise<SmartDiffResponse> => {
+      const { workspaceId } = await getContext(container, req);
+      const [pr] = await container.db
+        .select()
+        .from(t.pullRequests)
+        .where(and(eq(t.pullRequests.workspaceId, workspaceId), eq(t.pullRequests.id, req.params.id)));
+      if (!pr) throw new NotFoundError('Pull request not found');
+
+      const files = await container.db
+        .select({ path: t.prFiles.path, additions: t.prFiles.additions, deletions: t.prFiles.deletions })
+        .from(t.prFiles)
+        .where(eq(t.prFiles.prId, pr.id));
+
+      const reviewRows = await container.db
+        .select({ id: t.reviews.id, prId: t.reviews.prId, agentId: t.reviews.agentId })
+        .from(t.reviews)
+        .where(and(eq(t.reviews.prId, pr.id), eq(t.reviews.kind, 'review')))
+        .orderBy(desc(t.reviews.createdAt));
+      const latestPerAgent = latestReviewPerAgent(reviewRows);
+      const reviewIds = [...latestPerAgent.values()].flat().map((r) => r.id);
+
+      // `kind='finding'` only — the lethal-trifecta/secret-leak/phantom/hook
+      // kinds reviewer-core exempts from line-range grounding don't anchor to
+      // a single reliable line the way a diff finding does.
+      const anchors =
+        reviewIds.length > 0
+          ? await container.db
+              .select({ file: t.findings.file, startLine: t.findings.startLine, dismissedAt: t.findings.dismissedAt })
+              .from(t.findings)
+              .where(and(inArray(t.findings.reviewId, reviewIds), eq(t.findings.kind, 'finding')))
+          : [];
+
+      return buildSmartDiff(files, openFindingLinesByPath(anchors));
+    },
+  );
 
   // ---- Inline review comments (Files changed tab) -------------------------
   // Proxied live to GitHub (no local persistence): GET reflects existing PR

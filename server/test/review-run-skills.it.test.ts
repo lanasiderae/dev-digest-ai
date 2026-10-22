@@ -6,7 +6,13 @@ import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
 import { MockLLMProvider, MockGitClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
-import type { Review } from '@devdigest/shared';
+import type { Intent, Review } from '@devdigest/shared';
+
+/** The review-triggering routes also run the Intent Layer's eager pre-work,
+ *  which resolves `openrouter` by default — mock it too, or this test would
+ *  hit a real provider whenever a real OPENROUTER_API_KEY happens to be
+ *  configured on the machine running it. */
+const INTENT_FIXTURE: Intent = { intent: 'test PR', in_scope: [], out_of_scope: [] };
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
@@ -74,7 +80,10 @@ d('Review run resolves enabled linked skills into the prompt (Testcontainers pg)
       db: pg.handle.db,
       overrides: {
         git: new MockGitClient({ diff: DIFF }),
-        llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }) },
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          openrouter: new MockLLMProvider('openai', { structuredBySchema: { PrIntent: INTENT_FIXTURE } }),
+        },
       },
     });
   }

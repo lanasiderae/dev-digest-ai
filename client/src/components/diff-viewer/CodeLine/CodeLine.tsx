@@ -3,7 +3,10 @@
 "use client";
 
 import React from "react";
+import type { FindingRecord } from "../../../lib/types";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
+import { topSeverity, type DiffFindingApi } from "../findings";
+import { FindingPill } from "../FindingPill";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
@@ -14,12 +17,18 @@ export function CodeLine({
   path,
   threads,
   commenting,
+  findingsHere,
+  findingsApi,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** Findings anchored to this specific line (already matched by the caller). */
+  findingsHere?: FindingRecord[];
+  findingsApi?: DiffFindingApi;
 }) {
+  const showFindings = !!findingsApi?.visible && (findingsHere?.length ?? 0) > 0;
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
 
@@ -41,7 +50,7 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div style={lineRowFor(ln.kind, showFindings ? topSeverity(findingsHere!) : undefined)}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -62,6 +71,11 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {showFindings && (
+          <span style={{ paddingRight: 10 }}>
+            <FindingPill severity={topSeverity(findingsHere!)} />
+          </span>
+        )}
       </div>
 
       {commenting &&
@@ -69,6 +83,9 @@ export function CodeLine({
         threads.map((th) => (
           <CommentThreadView key={th.rootId} thread={th} commenting={commenting} path={path} />
         ))}
+
+      {showFindings &&
+        findingsHere!.map((f) => <div key={f.id}>{findingsApi!.renderFinding(f)}</div>)}
 
       {commenting && composing && target && (
         <InlineComposer

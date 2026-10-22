@@ -7,7 +7,13 @@ import { seed } from '../src/db/seed.js';
 import { MockLLMProvider, MockEmbedder, MockGitClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
-import type { Review } from '@devdigest/shared';
+import type { Intent, Review } from '@devdigest/shared';
+
+/** The review-triggering route also runs the Intent Layer's eager pre-work,
+ *  which resolves `openrouter` by default — mock it too, or this test would
+ *  hit a real provider whenever a real OPENROUTER_API_KEY happens to be
+ *  configured on the machine running it. */
+const INTENT_FIXTURE: Intent = { intent: 'test PR', in_scope: [], out_of_scope: [] };
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
@@ -119,6 +125,7 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
         git: new MockGitClient({ diff: DIFF }),
         llm: {
           [provider]: new MockLLMProvider(provider, { structured }),
+          openrouter: new MockLLMProvider('openai', { structuredBySchema: { PrIntent: INTENT_FIXTURE } }),
         },
       },
     });

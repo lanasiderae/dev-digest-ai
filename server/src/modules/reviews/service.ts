@@ -1,5 +1,5 @@
 import type { Container } from '../../platform/container.js';
-import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
+import type { FindingActionKind, PrIntentResponse, RunEventKind, RunTrace } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
 import { ReviewRepository } from './repository.js';
@@ -7,6 +7,7 @@ import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto, computeRunCost } from './helpers.js';
+import { IntentService } from './pipeline/intent.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -187,6 +188,36 @@ export class ReviewService {
         cost: info ? computeRunCost((m, i, o) => this.container.priceBook.estimate(m, i, o), info) : null,
       };
     });
+  }
+
+  // ===========================================================================
+  // Intent Layer
+  // ===========================================================================
+
+  /** `GET /pulls/:id/intent` — a pure read; never spends an LLM call. */
+  async getIntent(workspaceId: string, prId: string): Promise<PrIntentResponse> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    return new IntentService(this.container, this.repo).get(prId);
+  }
+
+  /** `POST /pulls/:id/intent` — the card's manual "Run Intent"/"Regenerate" action. */
+  async regenerateIntent(workspaceId: string, prId: string, logger?: Logger): Promise<PrIntentResponse> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repoRow = await this.repo.getRepo(pull.repoId);
+    if (!repoRow) throw new NotFoundError('Repo not found');
+    // Adapt the plain pino request logger ((obj, msg?) => void) to the
+    // IntentLogger shape ((msg, data?) => void) that IntentService expects —
+    // the eager/run-executor path instead passes the real RunLogger, which
+    // already matches that shape.
+    const adapted = logger ? { info: (msg: string, data?: unknown) => logger.info(data ?? {}, msg) } : undefined;
+    return new IntentService(this.container, this.repo).ensure(
+      workspaceId,
+      pull,
+      { owner: repoRow.owner, name: repoRow.name },
+      { force: true, trigger: 'manual', log: adapted },
+    );
   }
 
   async getRunTrace(runId: string): Promise<RunTrace | undefined> {

@@ -8,6 +8,7 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { IntentService, renderIntentForPrompt } from './pipeline/intent.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -112,6 +113,35 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // Eager intent pre-work (shared across every target agent, like the diff
+    // above): reuse an already-derived intent IF the PR hasn't moved since
+    // (same head_sha), otherwise derive a fresh one — so intent tracks new
+    // commits/re-runs, not just a PR's first review. Fails open — an
+    // unavailable intent never blocks or fails the review (AC8/AC11); the
+    // Overview tab's own GET stays a pure read regardless of this. `runLog`
+    // is passed straight through so the derivation's sub-steps (token
+    // estimate, model, result) stream live to this run's Live Log, exactly
+    // like every other step here — and `IntentService` only ever calls
+    // `.info()`, never `.error()`, so an unavailable intent never surfaces
+    // as a run-failure toast.
+    const intentResult = await runLog.step(
+      'Deriving PR intent',
+      () =>
+        new IntentService(this.container, this.repo).ensure(
+          workspaceId,
+          pull,
+          { owner: repo.owner, name: repo.name },
+          { force: false, trigger: 'eager', log: runLog },
+        ),
+      { kind: 'tool' },
+    );
+    const intentText = intentResult.intent ? renderIntentForPrompt(intentResult.intent) : undefined;
+    runLog.info(
+      intentText
+        ? 'Intent derived — injecting into review prompt'
+        : `Intent unavailable (${intentResult.unavailable_reason}) — reviewing without it`,
+    );
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -119,7 +149,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intentText);
         logger?.info(
           {
             runId,
@@ -151,6 +181,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intentText: string | undefined,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -227,6 +258,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Derived PR intent (shared pre-work above) — omitted when unavailable.
+        ...(intentText ? { intent: intentText } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),

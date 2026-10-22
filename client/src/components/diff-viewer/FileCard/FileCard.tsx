@@ -5,16 +5,18 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
-import type { PrFile } from "@/lib/types";
+import type { FindingRecord, PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
 import {
   buildThreads,
+  cs,
   keysForLine,
   partitionThreads,
   type CommentThread,
   type DiffCommentApi,
 } from "../comments";
+import { partitionFindings, type DiffFindingApi } from "../findings";
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
@@ -30,7 +32,26 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+/** Findings anchored to a given parsed line (new side only). */
+function findingsForLine(ln: Line, matched: Map<string, FindingRecord[]>): FindingRecord[] {
+  if (matched.size === 0) return [];
+  const out: FindingRecord[] = [];
+  for (const key of keysForLine(ln)) {
+    const list = matched.get(key);
+    if (list) out.push(...list);
+  }
+  return out;
+}
+
+export function FileCard({
+  file,
+  commenting,
+  findings,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  findings?: DiffFindingApi;
+}) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
@@ -47,6 +68,16 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
     for (const ln of lines) for (const k of keysForLine(ln)) renderedKeys.add(k);
     return partitionThreads(fileThreads, renderedKeys);
   }, [comments, file.path, lines]);
+
+  // Same split for review findings: anchored to a rendered new-side line vs
+  // not (AC27's "outside the visible patch" bucket).
+  const { matchedFindings, outsideFindings } = React.useMemo(() => {
+    if (!findings) return { matchedFindings: new Map<string, FindingRecord[]>(), outsideFindings: [] };
+    const renderedKeys = new Set<string>();
+    for (const ln of lines) for (const k of keysForLine(ln)) renderedKeys.add(k);
+    const part = partitionFindings(findings.forPath(file.path), renderedKeys);
+    return { matchedFindings: part.matched, outsideFindings: part.outside };
+  }, [findings, file.path, lines]);
 
   const commentCount = commenting
     ? commenting.comments.filter((c) => c.path === file.path).length
@@ -85,10 +116,20 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                findingsHere={findingsForLine(ln, matchedFindings)}
+                findingsApi={findings}
               />
             ))
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
+          {findings && findings.visible && outsideFindings.length > 0 && (
+            <div style={cs.outdatedWrap}>
+              <span style={cs.outdatedTitle}>{t("diffViewer.findingsOutsideDiff")}</span>
+              {outsideFindings.map((f) => (
+                <div key={f.id}>{findings.renderFinding(f)}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

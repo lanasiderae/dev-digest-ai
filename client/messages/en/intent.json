@@ -1,0 +1,16 @@
+{
+  "title": "Intent",
+  "inScope": "In scope",
+  "outOfScope": "Out of scope",
+  "noneIdentified": "None identified",
+  "notGenerated": {
+    "title": "Intent not yet analysed",
+    "body": "Run review agents to analyse the intent and scope of this pull request.",
+    "run": "Run Intent",
+    "running": "Running…"
+  },
+  "providerNotConfigured": "The intent model isn't configured yet (check Settings → Models).",
+  "generationFailed": "Couldn't derive intent — the model call failed.",
+  "retry": "Retry",
+  "regenerate": "Regenerate"
+}

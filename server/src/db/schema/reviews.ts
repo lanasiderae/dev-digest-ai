@@ -53,6 +53,10 @@ export const prIntent = pgTable('pr_intent', {
   intent: text('intent').notNull(),
   inScope: jsonb('in_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   outOfScope: jsonb('out_of_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  /** The PR's head_sha when this intent was derived — lets a new review run
+   *  tell a still-fresh intent from a stale one (new commits since) and
+   *  re-derive automatically, instead of silently reusing a stale cache. */
+  headSha: text('head_sha'),
 });
 
 export const prBrief = pgTable('pr_brief', {
