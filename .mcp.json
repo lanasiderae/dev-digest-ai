@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "devdigest": {
+      "command": "./mcp-server/node_modules/.bin/tsx",
+      "args": ["./mcp-server/src/index.ts"],
+      "env": { "DEVDIGEST_API_BASE": "http://127.0.0.1:3001" }
+    }
+  }
+}
