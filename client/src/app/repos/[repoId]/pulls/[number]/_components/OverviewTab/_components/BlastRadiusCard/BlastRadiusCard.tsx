@@ -1,0 +1,142 @@
+/* BlastRadiusCard — the Blast Radius section of the Overview tab. Shows each
+   changed symbol's downstream callers (file:line, deep-linked to GitHub) plus
+   the endpoints/crons they reach, grouped exactly as the server already
+   grouped them (no re-grouping here). Renders a deterministic summary line
+   built from blast.json's stat.* labels + numbers derived from the payload —
+   it does NOT render the server's `blast.summary` string verbatim, so the
+   line stays translatable instead of bypassing i18n. */
+"use client";
+
+import React from "react";
+import { useTranslations } from "next-intl";
+import { Chip, Icon, MonoLink, SectionLabel, Skeleton } from "@devdigest/ui";
+import type { BlastDegradedReason } from "@devdigest/shared";
+import { useBlastRadius } from "@/lib/hooks/blast-radius";
+import { githubBlobUrl } from "@/lib/github-urls";
+import { callerLabel, groupSymbols, totalCounts } from "./helpers";
+import { s } from "./styles";
+
+/** Maps the server's degraded reason enum onto blast.json's `degraded.reason.*`
+    keys. Any reason not in this map (future enum members) falls back to the
+    `unknown` key rather than throwing or rendering a blank. */
+const REASON_KEY: Record<BlastDegradedReason, string> = {
+  flag_off: "flagOff",
+  index_failed: "indexFailed",
+  index_partial: "indexPartial",
+  repo_too_large: "repoTooLarge",
+  no_data: "noData",
+};
+
+export function BlastRadiusCard({
+  prId,
+  repoFullName,
+  headSha,
+}: {
+  prId: string | null | undefined;
+  repoFullName: string | null | undefined;
+  headSha: string | null | undefined;
+}) {
+  const t = useTranslations("blast");
+  const { data, isLoading, isError } = useBlastRadius(prId);
+
+  if (isLoading) {
+    return (
+      <section style={s.root}>
+        <div style={s.labelRow}>
+          <SectionLabel icon="Zap">{t("title")}</SectionLabel>
+        </div>
+        <Skeleton height={110} />
+      </section>
+    );
+  }
+
+  // Hard failure (network/API down) — non-essential card; the rest of the
+  // Overview tab still renders, exactly like IntentCard's posture.
+  if (isError || !data) return null;
+
+  const { blast, degraded, reason } = data;
+  const groups = groupSymbols(blast);
+  const counts = totalCounts(blast);
+  const reasonKey = reason ? REASON_KEY[reason] ?? "unknown" : "unknown";
+
+  return (
+    <section style={s.root}>
+      <div style={s.labelRow}>
+        <SectionLabel icon="Zap">{t("title")}</SectionLabel>
+      </div>
+      <div style={s.card}>
+        <div style={s.summaryLine}>
+          {t("summaryLine", {
+            symbols: counts.symbols,
+            symbolsLabel: t("stat.symbols"),
+            callers: counts.callers,
+            callersLabel: t("stat.callers"),
+            endpoints: counts.endpoints,
+            endpointsLabel: t("stat.endpoints"),
+            crons: counts.crons,
+            cronsLabel: t("stat.crons"),
+          })}
+        </div>
+
+        {degraded && (
+          <div style={s.degradedBanner}>
+            <Icon.AlertTriangle size={15} style={{ color: "var(--warn)", flexShrink: 0, marginTop: 1 }} />
+            <div style={s.degradedText}>
+              <span style={s.degradedTitle}>{t("degraded.title")}</span>
+              <span style={s.degradedBody}>{t(`degraded.reason.${reasonKey}`)}</span>
+            </div>
+          </div>
+        )}
+
+        <div style={s.symbolList}>
+          {groups.map(({ symbol, downstream }) => (
+            <div key={`${symbol.name}:${symbol.file}`} style={s.symbolBlock}>
+              <div style={s.symbolHeader}>
+                <Icon.GitBranch size={13} style={{ color: "var(--text-muted)" }} />
+                <span style={s.symbolName}>{symbol.name}</span>
+                <span style={s.symbolFile}>{symbol.file}</span>
+              </div>
+
+              {!downstream ? (
+                <span style={s.muted}>{t("symbol.noCallers")}</span>
+              ) : (
+                <>
+                  <div style={s.callerList}>
+                    {downstream.callers.map((c) => (
+                      <div key={`${c.file}:${c.line}`} style={s.callerRow}>
+                        <MonoLink
+                          href={
+                            repoFullName && headSha
+                              ? githubBlobUrl(repoFullName, headSha, c.file, c.line)
+                              : undefined
+                          }
+                        >
+                          {callerLabel(c.file, c.line)}
+                        </MonoLink>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(downstream.endpoints_affected.length > 0 || downstream.crons_affected.length > 0) && (
+                    <div style={s.chipsRow}>
+                      {downstream.endpoints_affected.map((e) => (
+                        <Chip key={`endpoint:${e}`} icon="Activity">
+                          {e}
+                        </Chip>
+                      ))}
+                      {downstream.crons_affected.map((c) => (
+                        <Chip key={`cron:${c}`} icon="Clock">
+                          {c}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
