@@ -14,6 +14,12 @@ import type { DevDigestApi } from './client.js';
  * caching (two extra loopback GETs per tool call is cheaper than a
  * stale-repo-list bug; see `mcp-server/AGENTS.md`).
  *
+ * Note that `GET /repos/:id/pulls` is a GET but not effect-free server-side
+ * — it syncs from GitHub and upserts PR rows, same as loading the PR list in
+ * the UI. That's a pre-existing property of that endpoint, not something
+ * this resolver adds; see `mcp-server/AGENTS.md`'s "Do not touch" section
+ * for why `readOnlyHint: true` on the tools that call it is still correct.
+ *
  * `repo` (and every other model-supplied string) is NEVER interpolated into
  * a URL path — only uuids returned BY OUR OWN API ever reach a path segment,
  * closing the path-injection/SSRF surface at the resolver boundary.

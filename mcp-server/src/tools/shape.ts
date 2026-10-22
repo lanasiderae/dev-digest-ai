@@ -1,13 +1,15 @@
 import type { BlastCaller, FindingRecord } from '@devdigest/shared';
+import { wrapUntrusted } from '../untrusted.js';
 
 /** Pure response-shaping helpers — turn a full API payload into the concise
  *  shape a tool actually returns, never a raw API dump. No I/O, no grouping
  *  logic of its own: every tool using these feeds them an already-grouped
- *  server payload. */
+ *  server payload. Any repo/PR-derived free text (a finding's `title`, a
+ *  caller's label) is wrapped via `wrapUntrusted` here, once, so every call
+ *  site gets the delimiting for free instead of each tool re-doing it. */
 
 export const MAX_FINDINGS_PER_REVIEW = 30;
 export const MAX_CALLERS_PER_SYMBOL_OUT = 20;
-export const MAX_LIST_HINT = 20;
 
 export interface ConciseFinding {
   severity: FindingRecord['severity'];
@@ -25,16 +27,17 @@ export function conciseFinding(f: FindingRecord): ConciseFinding {
     category: f.category,
     file: f.file,
     line: f.start_line,
-    title: f.title,
+    title: wrapUntrusted(f.title),
     confidence: f.confidence,
     status: f.accepted_at ? 'accepted' : f.dismissed_at ? 'dismissed' : 'open',
   };
 }
 
-/** "path/to/file.ts:42 (callerName)" — the caller label the blast-radius tool
- *  surfaces per symbol. */
+/** "<untrusted>path/to/file.ts:42 (callerName)</untrusted>" — the caller
+ *  label the blast-radius tool surfaces per symbol. File/symbol names come
+ *  straight out of a cloned, possibly-hostile repository. */
 export function callerLabel(c: BlastCaller): string {
-  return `${c.file}:${c.line} (${c.name})`;
+  return wrapUntrusted(`${c.file}:${c.line} (${c.name})`);
 }
 
 export interface Truncated<T> {

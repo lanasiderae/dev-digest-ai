@@ -68,7 +68,14 @@ tool) and resolves it to this app's internal uuids via `src/api/resolve.ts`.
 - Must never touch the DB directly, and must never call a write/LLM
   server endpoint from a read-only tool (`get_findings`, `get_conventions`,
   `get_blast_radius`, `list_agents` are read-only; only `run_agent_on_pr`
-  writes).
+  writes). "Read-only" here means the HTTP method — it does NOT mean
+  effect-free: `GET /repos/:id/pulls` (which `resolvePull` calls on every
+  PR-scoped tool) has its own, pre-existing server-side side effects (a
+  GitHub sync + a persisted-row upsert, same as loading the PR list in the
+  UI). `readOnlyHint: true` is still correct for these four tools — none of
+  them let the model trigger a review, write a finding, or mutate anything
+  the model itself controls — but don't read the hint as "this call has zero
+  side effects on the server."
 
 ## Gotchas
 

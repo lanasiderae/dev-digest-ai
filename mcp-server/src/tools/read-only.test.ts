@@ -17,7 +17,13 @@ const FIXTURES: Record<string, unknown> = {
 };
 
 /** A write-endpoint denylist. The stub throws if hit by ANY of the 4
- *  read-only tools, and if a non-GET method is ever used. */
+ *  read-only tools, and if a non-GET method is ever used.
+ *
+ *  `GET /repos/:id/pulls` (hit by `resolvePull` on every PR-scoped tool) is
+ *  deliberately NOT in this denylist even though it has real server-side
+ *  side effects (a GitHub sync + a persisted-row upsert) — `readOnlyHint`
+ *  here means "never calls a write/LLM endpoint", not "zero server-side
+ *  effects"; see `mcp-server/AGENTS.md`'s "Do not touch" section. */
 const WRITE_DENYLIST = [/\/review$/, /\/conventions\/extract$/, /\/resync$/, /\/findings\/.+\/(accept|dismiss)$/];
 
 function stubFetch(): typeof fetch {

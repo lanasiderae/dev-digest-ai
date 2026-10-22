@@ -3,6 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { loadMcpConfig } from '../config.js';
 import { createMcpServer } from '../server.js';
+import { wrapUntrusted } from '../untrusted.js';
 
 const REPO_ID = '11111111-1111-1111-1111-111111111111';
 const PR_ID = '22222222-2222-2222-2222-222222222222';
@@ -201,7 +202,7 @@ describe('run_agent_on_pr', () => {
     const body = textOf(result);
     expect(body.status).toBe('done');
     expect(body.findings).toHaveLength(1);
-    expect(body.findings[0].title).toBe(SECRET_FINDING_TITLE);
+    expect(body.findings[0].title).toBe(wrapUntrusted(SECRET_FINDING_TITLE));
   }, 10_000);
 
   it('a failed run returns a non-error result carrying the error text', async () => {

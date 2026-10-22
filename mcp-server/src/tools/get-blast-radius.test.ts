@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { BlastRadiusResponse } from '@devdigest/shared';
 import { loadMcpConfig } from '../config.js';
 import { createMcpServer } from '../server.js';
+import { wrapUntrusted } from '../untrusted.js';
 
 const REPO_ID = '11111111-1111-1111-1111-111111111111';
 const PR_ID = '22222222-2222-2222-2222-222222222222';
@@ -104,7 +105,7 @@ describe('get_blast_radius', () => {
     const body = textOf(result);
     expect(body.degraded).toBe(false);
     const rateLimit = body.downstream.find((d: { symbol: string }) => d.symbol === 'rateLimit');
-    expect(rateLimit.callers).toEqual(['b.ts:23 (publicRouter)']);
+    expect(rateLimit.callers).toEqual([wrapUntrusted('b.ts:23 (publicRouter)')]);
     expect(rateLimit.endpoints_affected).toEqual(['GET /x']);
 
     // Zero-caller symbol is explicitly marked, not omitted.

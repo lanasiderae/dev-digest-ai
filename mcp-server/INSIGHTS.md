@@ -54,3 +54,39 @@
   Evidence: `src/tools/run-agent-on-pr.test.ts` (`runSummary(overrides)`
   helper), the `RunSummary` contract
   (`server/src/vendor/shared/contracts/trace.ts`).
+- **2026-10-22** — `truncate()`'s already-computed `total` (the real,
+  pre-truncation count) was destructured away at two call sites
+  (`get-findings.ts`, `get-blast-radius.ts`), so `totals.findings` and a
+  symbol's caller count silently understated whenever `findings_truncated`/
+  `callers_truncated` was true. Destructure and surface `total` everywhere
+  `truncate()` is used. Evidence: `src/tools/shape.ts`'s `truncate`,
+  `src/tools/get-findings.ts` (`findings_total`), `src/tools/get-blast-radius.ts`
+  (`callers_total`).
+
+## Codebase Patterns
+
+- **2026-10-22** — Repo/PR-derived free text a tool returns (finding titles,
+  review summary/grounding, convention rule/evidence_path, blast caller
+  labels) is reachable by a hostile PR or repository and crosses the MCP
+  boundary straight into the calling agent's context. The review pipeline's
+  own `wrapUntrusted`/`INJECTION_GUARD` (`reviewer-core/src/prompt.ts`)
+  guards the *reviewer* model against this exact content, but that guard
+  does not follow the text out through this boundary — a plain JSON string
+  has no "data, not instructions" framing. Fix: reimplemented the same
+  `<untrusted>...</untrusted>` delimiter LOCALLY (this package may depend
+  only on `@devdigest/shared`, never on `reviewer-core`), applied once at
+  the shared `shape.ts` helpers (`conciseFinding`, `callerLabel`) so every
+  tool using them gets it for free, plus a one-line `security_notice` in
+  each affected tool's response. Evidence: `src/untrusted.ts`,
+  `src/tools/shape.ts`, `src/untrusted.test.ts`.
+- **2026-10-22** — `readOnlyHint: true` on an MCP tool means "never calls a
+  write/LLM endpoint", not "zero server-side effects". `get_findings`/
+  `get_blast_radius` resolve a PR via `GET /repos/:id/pulls`, which syncs
+  from GitHub and upserts PR rows server-side
+  (`server/src/modules/pulls/routes.ts`) — a real, pre-existing side effect
+  of that endpoint (the same one loading the PR list in the UI causes), not
+  something this package added. Document the distinction explicitly
+  wherever the hint is explained, rather than letting a reader assume it
+  means fully inert. Evidence: `mcp-server/AGENTS.md` ("Do not touch"),
+  `src/api/resolve.ts`'s docblock, `src/tools/read-only.test.ts`'s denylist
+  comment.
