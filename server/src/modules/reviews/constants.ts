@@ -28,4 +28,6 @@ export const INTENT_MAX_STATEMENT_CHARS = 400;
 export const INTENT_MAX_BULLETS = 6;
 export const INTENT_MAX_BULLET_CHARS = 200;
 export const INTENT_MAX_RETRIES = 1;
-export const INTENT_TIMEOUT_MS = 15_000;
+// Intent is a small prompt, but provider cold starts can exceed 15 seconds.
+// Keep it bounded while allowing one normal OpenRouter response to complete.
+export const INTENT_TIMEOUT_MS = 60_000;
