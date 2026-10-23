@@ -458,6 +458,43 @@ export class RepoIntelRepository {
       .limit(limit);
   }
 
+  /**
+   * Top `limit` paths by rank DESC, with the raw `hotness` column alongside
+   * (unlike `getRankedPaths`, which only exposes `rank`). Same bounded
+   * `ORDER BY rank DESC LIMIT` shape — caller combines/filters/sorts in JS by
+   * `rank * (1 + hotness)`, same post-filter pattern `getTopFilesByRank` uses.
+   */
+  async getRankedFileFacts(
+    repoId: string,
+    limit: number,
+  ): Promise<Array<{ path: string; rank: number; hotness: number }>> {
+    return this.db
+      .select({ path: t.fileRank.filePath, rank: t.fileRank.rank, hotness: t.fileRank.hotness })
+      .from(t.fileRank)
+      .where(eq(t.fileRank.repoId, repoId))
+      .orderBy(desc(t.fileRank.rank))
+      .limit(limit);
+  }
+
+  /**
+   * Raw `stats` JSON blob for a repo's `repo_index_state` row (e.g. to read
+   * the pipeline-written `hotnessAvailable` key) without widening the stable
+   * `IndexState` shape `tryGetIndexState` returns to its many callers.
+   * Tolerant of a missing table/row, same as `tryGetIndexState`.
+   */
+  async getIndexStateStats(repoId: string): Promise<Record<string, unknown> | null> {
+    try {
+      const [row] = await this.db
+        .select({ stats: t.repoIndexState.stats })
+        .from(t.repoIndexState)
+        .where(eq(t.repoIndexState.repoId, repoId));
+      if (!row) return null;
+      return (row.stats ?? {}) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
   /** Repo-map candidates: symbols with a signature, joined to rank, ordered. */
   async getRepoMapCandidates(repoId: string): Promise<RepoMapCandidateRow[]> {
     return this.db

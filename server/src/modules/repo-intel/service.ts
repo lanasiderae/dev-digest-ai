@@ -36,6 +36,7 @@ import type {
   FileRankRow,
   IndexResult,
   IndexState,
+  RankedFilesResult,
   RefRow,
   RepoIntel,
   RepoMapResult,
@@ -653,6 +654,68 @@ export class RepoIntelService implements RepoIntel {
       if (out.length >= n) break;
     }
     return out;
+  }
+
+  /**
+   * Top-N files by `rank * (1 + hotness)` — the onboarding reading-order
+   * score (ONBOARD-AC-03) — read directly from the persisted `file_rank`
+   * raw rank/hotness columns. Unlike `getTopFilesByRank`/`getFileRank`
+   * (percentile-only), this exposes the raw stored columns so callers can
+   * compute their own score and see `hotnessAvailable` explicitly.
+   *
+   * Reads ONLY the persisted index: no reindex/refresh/AST/graph rebuild and
+   * no clone-scanning fallback. Preserves the same eligibility/degradation
+   * semantics `getIndexState`/`getBlastRadius` use — `degraded`+`reason` are
+   * only set for `flag_off`, an unusable (`degraded`/`failed`) index state, or
+   * an eligible-but-empty result (`no_data`); a `partial` index is still
+   * usable (matches `tryGetIndexState`'s documented "'partial' is still a
+   * working index" rule) and is NOT marked degraded.
+   *
+   * Bounded read: same over-fetch-then-filter shape `getTopFilesByRank` uses
+   * (`LIMIT max(n*10, 100)`, never an unbounded table scan), then junk-path
+   * exclusion + caller `exclude` substrings + score sort + `slice(0, n)`.
+   */
+  async getRankedFilesWithHotness(
+    repoId: string,
+    n: number,
+    opts?: { exclude?: string[] },
+  ): Promise<RankedFilesResult> {
+    if (!this.container.config.repoIntelEnabled) {
+      return { files: [], hotnessAvailable: false, degraded: true, reason: 'flag_off' };
+    }
+    if (n <= 0) return { files: [], hotnessAvailable: false };
+
+    const state = await this.repo.tryGetIndexState(repoId);
+    if (!state || state.status === 'degraded' || state.status === 'failed') {
+      return {
+        files: [],
+        hotnessAvailable: false,
+        degraded: true,
+        reason: state?.degradedReason ?? 'no_data',
+      };
+    }
+
+    const exclude = opts?.exclude ?? [];
+    const rows = await this.repo.getRankedFileFacts(repoId, Math.max(n * 10, 100));
+    const stats = await this.repo.getIndexStateStats(repoId);
+    const hotnessAvailable = stats?.hotnessAvailable === true;
+
+    const files = rows
+      .filter((r) => !isJunkPath(r.path) && !exclude.some((e) => r.path.includes(e)))
+      .map((r) => ({
+        path: r.path,
+        rank: r.rank,
+        hotness: r.hotness,
+        score: r.rank * (1 + r.hotness),
+      }))
+      // Deterministic tie-break: higher score first; equal score → lexicographic path.
+      .sort((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)))
+      .slice(0, n);
+
+    if (files.length === 0) {
+      return { files: [], hotnessAvailable, degraded: true, reason: 'no_data' };
+    }
+    return { files, hotnessAvailable };
   }
 
   /**

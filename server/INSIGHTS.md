@@ -194,6 +194,39 @@
   by reverting those two DTO fields and keeping only the DB columns +
   `ProjectContextSelectionList` (`contracts/project-context.ts`).
 
+- **2026-10-22** — The repo-intel indexer pipelines (`pipeline/full.ts:262`,
+  `pipeline/incremental.ts:251`) already write a `hotnessAvailable: false`
+  key into `repo_index_state.stats` (JSONB) on every run — but
+  `RepoIntelRepository.tryGetIndexState` only ever projects `stats.durationMs`
+  and `stats.reason` out of that blob; every other key (including
+  `hotnessAvailable`) is silently dropped before it reaches the stable
+  `IndexState` shape. A caller needing `hotnessAvailable` (or any other
+  pipeline-written stat) must read `repo_index_state.stats` directly rather
+  than assuming `getIndexState()`/`tryGetIndexState()` exposes it — added a
+  narrow `getIndexStateStats(repoId)` repository method for this rather than
+  widening `IndexState` (which has many existing callers). Evidence:
+  `server/src/modules/repo-intel/repository.ts` (`tryGetIndexState`'s
+  `stats.durationMs`/`stats.reason` projection vs. the new
+  `getIndexStateStats`), `server/src/modules/repo-intel/pipeline/full.ts:262`,
+  `server/src/modules/repo-intel/pipeline/incremental.ts:251`.
+- **2026-10-22** — `server/tsconfig.json`'s `include: ["src/**/*.ts"]` means
+  `pnpm typecheck` (`tsc --noEmit -p tsconfig.json`) never type-checks
+  anything under `server/test/`, and `vitest run` doesn't type-check either
+  (esbuild strips types without checking) — so a `*.it.test.ts` file whose
+  stub class does `implements SomeInterface` (e.g. `test/blast.it.test.ts`'s
+  `StubRepoIntel implements RepoIntel`) can silently fall out of sync with
+  that interface after a non-test-file change adds a new required method:
+  neither `pnpm typecheck` nor `pnpm exec vitest run` catches the missing
+  method, confirmed by running `tsc --noEmit` directly against the file
+  (`error TS2420: Class 'StubRepoIntel' incorrectly implements interface
+  'RepoIntel'. Property '<new method>' is missing`) after adding
+  `RepoIntel.getRankedFilesWithHotness` without touching the stub. Anyone
+  adding a method to a facade interface (`RepoIntel`, or similarly-shaped
+  ones) must manually `grep -rln "implements <Interface>"` across `test/`
+  too, not just `src/`, since the toolchain won't flag the gap. Evidence:
+  `server/tsconfig.json` (`include`), `server/test/blast.it.test.ts`
+  (`StubRepoIntel`).
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
