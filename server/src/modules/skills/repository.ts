@@ -1,7 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { SkillSource, SkillType } from '@devdigest/shared';
+import type { ProjectContextSelectionList, SkillSource, SkillType } from '@devdigest/shared';
 import { INITIAL_SKILL_VERSION } from './constants.js';
 import { isBodyChange } from './helpers.js';
 
@@ -23,6 +23,7 @@ export interface InsertSkill {
   body: string;
   enabled?: boolean;
   evidenceFiles?: string[] | null;
+  projectContext?: ProjectContextSelectionList;
 }
 
 export interface UpdateSkill {
@@ -31,6 +32,7 @@ export interface UpdateSkill {
   type?: SkillType;
   body?: string;
   enabled?: boolean;
+  projectContext?: ProjectContextSelectionList;
 }
 
 export class SkillsRepository {
@@ -72,6 +74,7 @@ export class SkillsRepository {
         enabled: values.enabled ?? true,
         version: INITIAL_SKILL_VERSION,
         evidenceFiles: values.evidenceFiles ?? null,
+        ...(values.projectContext !== undefined ? { projectContext: values.projectContext } : {}),
       })
       .returning();
     await this.snapshotVersion(row!, INITIAL_SKILL_VERSION);
@@ -101,6 +104,7 @@ export class SkillsRepository {
         ...(patch.type !== undefined ? { type: patch.type } : {}),
         ...(patch.body !== undefined ? { body: patch.body } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.projectContext !== undefined ? { projectContext: patch.projectContext } : {}),
         ...(bodyChanged ? { version: nextVersion } : {}),
       })
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))

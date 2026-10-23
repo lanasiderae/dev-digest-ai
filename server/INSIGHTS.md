@@ -25,9 +25,63 @@
   `server/src/adapters/mocks.ts` (`MockLLMOptions.structuredBySchema` doc
   comment), `server/src/modules/conventions/service.ts`,
   `server/src/modules/conventions/constants.ts` (`EXTRACTION_SCHEMA_NAME`).
+- **2026-10-22** — L05/TASK-04 added `project_context` to the server's
+  `Agent`/`Skill` DTOs in `vendor/shared/contracts/knowledge.ts` and
+  `disableTransportRetry` to `CompletionRequest`/`StructuredRequest` in
+  `vendor/shared/adapters.ts`, but did NOT mirror either change into
+  `client/src/vendor/shared/*` — this task ran under an explicit "backend-only,
+  never touch `client/**`" constraint (a separate frontend worker was
+  concurrently active on `client/**` in the same checkout) that overrode the
+  usual "both vendored copies change together" convention. The client copies
+  of both files were already non-byte-identical to the server's before this
+  session (confirmed: client's `knowledge.ts` omits `AgentVersionConfig`/
+  `AgentVersion` entirely per this file's 2026-10-22 entry below, and client's
+  `adapters.ts` omits `sessionId`/`commitFiles`/`sync`/etc.), so this is a
+  widening of an existing gap, not a new kind of drift — but it still needs a
+  follow-up hand-edit to `client/src/vendor/shared/contracts/knowledge.ts`
+  (add `project_context: ProjectContextSelectionList` to its `Agent`/`Skill`)
+  before any client code (e.g. TASK-05's `ProjectContextSelector`) can read
+  that field with a type-checked contract. `adapters.ts`'s
+  `disableTransportRetry` has no client consumer in this slice (TASK-08/10 are
+  server-only callers), so mirroring it is lower-urgency but still owed for
+  parity. Evidence: `server/src/vendor/shared/contracts/knowledge.ts` vs.
+  `client/src/vendor/shared/contracts/knowledge.ts` (diff after this session),
+  same pair for `adapters.ts`.
 
 ## Codebase Patterns
 
+- **2026-10-22** — No shared "does this workspace own repo id X" helper existed
+  anywhere in the codebase before L05/TASK-04 — `repo-intel/repository.ts`'s
+  `getRepoBasics(repoId)` is deliberately tenant-agnostic (its own comment says
+  so), and `project-context/repository.ts`'s `getOwnedRepo` is scoped to that
+  one module. Agent/skill CRUD needed to validate a `project_context`
+  selection's `repo_id` against workspace ownership, so TASK-04 added
+  `RepoRepository.listOwnedIds(workspaceId, repoIds): Promise<Set<string>>`
+  (bulk `inArray` check, same shape as `agentSkillCounts`/`skillAgentCounts`)
+  and exposed it as `container.reposRepo`, following the exact
+  `agentsRepo`/`skillsRepo`/`reviewRepo` lazy-getter precedent. Any future
+  module needing the same "workspace owns repo X" check should reuse this
+  rather than adding a fourth near-duplicate query. Evidence:
+  `server/src/modules/repos/repository.ts` (`listOwnedIds`),
+  `server/src/platform/container.ts` (`reposRepo` getter),
+  `server/src/modules/agents/service.ts`/`modules/skills/service.ts`
+  (`assertProjectContextReposOwned`).
+- **2026-10-22** — Agents' and skills' `project_context` field participates in
+  their version-bump rule DIFFERENTLY, by design, matching each module's
+  pre-existing versioning semantics: agents' `isConfigChange` bumps
+  `agent_versions` on any genuine `project_context` content change (same
+  bucket as `provider`/`model`/`strategy`, compared via a `JSON.stringify`
+  equality check — `projectContextEqual` — so resubmitting an
+  object-identity-different-but-content-same array doesn't spuriously bump
+  it); skills' `isBodyChange` never looks at `project_context` at all, since
+  `skill_versions` is deliberately body-only (per its own doc comment, editing
+  name/description/type/enabled already doesn't version a skill, and
+  `project_context` joins that same unversioned bucket). Don't assume the two
+  modules' "does this field bump the version" rule is symmetric when adding a
+  new field to either. Evidence: `server/src/modules/agents/helpers.ts`
+  (`isConfigChange`, `projectContextEqual`), `server/src/modules/skills/helpers.ts`
+  (`isBodyChange`'s doc comment), `server/test/agents-helpers-project-context.test.ts`,
+  `server/test/skills-project-context.test.ts`.
 - **2026-10-22** — `pull_requests` has no dedicated merge-timestamp column —
   `status` ('open'/'merged'/'closed') IS the GitHub merge state (confirmed
   by `pulls/status.ts:89`'s `ghStatus === 'merged'` check), and `updated_at`
@@ -320,6 +374,22 @@
   `server/src/modules/project-context/service.ts` (`private getRoots`),
   `server/test/project-context-service.test.ts` (the `getRoots` override in
   `makeService`).
+- **2026-10-22** — Extending `Tokenizer.count()` with encoding-aware metadata
+  (`'cl100k_base'` vs `'heuristic'`) without touching `count()`'s own frozen
+  signature: added a wider sibling interface `TokenizerWithEstimate extends
+  Tokenizer { estimate(text): TokenEstimate }`, implemented by
+  `TiktokenTokenizer` (whose `count()` now just delegates to
+  `estimate().tokens`, so there's exactly one try/catch/sticky-`broken` code
+  path, not two), plus a free function `estimateWithEncoding(tokenizer, text)`
+  that duck-checks for `.estimate` and falls back to `{tokens: count(),
+  encoding: 'heuristic'}` for an opaque/mock tokenizer. This was necessary
+  because `test/repo-intel-rank-map.test.ts`'s `charTokenizer: Tokenizer = {
+  count: (t) => t.length }` is a literal object satisfying exactly the narrow
+  interface — adding a new REQUIRED method to `Tokenizer` itself would have
+  broken that fixture's type (even though `server/test/` isn't covered by
+  `pnpm typecheck`, per this file's existing `tsconfig.json include` gotcha).
+  Evidence: `server/src/adapters/tokenizer/index.ts` (`TokenizerWithEstimate`,
+  `estimateWithEncoding`), `server/test/tokenizer-estimate.test.ts`.
 
 ## Recurring Errors & Fixes
 
@@ -381,3 +451,23 @@
   returning. Evidence: `server/src/modules/reviews/run-executor.ts:300-345`
   (`completeAgentRun` before `saveRunTrace`, same order in the `failAll`
   and catch branches), `server/test/helpers/runs.ts` (`tracesExist`).
+- **2026-10-22** — Before L05/TASK-04, `AnthropicProvider`/`OpenAIProvider`'s
+  `completeStructured` reprompt loop had no `try/catch` around the per-attempt
+  API call — a transport failure on attempt 2+ (after attempt 1 already
+  returned a response that merely failed schema validation, accumulating real
+  `tokensIn`/`tokensOut`) propagated the RAW SDK error straight out of
+  `completeStructured`, silently dropping that already-accumulated usage with
+  no way for a caller to log it. Fixed by wrapping each attempt's API call in
+  its own `try/catch` that rethrows an `ExternalServiceError` carrying
+  `{ usage: usageKnown ? { tokensIn, tokensOut } : 'unknown' }` — `usageKnown`
+  flips true only after at least one attempt actually received a response, so
+  a failure before any response is honestly labeled `'unknown'` rather than
+  `{tokensIn: 0, tokensOut: 0}` (which would read as a confirmed free call —
+  same "never guess a cost/usage number" principle `PriceBook.estimate`
+  already follows for pricing, per `server/docs/architecture.md`). Any other
+  multi-attempt LLM call site added later should check for this same
+  swallowed-usage-on-transport-failure shape. Evidence:
+  `server/src/adapters/llm/openai.ts`/`anthropic.ts` (`completeStructured`'s
+  per-attempt `try/catch`), `server/test/llm-disable-retry.test.ts` ("preserves
+  real accumulated usage on failure when an earlier attempt DID respond",
+  "labels failure usage 'unknown' when no response was ever received").

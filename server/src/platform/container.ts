@@ -26,6 +26,7 @@ import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
 import { fetchSkillUrl, type UrlImportResult } from '../modules/skills/import/url.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
@@ -82,6 +83,7 @@ export class Container {
   private _agentsRepo?: AgentsRepository;
   private _skillsRepo?: SkillsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _reposRepo?: RepoRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -109,6 +111,15 @@ export class Container {
 
   get skillsRepo(): SkillsRepository {
     return (this._skillsRepo ??= new SkillsRepository(this.db));
+  }
+
+  /**
+   * Shared "does this workspace own repo id X" read (L05, TASK-04) — used by
+   * agent/skill CRUD to validate `project_context` selections without each
+   * module duplicating the `t.repos` ownership query itself.
+   */
+  get reposRepo(): RepoRepository {
+    return (this._reposRepo ??= new RepoRepository(this.db));
   }
 
   /** Resolve a skill-import URL (SSRF-guarded fetch by default, overridable in tests). */

@@ -7,7 +7,7 @@ import type {
   StructuredRequest,
   StructuredResult,
 } from '@devdigest/shared';
-import { withRetry, withTimeout } from '../../platform/resilience.js';
+import { withRetry, withRetryUnless, withTimeout } from '../../platform/resilience.js';
 import { toJsonSchema, parseWithRepair } from '../../platform/structured.js';
 import { estimateCost } from './pricing.js';
 import { ExternalServiceError } from '../../platform/errors.js';
@@ -62,7 +62,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
-    return withRetry(() =>
+    return withRetryUnless(req.disableTransportRetry, () =>
       withTimeout(this.doComplete(req), req.timeoutMs ?? DEFAULT_TIMEOUT),
     );
   }
@@ -87,30 +87,48 @@ export class OpenAIProvider implements LLMProvider {
 
   async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     const jsonSchema = toJsonSchema(req.schema, req.schemaName);
-    const maxRetries = req.maxRetries ?? 2;
+    // disableTransportRetry forces exactly one attempt total — it overrides
+    // maxRetries' own reprompt-on-error loop, not just the transport retry
+    // below (see StructuredRequest.disableTransportRetry's doc comment).
+    const maxRetries = req.disableTransportRetry ? 0 : (req.maxRetries ?? 2);
     const messages = [...req.messages];
     let tokensIn = 0;
     let tokensOut = 0;
+    // True once at least one attempt actually received a response — lets a
+    // failure distinguish "the provider reported some usage before this
+    // failed" from "no attempt ever got a response", rather than reporting
+    // 0 tokens (which would read as a confirmed free call) for the latter.
+    let usageKnown = false;
     let lastRaw = '';
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-      const res = await withRetry(() =>
-        withTimeout(
-          this.client.chat.completions.create({
-            model: req.model,
-            messages,
-            ...tuningParams(req.model, req.temperature, req.maxTokens),
-            response_format: {
-              type: 'json_schema',
-              json_schema: { name: req.schemaName, schema: jsonSchema.schema, strict: true },
-            },
-          }),
-          req.timeoutMs ?? DEFAULT_TIMEOUT,
-        ),
-      );
+      let res;
+      try {
+        res = await withRetryUnless(req.disableTransportRetry, () =>
+          withTimeout(
+            this.client.chat.completions.create({
+              model: req.model,
+              messages,
+              ...tuningParams(req.model, req.temperature, req.maxTokens),
+              response_format: {
+                type: 'json_schema',
+                json_schema: { name: req.schemaName, schema: jsonSchema.schema, strict: true },
+              },
+            }),
+            req.timeoutMs ?? DEFAULT_TIMEOUT,
+          ),
+        );
+      } catch (err) {
+        throw new ExternalServiceError('OpenAI structured output request failed', {
+          raw: lastRaw,
+          usage: usageKnown ? { tokensIn, tokensOut } : 'unknown',
+          cause: err instanceof Error ? err.message : String(err),
+        });
+      }
       lastRaw = res.choices?.[0]?.message?.content ?? '';
       tokensIn += res.usage?.prompt_tokens ?? 0;
       tokensOut += res.usage?.completion_tokens ?? 0;
+      usageKnown = true;
 
       const parsed = parseWithRepair(req.schema, lastRaw);
       if (parsed.ok) {
@@ -131,6 +149,7 @@ export class OpenAIProvider implements LLMProvider {
 
     throw new ExternalServiceError('OpenAI structured output failed schema validation', {
       raw: lastRaw,
+      usage: usageKnown ? { tokensIn, tokensOut } : 'unknown',
     });
   }
 
