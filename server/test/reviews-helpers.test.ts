@@ -54,6 +54,11 @@ describe('computeRunCost', () => {
   it('passes through a null estimate (e.g. unknown model) unchanged', () => {
     expect(computeRunCost(nullEstimate, { status: 'done', model: 'unknown-model', tokensIn: 100, tokensOut: 50 })).toBeNull();
   });
+
+  it('is null rather than a nonsensical negative cost when a token count is negative', () => {
+    expect(computeRunCost(estimate, { status: 'done', model: 'gpt-4.1', tokensIn: -1, tokensOut: 50 })).toBeNull();
+    expect(computeRunCost(estimate, { status: 'done', model: 'gpt-4.1', tokensIn: 100, tokensOut: -1 })).toBeNull();
+  });
 });
 
 /**

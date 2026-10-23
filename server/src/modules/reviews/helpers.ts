@@ -67,6 +67,9 @@ export function computeRunCost(
 ): number | null {
   if (run.status !== 'done') return null;
   if (!run.model || run.tokensIn == null || run.tokensOut == null) return null;
+  // Negative counts only happen from an upstream bug — a nonsensical negative
+  // cost is worse than surfacing "no data" here.
+  if (run.tokensIn < 0 || run.tokensOut < 0) return null;
   return estimate(run.model, run.tokensIn, run.tokensOut);
 }
 
