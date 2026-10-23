@@ -17,6 +17,7 @@
     "graph": "graph"
   },
   "callerCount": "{count, plural, one {# caller} other {# callers}}",
+  "noSymbols": "No changed code symbols.",
   "noDownstream": "{count} changed symbol(s), no downstream callers found.",
   "degraded": {
     "title": "Index incomplete",

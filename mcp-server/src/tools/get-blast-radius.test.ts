@@ -116,6 +116,15 @@ describe('get_blast_radius', () => {
     expect(calls.filter((c) => c.endsWith('/blast'))).toHaveLength(1);
   });
 
+  it('explains a healthy map with no changed symbols', async () => {
+    const { result } = await callBlastTool({
+      blast: { changed_symbols: [], downstream: [], summary: 'No changed symbols detected.' },
+      degraded: false,
+      reason: null,
+    });
+    expect(textOf(result).empty_state).toBe('No changed code symbols.');
+  });
+
   it('surfaces degraded:true with its reason', async () => {
     const { result } = await callBlastTool({
       blast: { changed_symbols: [], downstream: [], summary: 's' },
@@ -125,5 +134,6 @@ describe('get_blast_radius', () => {
     const body = textOf(result);
     expect(body.degraded).toBe(true);
     expect(body.degraded_reason).toBe('index_partial');
+    expect(body.empty_state).toBeUndefined();
   });
 });

@@ -63,6 +63,9 @@ export function registerGetBlastRadiusTool(server: McpServer, deps: { api: DevDi
                 repo: repo.fullName,
                 pr_number: pull.number,
                 summary: blast.summary,
+                ...(!degraded && blast.changed_symbols.length === 0
+                  ? { empty_state: 'No changed code symbols.' }
+                  : {}),
                 degraded,
                 degraded_reason: reason,
                 changed_symbols: blast.changed_symbols,

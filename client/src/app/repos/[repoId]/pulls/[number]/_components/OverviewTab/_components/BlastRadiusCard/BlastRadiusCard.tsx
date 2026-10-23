@@ -110,6 +110,12 @@ export function BlastRadiusCard({
           </div>
         )}
 
+        {!degraded && counts.callers === 0 && (
+          <p style={s.muted}>
+            {counts.symbols === 0 ? t("noSymbols") : t("noDownstream", { count: counts.symbols })}
+          </p>
+        )}
+
         <div style={s.symbolList}>
           {groups.map(({ symbol, downstream }) => {
             const key = symbolKey(symbol);

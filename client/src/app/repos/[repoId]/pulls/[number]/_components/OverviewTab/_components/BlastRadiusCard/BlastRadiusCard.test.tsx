@@ -149,6 +149,7 @@ describe("BlastRadiusCard", () => {
 
     await waitFor(() => expect(screen.getByText("Index incomplete")).toBeInTheDocument());
     expect(screen.getByText("The repo index is only partially built.")).toBeInTheDocument();
+    expect(screen.queryByText("No changed code symbols.")).not.toBeInTheDocument();
     // Distinct from the per-symbol empty-state text used in the "mixed empty" case.
     expect(screen.queryByText("No downstream callers found for this symbol.")).not.toBeInTheDocument();
   });
@@ -165,6 +166,8 @@ describe("BlastRadiusCard", () => {
 
     await waitFor(() => expect(screen.getByText("No prior PRs overlap these files.")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /Prior PRs touching these files/ })).not.toBeInTheDocument();
+    expect(screen.getByText("No changed code symbols.")).toBeInTheDocument();
+    expect(screen.queryByText("Index incomplete")).not.toBeInTheDocument();
   });
 
   it("expands the Prior PRs footer to show each prior PR, linked to GitHub, with its merged-by line and shared-file count", async () => {
