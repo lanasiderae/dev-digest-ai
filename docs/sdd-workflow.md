@@ -97,5 +97,6 @@ Prompt Assembly exposes **project context attached specs**, with the full text
 actually sent for that run. That immutable trace snapshot is distinct from
 path-only attachment metadata.
 
-The current feature specification remains a draft. Historical approval text
-does not approve it; its remaining decisions must be resolved explicitly.
+The L05 feature specification was explicitly approved after resolving its
+remaining decisions. That approval covers the specification; the separately
+generated implementation plan still requires review and approval.

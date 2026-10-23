@@ -1,6 +1,7 @@
 # L05 feature specification
 
-- Status: **Draft — awaiting clarification and explicit approval.**
+- Status: **APPROVED**.
+- Approval evidence: in the 2026-10-22 session, the user explicitly answered “yes” to approval of the C2, C4 and C7 recommendations. This approves this specification, not a future implementation plan or code.
 - Author: `spec-creator` subagent; generated from the assignment and inspected fork evidence.
 - Baseline: `lanasiderae/dev-digest-ai`, `l04/mcp`, commit `da33d6d126e5fd9e23f75f769753c0207115356d`.
 - Target branch: `l05/specs`; `main` is not the baseline.
@@ -9,11 +10,11 @@
 
 ## Approval checklist and stage order
 
-Before approval, review goals/non-goals, the six clarification categories, source provenance, missing-data semantics, numeric token budgets and their counting method, and every `[NEEDS CLARIFICATION]` marker. Do not pass an unresolved draft to `implementation-planner`.
+Goals/non-goals, the six clarification categories, source provenance, missing-data semantics and numeric token budgets are resolved in this approved specification. There are no outstanding product clarification markers; it may be passed to the separately invoked `implementation-planner`.
 
 Required sequence: workflow foundation → approved specification → separately invoked implementation planner → AC-linked plan → cross-model plan review → commit specification and reviewed plan → manually invoked execution-only `run-plan` → Project Context Folder → PR Brief → Onboarding Generator → architecture review, fixes and documentation → final read-only `plan-verifier` → manually invoked retrospective and delivery evidence. An early verifier checkpoint is optional and does not replace final verification. Stage commits must remain traceable. Approval of this specification is not approval of a future plan.
 
-The planner asks once whether execution should use a single agent or multiple agents and resolves technical ambiguities; it does not create or edit the specification. `run-plan` does not invoke specification creation or planning. For this slice, the implementer writes AC-derived tests; a dedicated test-writer phase is skipped, not validation. Architecture reviewer and final verifier use Sonnet in Claude Code. Repository-wide checks are consolidated by the root coordinator rather than repeated independently by each subagent. The user has requested splitting current work where possible; that execution preference does not approve this specification.
+The planner asks once whether execution should use a single agent or multiple agents and resolves technical ambiguities; it does not create or edit the specification. `run-plan` does not invoke specification creation or planning. For this slice, the implementer writes AC-derived tests; a dedicated test-writer phase is skipped, not validation. Architecture reviewer and final verifier use Sonnet in Claude Code. Repository-wide checks are consolidated by the root coordinator rather than repeated independently by each subagent. The user has requested splitting current work where possible; this execution preference is separate from specification approval.
 
 ## Consolidated decisions
 
@@ -28,21 +29,21 @@ The planner asks once whether execution should use a single agent or multiple ag
 
 | Category | Confirmed requirement / inspected evidence | Unresolved decision |
 |---|---|---|
-| 1. Goals, users, scope | Assignment includes all three product features; Project Context Folder comes first. | Whole specification approval is pending. |
-| 2. Behavior and interaction | Manual repository-qualified attachments and a repository-scoped tour preserve the existing add-repository flow. Brief generation is explicit. | C2: decide how reviewer-attached context reaches a brief; a PR-linked specification alone does not satisfy the assignment. |
-| 3. Data and provenance | Proposed `repoId` plus relative path prevents cross-repository ambiguity; the synced default-branch snapshot must remain distinct from PR head. | C4: approve workspace scope for configurable roots. |
-| 4. Failure and edge cases | Whole-document dropping preserves complete rules; zero-call skeletons expose unavailable index data; failed regeneration should preserve a generated cache. | Proposed behavior below awaits specification approval. |
-| 5. Constraints and budget | Proposed limits bound document reads, attachments and model input while allowing a complete five-section tour. | C7: approve numeric budgets, hard whole-input enforcement and tokenizer policy. |
-| 6. Verification and delivery | AC → task → test → commit; real cross-model family review; open PR and demo video. | Cross-model provider availability, paid-call budget, and user approval of draft remain pending; do not fabricate evidence. |
+| 1. Goals, users, scope | Assignment includes all three product features; Project Context Folder comes first. | Resolved; specification approved. |
+| 2. Behavior and interaction | Optional explicit reviewer selection supplies attached context; a safe PR-linked specification is unioned and deduplicated. No selected reviewer does not block generation. | C2 approved; show “Reviewer context not selected.” when absent. |
+| 3. Data and provenance | `repoId` plus relative path prevents cross-repository ambiguity; the synced default-branch snapshot remains distinct from PR head. | C4 approved: workspace roots; per-repository overrides deferred. |
+| 4. Failure and edge cases | Whole-document dropping preserves complete rules; zero-call skeletons expose unavailable index data; failed regeneration preserves generated cache. | Resolved in approved behavior below. |
+| 5. Constraints and budget | Agreed numeric limits bound document reads, attachments and model input while allowing a complete five-section tour. | C7 approved: hard whole-input enforcement and documented tokenizer policy. |
+| 6. Verification and delivery | AC → task → test → commit; real cross-model family review; open PR and demo video. | Future plan approval, cross-model provider availability and paid-call budget are not established by specification approval. |
 
-### Proposed draft decisions
+### Approved decisions
 
-These policies await approval as part of this specification; they are design proposals, not claims of existing runtime behavior.
+These policies are approved requirements, not claims of existing runtime behavior.
 
 - C1 (scope resolved): include all three product features, with Project Context Folder first.
-- C2 (decision pending): support an optional safe PR-body Spec reference without introducing a mandatory reviewer picker. The assignment additionally requires reviewer-attached specifications. Proposed integration: an optional explicit reviewer/context selection for generation, unioned with the PR-linked specification when present; no implicit “last reviewer.” Confirm this interaction before planning.
+- C2: generation accepts optional explicit reviewer/context selection. Union that reviewer's direct documents and enabled safe skill documents with any explicit safe PR-linked specification, preserving order and deduplicating. Without a selected reviewer, generation still works and explicitly shows “Reviewer context not selected.” Never infer the last reviewer.
 - C3: store `repoId` plus normalized relative path. Resolve only selections for the reviewed repository, ordered direct-agent first, then enabled safe skills in configured order; first occurrence wins. Read the synced default-branch managed clone, record actual revision/digests separately from PR head, and prevent cross-repository inclusion.
-- C4 (scope pending): configure discovery roots at workspace scope, defaulting to `**/{specs,docs,insights}/**/*.md`; no host paths. Discover nested matching directories as required by the assignment.
+- C4: configure discovery roots at workspace scope, defaulting to `**/{specs,docs,insights}/**/*.md`, confined to the imported repository; no host paths. Discover nested matching directories. Per-repository overrides are deferred.
 - C5: 256 KiB per document, 2,000 discovered documents and 100 attachments per agent/skill. Attached-block budget is 20% of the selected model context window, clamped to 4,000–32,000 tokens, falling back to 16,000 when unknown. Include headings/delimiters in block counts. Drop whole documents from the end until the block fits; do not truncate documents into misleading rule fragments. Show omission reasons and deterministic order.
 - C6: without an eligible index, return a deterministic five-section skeleton with accurate limited status and zero model calls. Eligible generation makes one attempt, no retry. On model failure, return truthful fallback status while preserving any previously generated cached tour. Concurrent generation for the same resource returns 409 with a useful message.
 - C7: brief full-input cap 8,000 tokens, output allowance 1,500; tour full-input cap 24,000 tokens, output allowance 8,000. The larger tour allowance accommodates five structured sections and reduces JSON truncation risk; it is a cap, not a usage target. Count all assembled messages with the configured tokenizer, identify encoding/estimate status, and fail before the call if mandatory input cannot fit. Initial workflow maximum: two concurrent subagents, focused hermetic checks first, one deterministic e2e smoke per final product journey, expanding on failures; confirm actual available budget before model selection or paid demos.
@@ -71,7 +72,7 @@ The parent research inventory identifies these integration points; implementatio
 | Tour facts | Existing `repoIntel.getTopFilesByRank`, `getCriticalPaths`, `getRepoMap`, `getIndexState`; ranked persisted index is the source, not a new graph traversal/index build. |
 | Existing onboarding | `/onboarding` adds repositories. Preserve that flow and provide an accessible repository-scoped tour entry. Existing onboarding prompt sections do not match the required five sections and cannot be reused unchanged. |
 
-No live DevDigest MCP state was queried: those tools are not exposed in this Codex session. No paid model call, live review, user budget measurement, or product verification is claimed by this draft.
+No live DevDigest MCP state was queried: those tools are not exposed in this Codex session. No paid model call, live review, user budget measurement, or product verification is claimed by this specification.
 
 ## Workflow behavior and acceptance criteria
 
@@ -104,7 +105,7 @@ Discovery exposes repository-relative path and document type (`specs`, `docs`, `
 
 Documents are untrusted repository data. Only Markdown under configured repository roots is eligible; reject absolute paths, traversal, unsafe symlink escapes and cross-repository reads. Use existing delimiter escaping and injection guard under `## Project context`; document claims never disable structural safety or grounding. Selection/loading makes no model call. Preserve normal review call strategy; do not promise every review itself uses one call.
 
-Proposed C5 caps await approval. Retain deterministic ordering/deduplication and whole-document dropping; never truncate an attached rule document. Warn on stale/missing/unsafe selections without pretending they were read. Reading the synced default-branch clone does not imply it matches PR head; trace records actual provenance.
+Approved C5 caps apply. Retain deterministic ordering/deduplication and whole-document dropping; never truncate an attached rule document. Warn on stale/missing/unsafe selections without pretending they were read. Reading the synced default-branch clone does not imply it matches PR head; trace records actual provenance.
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
@@ -122,7 +123,7 @@ Proposed C5 caps await approval. Retain deterministic ordering/deduplication and
 
 ### User story and behavior
 
-As a reviewer, I open Overview, generate a brief using available PR-linked specifications and the approved reviewer-context interaction under C2, examine summary/risks/priorities beside available Intent/Blast, navigate to a relevant diff file, reload a cached result and explicitly regenerate it.
+As a reviewer, I open Overview, optionally select reviewer context, generate a brief using eligible attached documents and any explicit safe PR-linked specification, examine summary/risks/priorities beside available Intent/Blast, navigate to a relevant diff file, reload a cached result and explicitly regenerate it. Without a reviewer selection, the brief still generates and shows “Reviewer context not selected.”
 
 ### Contracts and provenance
 
@@ -136,14 +137,14 @@ Ground every risk path and focus path against the union of current PR files and 
 
 Resolve `resolveFeatureModel(container, workspaceId, 'risk_brief')`; use one `llm.completeStructured({model, schema, schemaName, messages})` attempt producing `{summary, risks: [], review_focus: []}`. No repair model call, retry, Intent generation, document summarization or secondary model call in this operation. Validate the contract and reject invalid references rather than persisting invented paths. Model/provider adapters must not hide additional billable retries.
 
-Proposed C7 cap: 8,000 whole-input tokens, separately 1,500 output tokens. Deterministic priority: source status/head/file allowlist and instructions; compact diff statistics/roles and available Intent/Blast; bounded PR/issue text; whole selected documents within remaining budget. Report omissions. If mandatory input cannot fit, fail before a model call with an actionable message. Raw diff hunks and source code are never included.
+Approved C7 cap: 8,000 whole-input tokens, separately 1,500 output tokens. Deterministic priority: source status/head/file allowlist and instructions; compact diff statistics/roles and available Intent/Blast; bounded PR/issue text; whole selected documents within remaining budget. Drop whole documents from the tail and report omission reasons. If mandatory input cannot fit, fail before a model call with an actionable message. Raw diff hunks and source code are never included.
 
 Missing Intent/Blast/issue/context is recorded and does not block generation using remaining facts. On model failure, preserve cache and show failure. PR-derived descriptions, issue text, index facts and documents remain delimiter-wrapped untrusted data with the guard preserved. Concurrent regeneration/head-change behavior must not corrupt or mislabel cache.
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
 | BRIEF-AC-01 | P1 | WHEN Overview has no cached brief, it SHALL show a PR Brief section and Generate brief button. | Component test and browser demo. |
-| BRIEF-AC-02 | P1 | WHEN generation succeeds, Overview SHALL display summary, Risk areas and ordered Review focus alongside available Intent/Blast and identify missing or degraded sources. | Complete/missing/degraded source tests and demo. |
+| BRIEF-AC-02 | P1 | WHEN generation succeeds, Overview SHALL display summary, Risk areas and ordered Review focus alongside available Intent/Blast and identify missing or degraded sources; IF no reviewer was selected, THEN generation SHALL still work and show “Reviewer context not selected.” | Complete/missing/degraded source and unselected-reviewer tests and demo. |
 | BRIEF-AC-03 | P1 | WHEN risks/focus are displayed, every risk SHALL have a title and related file and every focus item SHALL show file:line and reason. | Contract/render tests. |
 | BRIEF-AC-04 | P1 | IF model output references a file absent from both the PR and available Blast map, THEN the response SHALL be rejected before persistence. | Grounding rejection test and unchanged-cache check. |
 | BRIEF-AC-05 | P1 | WHEN a focus item belonging to the PR is clicked, the UI SHALL open Files changed with `?tab=diff` and select its file. | Browser navigation check. |
@@ -175,7 +176,7 @@ Reuse saved `repoIntel.*` facts and ranked files/import graph information; rank 
 
 Store five structured sections plus repository/index revision, status, evidence paths, ordered reading path and call/token/cost metadata in existing onboarding JSON storage. Resolve the `onboarding` feature model setting. For a complete eligible index, make one structured narrative model attempt. Validate section count/shape and paths before caching. Without an eligible index, use C6's zero-call deterministic five-section skeleton; on model/validation failure after one attempt, provide a skeleton and truthful failure status while preserving any previously generated tour in cache. Never label fallback as a successful generated narrative. Reject concurrent generation for the repository with an actionable 409 response.
 
-Proposed C7 budget: 24,000 whole-input tokens including instructions/delimiters, separate 8,000-token output allowance. Prioritize index status/revision and permitted file references, compact repository map and critical paths, ranked reading files, then bounded setup documentation. Enforce the whole-input cap before calling. Large repositories are bounded using existing ranked index retrieval; no whole-repository prompt or recursive code parsing. Incomplete clone and partial index must remain visible. Record model-reported usage/cost; unknown price remains unknown, not zero. Guard all repo-derived data against injection.
+Approved C7 budget: 24,000 whole-input tokens including instructions/delimiters, separate 8,000-token output allowance. Prioritize index status/revision and permitted file references, compact repository map and critical paths, ranked reading files, then bounded setup documentation. Enforce the whole-input cap before calling and fail before the model if essential input cannot fit. Large repositories are bounded using existing ranked index retrieval; no whole-repository prompt or recursive code parsing. Incomplete clone and partial index must remain visible. Record model-reported usage/cost; unknown price remains unknown, not zero. Guard all repo-derived data against injection.
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
@@ -192,20 +193,18 @@ Proposed C7 budget: 24,000 whole-input tokens including instructions/delimiters,
 
 ## Validation and delivery
 
-This draft has **49 acceptance criteria: 36 P1, 7 P2, 6 P3**. A final verifier must reconcile actual approved scope and priority counts before reporting coverage. Optional enhancements are not approval blockers; unresolved required criteria are.
+This approved specification has **49 acceptance criteria: 36 P1, 7 P2, 6 P3**. A final verifier must reconcile implemented coverage before reporting completion. Optional enhancements do not block delivery; unresolved required criteria do.
 
-Use specification-derived seam tests: prompt-level agent restrictions; document path containment; metadata/prompt/trace parity; brief source assembly, grounding, cache and navigation; tour ranking, structured call count and fallback. The implementer authors these AC-derived tests for this slice. The root coordinator runs affected-package test/typecheck/lint/audit commands from root guidance once after integrating changes, repeating only for new changes or failures. DB-backed tests keep `.it.test.ts`; record skipped Docker tests honestly. Run a real UI check for UI changes and a limited deterministic e2e journey; mocked tests do not establish live model behavior. Do not run tests or paid generation merely to approve this documentation draft.
+Use specification-derived seam tests: prompt-level agent restrictions; document path containment; metadata/prompt/trace parity; brief source assembly, grounding, cache and navigation; tour ranking, structured call count and fallback. The implementer authors these AC-derived tests for this slice. The root coordinator runs affected-package test/typecheck/lint/audit commands from root guidance once after integrating changes, repeating only for new changes or failures. DB-backed tests keep `.it.test.ts`; record skipped Docker tests honestly. Run a real UI check for UI changes and a limited deterministic e2e journey; mocked tests do not establish live model behavior. Specification approval does not establish a paid-generation budget.
 
-Final specification self-check: all six clarification categories are covered; goals/non-goals, contracts and user flows are explicit; relevant module interactions and supplied-design gaps are identified; safety, token budgets and failure NFRs are observable; trace snapshot requirements are testable; every AC has verification evidence. Detailed implementation choices belong in the separate plan. Pasted historical approvals do not approve this draft.
+Final specification self-check: all six clarification categories are covered; goals/non-goals, contracts and user flows are explicit; relevant module interactions and supplied-design gaps are identified; safety, token budgets and failure NFRs are observable; trace snapshot requirements are testable; every AC has verification evidence. Detailed implementation choices belong in the separate plan. Approval is based on the user's current-session “yes,” not pasted historical approvals.
 
 Required PR evidence: approved agent-generated dated English specification (`2026-10-22-l05-context-brief-onboarding.md`) and its separately generated AC-linked implementation plan committed before product code; actual cross-family review note; stage contributions; tests and audits with pre-existing vulnerabilities distinguished; final read-only verifier report; retrospective/ledger with honest metrics coverage; open PR implementation description; linked 1–3 minute PR Brief video. Video shows generate → summary/risks/focus and available/missing sources → diff navigation → reload without new call → refresh → spec/plan/verifier. Explain that precomputed facts keep source grounding and budgets controlled without sending raw diff hunks or rebuilding index facts. Context rule-violation and unfamiliar-repo tour demonstrations may be separate clips, with actual call/cost evidence.
 
-## Outstanding decisions
+## Approval and next-stage boundaries
 
-1. [NEEDS CLARIFICATION: C2 — approve optional explicit reviewer/context selection for brief generation, unioned with a PR-linked specification, to satisfy attached-spec integration? If another source-selection flow is intended, specify it.]
-2. [NEEDS CLARIFICATION: C4 — approve workspace-level configurable discovery roots constrained to the imported repository, using the assignment's recursive default glob?]
-3. [NEEDS CLARIFICATION: C7 — approve proposed limits (C5 document/context policy; brief 8,000 input/1,500 output tokens; tour 24,000 input/8,000 output tokens), with enforced whole-input caps and documented tokenizer/estimate handling?]
+C2, C4 and C7 are closed by the user's explicit approval on 2026-10-22. No product clarification remains outstanding. The implementation planner may now create the separate AC-linked plan.
 
 The retrospective ledger is `docs/retro/ledger.md`. Add no entry until the retrospective is manually invoked and actual run evidence is available.
 
-No user approval, plan approval, execution budget or cross-model availability has been inferred. Resolve these markers and record user evidence before planning.
+Future implementation-plan approval, paid-call budget and cross-model availability remain separate execution requirements; none is granted or claimed by this specification approval.
