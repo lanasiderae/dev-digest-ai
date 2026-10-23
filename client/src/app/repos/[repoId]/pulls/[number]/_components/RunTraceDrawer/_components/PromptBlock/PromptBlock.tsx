@@ -44,7 +44,20 @@ export function PromptBlock({
   };
   return (
     <div style={s.promptRow}>
-      <div onClick={() => setOpen((o) => !o)} style={s.promptHead}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
+        style={s.promptHead}
+      >
         <span style={s.promptDot(color)} />
         <span style={s.promptLabel}>{label}</span>
         {tokens != null && (

@@ -118,7 +118,7 @@ d('Onboarding Tour (Testcontainers pg) — DB round trip + real advisory lock', 
   });
 
   function appWith(opts: { generateDelayMs?: number; indexRevision?: string; repoIntelEnabled?: boolean } = {}) {
-    const llm = new MockLLMProvider('openai', {
+    const llm = new MockLLMProvider('openrouter', {
       structuredBySchema: { OnboardingTourGeneration: VALID_GENERATION },
     });
     if (opts.generateDelayMs) {
@@ -137,7 +137,7 @@ d('Onboarding Tour (Testcontainers pg) — DB round trip + real advisory lock', 
       db: pg.handle.db,
       overrides: {
         repoIntel: new StubRepoIntel(opts.indexRevision),
-        llm: { openai: llm },
+        llm: { openrouter: llm },
         rawSql: pg.handle.sql,
       },
     });

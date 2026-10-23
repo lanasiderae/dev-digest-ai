@@ -79,7 +79,7 @@ describe("ProjectContextSection", () => {
       attached_specs: ATTACHED_SPECS_TEXT,
     });
 
-    const label = screen.getByText("project context attached specs");
+    const label = screen.getByRole("button", { name: "project context attached specs" });
     expect(label).toBeInTheDocument();
     // Collapsed by default — the raw snapshot <pre> is not rendered yet.
     expect(container.querySelector("pre")).toBeNull();
