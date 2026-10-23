@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectContextSnapshot } from './project-context.js';
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -44,9 +45,10 @@ export const PromptAssembly = z.object({
   skills_tokens: z.number().int().nullish(),
   memory: z.string().nullish(),
   specs: z.string().nullish(),
-  /** Callers-of-changed-symbols digest (repo-intel); null when absent. */
+  /** Callers-of-changed-symbols digest (T1.3); null when absent. */
   callers: z.string().nullish(),
-  /** Repo skeleton / map (repo-intel); null when absent. */
+  /** Repo skeleton / map (T3); null when absent. Enables per-slot token
+      attribution in the run trace. */
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
@@ -88,7 +90,17 @@ export const RunTrace = z.object({
   tool_calls: z.array(ToolCall),
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
+  /** Flat path list of every project-context document actually read for this
+      run (CTX-AC-06). `project_context.documents` below carries the same
+      paths with full metadata (type/revision/tokens) — this field stays the
+      simple list for callers that only need "what was read". */
   specs_read: z.array(z.string()),
+  /** Included/omitted project-context documents, token totals and the full
+      guarded snapshot text actually sent (the "project context attached
+      specs" expandable section) — stored distinctly from the path-only
+      `ProjectContextSelection` attachment metadata. `.nullish()` so a trace
+      persisted before this field existed still parses. */
+  project_context: ProjectContextSnapshot.nullish(),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

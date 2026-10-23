@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
 import { SeverityCounts } from './findings.js';
+import { DEFAULT_PROJECT_CONTEXT_ROOTS } from './project-context.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -95,6 +96,14 @@ export const SettingsKnown = z.object({
   automatic_reviews: z.boolean().default(false),
   /** Per-feature model overrides (provider+model), keyed by FeatureModelId. */
   feature_models: z.record(FeatureModelId, FeatureModelChoice).default({}),
+  /** Project Context Folder discovery roots (C4) — workspace-scoped, no
+      per-repository overrides in this slice. Confined to the imported
+      repository; no host paths. */
+  project_context: z
+    .object({
+      roots: z.array(z.string()).min(1).default(DEFAULT_PROJECT_CONTEXT_ROOTS),
+    })
+    .default({ roots: DEFAULT_PROJECT_CONTEXT_ROOTS }),
 });
 export type SettingsKnown = z.infer<typeof SettingsKnown>;
 

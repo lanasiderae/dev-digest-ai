@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey } from 'drizzle-orm/pg-core';
-import { now } from './_shared';
+import { now, type ProjectContextSelectionRow } from './_shared';
 import { workspaces } from './core';
 
 export const skills = pgTable('skills', {
@@ -16,7 +17,19 @@ export const skills = pgTable('skills', {
   body: text('body').notNull(),
   enabled: boolean('enabled').notNull().default(true),
   version: integer('version').notNull().default(1),
+  // Pre-existing, unrelated field (not this feature's attachment storage —
+  // see `project-context.ts`'s header comment).
   evidenceFiles: jsonb('evidence_files').$type<string[]>(),
+  // Project Context Folder (L05): same shape/cap/semantics as
+  // `agents.project_context` above it in the sibling schema file — ordered
+  // per-repository selected document paths only, default empty, capped at
+  // 100 attachments total via the shared Zod refinement. Participates in the
+  // EXISTING `version`/`skillVersions` snapshot semantics; no second
+  // versioning mechanism is added.
+  projectContext: jsonb('project_context')
+    .$type<ProjectContextSelectionRow>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   createdAt: now(),
 });
 

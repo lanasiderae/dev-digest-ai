@@ -112,11 +112,91 @@ export const SmartDiff = z.object({
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
 
+// ---- Review focus (file:line navigation into Files changed) ----
+export const ReviewFocusItem = z.object({
+  file: z.string(),
+  /** 1-based; exact-line diff navigation uses existing diff metadata, never
+      a line fed to/invented by the model from raw hunks. */
+  line: z.number().int().positive(),
+  reason: z.string(),
+});
+export type ReviewFocusItem = z.infer<typeof ReviewFocusItem>;
+
+// ---- Source availability / degradation (never silently healthy-empty) ----
+export const BriefSourceStatus = z.enum(['available', 'degraded', 'unavailable']);
+export type BriefSourceStatus = z.infer<typeof BriefSourceStatus>;
+
+export const BriefSource = z.object({
+  status: BriefSourceStatus,
+  /** Human-readable reason when `status !== 'available'`. For
+      `reviewer_context`, the literal "Reviewer context not selected." is the
+      expected C2 case, not an error. Null when available. */
+  reason: z.string().nullable(),
+});
+export type BriefSource = z.infer<typeof BriefSource>;
+
+/** One source per generation input that can be missing/degraded without
+    blocking generation (BRIEF-AC-02). */
+export const BriefSources = z.object({
+  intent: BriefSource,
+  blast: BriefSource,
+  issue: BriefSource,
+  reviewer_context: BriefSource,
+  documents: BriefSource,
+});
+export type BriefSources = z.infer<typeof BriefSources>;
+
+// ---- Generation provenance (cached-generation identity, never the live
+// reviewer-selector state — see plan finding D1: these must never be
+// rendered/stored as the same field) ----
+export const BriefDocumentProvenance = z.object({
+  repo_id: z.string(),
+  path: z.string(),
+  /** The pinned clone revision this document was read at; null if unknown. */
+  revision: z.string().nullable(),
+  /** Content digest, for change detection independent of path/revision. */
+  digest: z.string().nullable(),
+});
+export type BriefDocumentProvenance = z.infer<typeof BriefDocumentProvenance>;
+
+export const BriefProvenance = z.object({
+  /** Explicit reviewer agent id used for THIS generation; null means no
+      reviewer was selected for this generation — never inferred from a
+      prior run (C2). Read-only cached-generation identity; the live
+      reviewer-selector control for the NEXT regeneration is a separate
+      field/value owned by the API request, not this one. */
+  reviewer_agent_id: z.string().nullable(),
+  /** Enabled safe skill ids attached to that reviewer, resolution order. */
+  skill_ids: z.array(z.string()),
+  documents: z.array(BriefDocumentProvenance),
+  /** Explicit PR-linked spec path, when unioned in under C2; null otherwise. */
+  pr_linked_spec_path: z.string().nullable(),
+  /** PR head SHA this brief was generated against. */
+  head_sha: z.string(),
+  /** Deterministic fingerprint of {reviewer_agent_id, skill_ids, documents,
+      order} — lets the API detect a changed context selection independently
+      of head_sha movement. */
+  context_fingerprint: z.string(),
+  generated_at: z.string(),
+});
+export type BriefProvenance = z.infer<typeof BriefProvenance>;
+
 // ---- Composed PR Brief (pr_brief.json) ----
 export const PrBrief = z.object({
-  intent: Intent,
-  blast: BlastRadius,
+  summary: z.string(),
+  /** Null when Intent was never derived / is unavailable for this PR — NOT
+      the same as a derived Intent with empty in/out-of-scope lists, which is
+      a healthy-empty `Intent` value, never represented as null. */
+  intent: Intent.nullable(),
+  /** Null when Blast Radius couldn't be computed (e.g. repo-intel disabled
+      or index unavailable) — NOT the same as a computed `BlastRadius` with
+      no changed symbols/downstream impact, which stays a healthy-empty
+      object, never null. */
+  blast: BlastRadius.nullable(),
   risks: Risks,
   history: PrHistory,
+  review_focus: z.array(ReviewFocusItem),
+  sources: BriefSources,
+  provenance: BriefProvenance,
 });
 export type PrBrief = z.infer<typeof PrBrief>;

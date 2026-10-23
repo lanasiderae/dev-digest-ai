@@ -163,6 +163,37 @@
   `server/test/blast-grouping.test.ts` ("a caller row reaching two different
   changed symbols from the same file/symbol/line survives in both groups").
 
+- **2026-10-22** — The two vendored `vendor/shared/contracts/knowledge.ts`
+  copies are NOT byte-identical, unlike `brief.ts`/`trace.ts`/`platform.ts`/
+  `index.ts` (which this session kept byte-identical copies for): the client's
+  copy omits `AgentVersionConfig`/`AgentVersion` entirely and has a narrower
+  `provider` enum comment / different `ci_fail_on` wording, because the
+  client UI never replays an agent's versioned config snapshot. A future edit
+  to `Agent`/`Skill`/`AgentVersionConfig` in `knowledge.ts` must be mirrored
+  field-by-field by hand into the client copy, not via `cp`, unlike the four
+  files above where a straight copy is correct. Evidence: `diff
+  server/src/vendor/shared/contracts/knowledge.ts
+  client/src/vendor/shared/contracts/knowledge.ts` (lines 227–251 of the
+  server copy, `AgentVersionConfig`/`AgentVersion`, absent from client's).
+- **2026-10-22** — Adding a new `.notNull().default(...)` jsonb column to
+  `agents`/`skills` and then also adding the matching *required* field to the
+  public `Agent`/`Skill` Zod DTOs in `knowledge.ts` immediately breaks
+  `tsc --noEmit` in `modules/agents/helpers.ts` (`toAgentDto`) and
+  `modules/skills/helpers.ts` (`toSkillDto`) — their pure row→DTO mapper
+  literals now miss the new required property, even though those files
+  contain no business logic and aren't routes. A schema-freeze task that adds
+  a DB column should land the column plus a standalone Zod type for the new
+  value (e.g. an exported `FooSelectionList`) and stop there; wiring it into
+  the public `Agent`/`Skill` DTO (and fixing the two mapper functions) belongs
+  to whichever task actually implements the CRUD/mapping, not the schema task
+  — otherwise a "contracts/schema only" task silently expands into editing
+  service-layer files. Evidence: `tsc --noEmit -p tsconfig.json` error
+  `TS2741: Property 'project_context' is missing in type` at
+  `src/modules/agents/helpers.ts:13` and `src/modules/skills/helpers.ts:12`
+  when `Agent.project_context`/`Skill.project_context` were added, resolved
+  by reverting those two DTO fields and keeping only the DB columns +
+  `ProjectContextSelectionList` (`contracts/project-context.ts`).
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
