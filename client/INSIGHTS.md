@@ -23,6 +23,38 @@
   (plus copy/fullscreen for free). Prefer reusing it over writing a bespoke
   collapsible whenever a new trace sub-section needs the same shape. Evidence:
   `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/ProjectContextSection/ProjectContextSection.tsx`.
+- **2026-10-23** — Every existing top-level `*View` component that wraps
+  `AppShell` (`ConventionsView`, `SkillsListView`, `AgentsListView`,
+  `SettingsView`) has NO `.test.tsx` of its own anywhere in this repo —
+  `AppShell` pulls in heavy context (`useShellContext`'s
+  `usePulls`/`useDeleteRepo`/`useTheme`, `useGlobalShortcuts`,
+  `repo-context`) that makes unit-testing the shell-wrapping component
+  directly impractical. Working pattern: keep that top-level `View`
+  intentionally thin (repo-not-found branch + header + delegate to a child),
+  and put ALL actual testable feature logic into a nested, AppShell-free
+  `_components/<Name>Panel` sub-component that takes plain props (e.g.
+  `repoId`) and calls its own hooks — that sub-component gets the real test
+  suite instead. Evidence:
+  `client/src/app/repos/[repoId]/onboarding/_components/OnboardingTourView/OnboardingTourView.tsx`
+  (untested, thin) delegating to
+  `.../_components/OnboardingTourPanel/OnboardingTourPanel.tsx` (tested).
+- **2026-10-23** — A generate/regenerate endpoint whose response can report
+  "the cache was preserved, not overwritten" (e.g. L05 Onboarding Tour's
+  `POST /repos/:id/onboarding` → `{tour, cached_tour_preserved}`) needs the
+  client to NOT render that response's own `tour` field directly when
+  `cached_tour_preserved` is true — in that case `tour` is the ephemeral
+  failed/skeleton attempt, never persisted, while the real current state is
+  whatever the paired cache-only GET still returns unchanged. Rendering the
+  POST response's `tour` as-is there would show a regressed/failed-looking
+  view even though nothing was actually lost. Fix: a pure
+  `selectDisplayTour(generateResult, cachedTour)` helper that prefers the
+  still-cached tour over the mutation's own ephemeral one specifically when
+  `cached_tour_preserved` is true, paired with an explicit
+  `isRefreshFallback` banner ("Refresh failed; showing the last successful
+  tour."). Reusable for any future generate/regenerate-with-fallback
+  endpoint sharing this response shape. Evidence:
+  `client/src/app/repos/[repoId]/onboarding/_components/OnboardingTourView/_components/OnboardingTourPanel/helpers.ts`
+  (`selectDisplayTour`, `isRefreshFallback`).
 
 ## What Doesn't Work
 
@@ -139,6 +171,45 @@
   `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.tsx`,
   `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/DiffTab.tsx`
   (`focusTarget` computed from `useSearchParams().get("file"/"line")`).
+- **2026-10-23** — `client/src/vendor/ui/nav.ts` and `icons.tsx` have NO
+  cross-package counterpart, unlike `client/src/vendor/shared` (which must
+  mirror `server/src/vendor/shared` by hand) — confirmed via `git log
+  --follow -- client/src/vendor/ui/nav.ts`: both prior nav-tab additions
+  ("add skills and agents tabs in side menu" `6b24ade`, "add conventions
+  tab" `dfe8357`) edited `nav.ts`/`icons.tsx` directly with no second file
+  to keep in sync. Root `CLAUDE.md`'s "Do not touch" phrasing ("never edit
+  `src/vendor/shared/**` or `client/src/vendor/ui/**` without mirroring the
+  change by hand to its counterpart") reads as if it applies identically to
+  both, but for `vendor/ui` there is nothing to mirror to — adding a new
+  repo-scoped nav item (key/label/icon/href/optional `gKey`) by editing
+  `nav.ts` (and `icons.tsx` if a new icon is needed) directly is the
+  established, safe pattern there. Evidence:
+  `client/src/vendor/ui/nav.ts`'s `"onboarding-tour"` WORKSPACE-section
+  item, `client/src/vendor/ui/icons.tsx`'s added `Compass`.
+- **2026-10-23** — There is a pre-existing, unused
+  `client/messages/en/onboarding.json` (keys like `sections`,
+  `sectionCount`, `regenerate`, a 5-section description of "overview,
+  architecture, key modules, getting started, conventions & gotchas") with
+  zero `useTranslations("onboarding")` consumers anywhere in the
+  codebase — leftover scaffolding for a superseded onboarding-tour design,
+  distinct from BOTH the add-repo `/onboarding` screen (which has no i18n
+  at all — hardcoded strings in `AddRepoView.tsx`) AND the actual L05
+  OnboardingTour feature (`contracts/onboarding.ts`'s 5 keys:
+  `architecture_overview`/`critical_paths`/`local_setup`/`reading_order`/
+  `first_tasks`). Do not reuse/extend `onboarding.json` for onboarding-tour
+  work — added a separate `client/messages/en/onboarding-tour.json`
+  (namespace `"onboarding-tour"`) instead. Distinct from the existing
+  `context.json`-vs-`project-context.json` naming-collision entry above —
+  this is the same category of gotcha but a different pair of files.
+- **2026-10-23** — `next-intl`'s message namespace key is the exact
+  `messages/en/<file>.json` filename, hyphens included — not a camelCase
+  transform. Confirmed via `client/src/i18n/request.ts`'s `loadMessages`
+  (`ns = file.replace(/\.json$/, "")`) and the existing precedent
+  `project-context.json` consumed via `useTranslations("project-context")`.
+  A new hyphenated-filename namespace must be consumed with the same
+  literal hyphenated string (e.g. `onboarding-tour.json` →
+  `useTranslations("onboarding-tour")`), not a camelCase guess like
+  `"onboardingTour"`.
 
 ## Tool & Library Notes
 
