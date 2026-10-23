@@ -1,4 +1,4 @@
-import type { BlastCaller, BlastRadius, DownstreamImpact } from '@devdigest/shared';
+import type { BlastCaller, BlastRadius, DiffHunk, DownstreamImpact } from '@devdigest/shared';
 import type { BlastResult } from '../repo-intel/types.js';
 
 /**
@@ -114,4 +114,42 @@ export function buildBlastSummary(counts: {
 
 function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * Remap a 1-based line number recorded against one commit (`base`) onto the
+ * equivalent line in another commit (`head`), given the hunks of a direct
+ * `base..head` diff for that one file.
+ *
+ * Why this exists: a caller's `line` comes from the persistent index, which
+ * is built against `repo_index_state.last_indexed_sha` — NOT the PR's
+ * `head_sha` the UI links to on GitHub. Any commit that inserted/removed
+ * lines above the caller's line between those two shas shifts it, so linking
+ * the indexed line straight to `head_sha` can point at the wrong line (or
+ * the wrong statement entirely).
+ *
+ * `hunks` need not be sorted; this sorts a copy by `oldStart` ascending and
+ * walks it once. A line inside a hunk that was itself touched has no exact
+ * new-side equivalent — it's clamped into that hunk's new range rather than
+ * left unmapped, since "approximately where the surrounding code moved to"
+ * beats falling back to a line that may now be in an unrelated statement.
+ */
+export function mapOldLineToNewLine(hunks: DiffHunk[], oldLine: number): number {
+  let offset = 0;
+  for (const h of [...hunks].sort((a, b) => a.oldStart - b.oldStart)) {
+    if (h.oldLines > 0) {
+      if (oldLine < h.oldStart) break;
+      if (oldLine <= h.oldStart + h.oldLines - 1) {
+        const withinHunk = oldLine - h.oldStart;
+        return h.newStart + Math.min(withinHunk, Math.max(h.newLines - 1, 0));
+      }
+      offset += h.newLines - h.oldLines;
+    } else {
+      // Pure insertion, anchored right after old line `h.oldStart` — a line
+      // AT the anchor is unaffected; only lines after it shift.
+      if (oldLine <= h.oldStart) break;
+      offset += h.newLines;
+    }
+  }
+  return oldLine + offset;
 }

@@ -221,6 +221,15 @@ export interface GitClient {
    * Returns an empty array when the two refs resolve to the same commit.
    */
   diffNameOnly(repo: RepoRef, base: string, head: string): Promise<string[]>;
+  /**
+   * Direct two-dot diff (`git diff base..head`) with full hunks — unlike
+   * `diff()`'s three-dot review-diff semantics (symmetric difference from the
+   * merge base), this reflects literally everything that changed in a file
+   * between the two commits. Needed to remap a line number recorded against
+   * one commit onto the equivalent line in another (e.g. blast radius
+   * callers indexed at `lastIndexedSha` but linked to a PR's `headSha`).
+   */
+  diffDirect(repo: RepoRef, base: string, head: string): Promise<UnifiedDiff>;
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;

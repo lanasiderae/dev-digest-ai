@@ -245,6 +245,8 @@ export interface MockGitOptions {
   files?: Record<string, string>;
   /** Name-only diff result (drives the incremental indexer's "changed files since X" path). */
   diffNameOnly?: string[];
+  /** Raw unified-diff text for `diffDirect()` — defaults to `diff`'s fixture when unset. */
+  diffDirect?: string;
   /** Override `currentHead()` so tests can simulate "sha unchanged since last index". */
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
@@ -283,6 +285,9 @@ export class MockGitClient implements GitClient {
       this.opts.diff ??
       'diff --git a/src/config.ts b/src/config.ts\n--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,3 +10,4 @@\n   port: 3000,\n+  stripeKey: "sk_live_xxx",\n   redisUrl: x,';
     return parseUnifiedDiff(raw);
+  }
+  async diffDirect(): Promise<UnifiedDiff> {
+    return parseUnifiedDiff(this.opts.diffDirect ?? this.opts.diff ?? '');
   }
   async blame(): Promise<BlameLine[]> {
     return [{ line: 1, sha: 'a1b2c3d4', author: 'marisa.koch', date: '2026-06-01', summary: 'init' }];

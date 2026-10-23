@@ -111,6 +111,11 @@ export class SimpleGitClient implements GitClient {
       .filter((s) => s.length > 0);
   }
 
+  async diffDirect(repo: RepoRef, base: string, head: string): Promise<UnifiedDiff> {
+    const raw = await this.git(repo).diff([`${base}..${head}`]);
+    return parseUnifiedDiff(raw);
+  }
+
   async blame(repo: RepoRef, path: string): Promise<BlameLine[]> {
     const raw = await this.git(repo).raw(['blame', '--line-porcelain', path]);
     return parseBlamePorcelain(raw);
