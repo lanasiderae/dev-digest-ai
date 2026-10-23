@@ -8,7 +8,7 @@ export default defineConfig({
       // tsconfig paths on its own (see reviewer-core/vitest.config.ts, which
       // hits the same thing for the same reason: @devdigest/shared is the
       // server's vendored contracts tree, not an installed package).
-      "@devdigest/shared": path.resolve(__dirname, "../server/src/vendor/shared"),
+      "@devdigest/shared": path.resolve(import.meta.dirname, "../server/src/vendor/shared"),
     },
   },
   test: {
