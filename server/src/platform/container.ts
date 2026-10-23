@@ -15,6 +15,7 @@ import { LocalSecretsProvider } from '../adapters/secrets/local.js';
 import { LocalNoAuthProvider } from '../adapters/auth/local.js';
 import { OctokitGitHubClient } from '../adapters/github/octokit.js';
 import { SimpleGitClient } from '../adapters/git/simple-git.js';
+import { SimpleGitTreeReader, type GitTreeReader } from '../adapters/git/tree-reader.js';
 import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
 import { OpenAIProvider } from '../adapters/llm/openai.js';
 import { AnthropicProvider } from '../adapters/llm/anthropic.js';
@@ -53,6 +54,9 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Project Context Folder (L05) — tests inject a mock to avoid shelling out
+   *  to a real git binary; production uses `SimpleGitTreeReader`. */
+  gitTreeReader?: GitTreeReader;
   /** Skill URL-import fetcher — tests inject a stub to avoid a real network/DNS
    *  round trip; production uses the real SSRF-guarded `fetchSkillUrl`. */
   skillsUrlFetch?: (url: string) => Promise<UrlImportResult>;
@@ -82,6 +86,7 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _gitTreeReader?: GitTreeReader;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -144,6 +149,17 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /**
+   * Content-addressed git tree/blob reader for Project Context Folder (L05) —
+   * see `adapters/git/tree-reader.ts`'s doc comment for why this reads by
+   * object id at a pinned commit instead of a filesystem path.
+   */
+  get gitTreeReader(): GitTreeReader {
+    if (this.overrides.gitTreeReader) return this.overrides.gitTreeReader;
+    this._gitTreeReader ??= new SimpleGitTreeReader(this.config.cloneDir);
+    return this._gitTreeReader;
   }
 
   /**

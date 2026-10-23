@@ -227,6 +227,38 @@
   `server/tsconfig.json` (`include`), `server/test/blast.it.test.ts`
   (`StubRepoIntel`).
 
+- **2026-10-22** — A narrow adapter interface that only ONE server module needs
+  (not shared with `reviewer-core`/client the way `GitClient`/`LLMProvider` in
+  `vendor/shared/adapters.ts` are) belongs beside its own adapter file, not in
+  `vendor/shared/adapters.ts` — `adapters/tokenizer/index.ts`'s `Tokenizer`
+  interface already does this (confirmed by grep: it's defined there, not in
+  `vendor/shared`), and the new project-context `GitTreeReader`/`GitTreeEntry`
+  (`adapters/git/tree-reader.ts`) followed the same precedent rather than
+  adding to the mirrored-to-client `vendor/shared/adapters.ts` file (which
+  would have required a byte-identical client-copy edit for an interface the
+  client never calls). Check whether an interface is cross-package before
+  picking its home. Evidence: `server/src/adapters/tokenizer/index.ts`
+  (`export interface Tokenizer`), `server/src/adapters/git/tree-reader.ts`.
+- **2026-10-22** — `GitClient.readFile` (`adapters/git/simple-git.ts`) validates
+  an untrusted path with `resolve()` + `realpath()` against the clone root
+  BEFORE reading — safe in the common case, but it's a check-then-use over a
+  MUTABLE working-tree directory (a concurrent `git reset --hard`/fetch, or a
+  symlink swap, could in principle change what the path resolves to between
+  the check and the `fs.readFile`). For a feature that reads untrusted
+  repo-relative paths more adversarially (L05's Project Context Folder), the
+  new `GitTreeReader` (`adapters/git/tree-reader.ts`) instead resolves content
+  by content-addressed git OBJECT ID (`git ls-tree -r -l -z <pinned-commit>`
+  → exact-string match in memory → `git cat-file -s`/`-p <oid>`) — no
+  filesystem path is ever joined/resolved against user input, so there is no
+  parent-directory TOCTOU window at all, not just a narrowed one. Reach for
+  this pattern (not `readFile`) for any future untrusted-path read that needs
+  a stronger guarantee than "safe in the common case". Evidence:
+  `server/src/adapters/git/tree-reader.ts`'s doc comment,
+  `server/src/adapters/git/tree-reader.test.ts`'s "immune to a TOCTOU swap of
+  the working-tree file after listing" test (swaps the committed file for a
+  symlink to `/etc/hosts` AFTER `listTree()`, then shows `readBlob` still
+  returns the original committed content).
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
@@ -258,6 +290,36 @@
   `zipfile.openReadStreamPromise`) over the callback API shown in most
   yauzl examples — much less boilerplate. Evidence:
   `server/src/modules/skills/import/archive.ts`.
+- **2026-10-22** — `git ls-tree`'s TYPE column for a symlink entry is `blob`,
+  not a distinct "symlink" type — only the separate MODE column (`120000`)
+  tells you it's a symlink; a symlink's "content" (readable via `cat-file -p`
+  on its oid, same as any other blob) is the link-target text, not file data.
+  Any code branching on `ls-tree` output to decide "is this readable document
+  content" must check `mode === '120000'` first and treat it as its own
+  case — checking `type === 'blob'` alone will treat a symlink exactly like a
+  real file. Evidence: `server/src/adapters/git/tree-reader.ts`
+  (`parseLsTreeLongLine`'s `mode === MODE_SYMLINK` check, which must run
+  before the `type === 'blob'` branch), `server/src/adapters/git/tree-reader.test.ts`
+  ("reports a symlink entry by kind, distinct from a real blob").
+
+## What Works
+
+- **2026-10-22** — A `new Service(container)`-style class whose method calls a
+  free function (not a container adapter) for one of its dependencies — e.g.
+  `settings/feature-models.ts`'s `getProjectContextRoots(container,
+  workspaceId)` — can still be made hermetically testable without a
+  chainable-Drizzle mock: wrap the call in an instance property
+  (`private getRoots = (workspaceId) => getProjectContextRoots(this.container,
+  workspaceId)`) instead of calling the import directly inside the method body,
+  then override that property post-construction in tests
+  (`(service as unknown as {getRoots: Fn}).getRoots = async () => [...]`) —
+  the exact same technique `test/repo-intel-resync.test.ts` already uses for
+  `.repo`, extended to a plain function dependency instead of a class one.
+  Avoids needing to fake `container.db.select().from().where()` chains just to
+  unit-test a method that reads one settings key. Evidence:
+  `server/src/modules/project-context/service.ts` (`private getRoots`),
+  `server/test/project-context-service.test.ts` (the `getRoots` override in
+  `makeService`).
 
 ## Recurring Errors & Fixes
 

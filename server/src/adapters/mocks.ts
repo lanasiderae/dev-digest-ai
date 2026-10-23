@@ -33,6 +33,7 @@ import type {
   SecretKey,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './git/diff-parser.js';
+import { BlobTooLargeError, type GitTreeEntry, type GitTreeReader, type GitTreeReadResult } from './git/tree-reader.js';
 
 /**
  * Deterministic MOCK adapters for tests/dev — NO real network. Each mirrors the
@@ -297,6 +298,27 @@ export class MockGitClient implements GitClient {
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? '';
+  }
+}
+
+// ---------- Mock GitTreeReader (Project Context Folder, L05) ----------
+
+/** Deterministic in-memory tree — no real git process, no filesystem. */
+export class MockGitTreeReader implements GitTreeReader {
+  constructor(
+    private entries: GitTreeEntry[] = [],
+    private blobsByOid: Record<string, string> = {},
+  ) {}
+
+  async listTree(): Promise<GitTreeEntry[]> {
+    return this.entries;
+  }
+
+  async readBlob(_repo: RepoRef, oid: string, maxBytes: number): Promise<GitTreeReadResult> {
+    const content = this.blobsByOid[oid] ?? '';
+    const sizeBytes = Buffer.byteLength(content, 'utf8');
+    if (sizeBytes > maxBytes) throw new BlobTooLargeError(oid, sizeBytes, maxBytes);
+    return { content, sizeBytes };
   }
 }
 
