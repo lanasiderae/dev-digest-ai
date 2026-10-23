@@ -1,13 +1,10 @@
 # L08 feature specification — Agent Performance Dashboard
 
-- Status: **DRAFT — operator-authored, pending user approval.** The session
-  operator (Claude Code) was explicitly instructed to complete this
-  assignment end-to-end without further questions ("I won't be able to
-  answer questions"). Per `specs/README.md`, a draft is approved only with
-  explicit user approval; no such approval exists yet for this document. It
-  is carried forward as the working baseline so planning/implementation can
-  proceed, but should be reviewed and explicitly approved (or amended) by
-  the user before being treated as final.
+- Status: **APPROVED** — explicitly approved by the user on 2026-10-23
+  (session operator-authored draft, approved as written with no amendments
+  requested). Implementation on `l08/final` (commit `adf5ae4`) was already
+  built against this draft before approval; no changes to scope or ACs were
+  needed as a result of approval.
 - Author: session operator, generated from the L08 assignment brief
   ("DevDigest AI Marketplace — Implementation, Release & Homework", Part 5 —
   Optional Assignment: Agent Performance Dashboard) and inspected repo
