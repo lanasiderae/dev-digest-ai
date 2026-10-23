@@ -361,3 +361,13 @@
   with different public API URLs must use separate `distDir` values; shared
   `.next` assets made the dev browser call the stopped test API on port 3101.
   `next.config.mjs` now selects `.next-e2e` for `E2E_FIXTURES=1`; the user confirmed recovery and all 10 concurrent-stack smoke flows passed.
+- **2026-10-23** — `Sparkline`'s x-coordinate formula `(i / (data.length - 1)) * w`
+  divides by zero (`NaN`) whenever `data` has exactly one point — React then
+  warns "Received NaN for the `cx` attribute" on the trailing `<circle>`. A
+  single-point trend is the common case for a narrow "1 day" range filter, not
+  an edge case — the existing test only covered the empty-array early return,
+  not length-1. Fix: `const step = data.length - 1 || 1`. Caught via live
+  manual check after shipping, not by the component test suite. Evidence:
+  `client/src/vendor/ui/charts/Sparkline.tsx:18-19`; regression test in
+  `client/src/app/agent-performance/_components/AgentPerformanceView/_components/PerformanceTable/PerformanceTable.test.tsx`
+  ("renders a single-point trend ... without a NaN SVG coordinate").

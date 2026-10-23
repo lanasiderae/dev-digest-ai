@@ -77,6 +77,14 @@ describe("PerformanceTable", () => {
     expect(screen.getAllByText("Low sample")).toHaveLength(1);
   });
 
+  it("renders a single-point trend (narrow 1-day range) without a NaN SVG coordinate", () => {
+    renderTable([row({ agent_id: "a1", agent_name: "Agent", trend: [0.5] })]);
+    const circle = document.querySelector("circle");
+    expect(circle).not.toBeNull();
+    expect(circle!.getAttribute("cx")).not.toBe("NaN");
+    expect(circle!.getAttribute("cy")).not.toBe("NaN");
+  });
+
   it('clicking "View" navigates to the agent\'s own Stats tab, not a review-run route', () => {
     renderTable([row({ agent_id: "ag-42", agent_name: "Agent 42" })]);
     fireEvent.click(screen.getByText("View"));
