@@ -115,6 +115,46 @@ export const s = {
   row: { display: "flex", gap: 12 } satisfies CSSProperties,
   rowLabel: { color: "var(--text-muted)", width: 110 } satisfies CSSProperties,
 
+  // ---- ProjectContextSection ----
+  ctxDocList: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 } satisfies CSSProperties,
+  ctxDocRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 10px",
+    borderRadius: 6,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  // minWidth: 0 is required alongside flex: 1 for the ellipsis to actually
+  // engage on a long path in a flex row — see client/INSIGHTS.md.
+  ctxDocPath: {
+    fontSize: 12.5,
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  ctxDocRevision: { fontSize: 11, color: "var(--text-muted)", flexShrink: 0 } satisfies CSSProperties,
+  ctxDocTokens: { fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 } satisfies CSSProperties,
+  ctxTotal: { fontSize: 12, color: "var(--text-muted)", marginBottom: 10 } satisfies CSSProperties,
+  ctxOmissionsWrap: { marginBottom: 10 } satisfies CSSProperties,
+  ctxOmissionsTitle: { fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 } satisfies CSSProperties,
+  ctxOmissionRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: 10,
+    padding: "6px 10px",
+    borderRadius: 6,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+    marginBottom: 6,
+    flexWrap: "wrap",
+  } satisfies CSSProperties,
+  ctxOmissionReason: { fontSize: 11.5, color: "var(--warn)", fontWeight: 600, flexShrink: 0 } satisfies CSSProperties,
+  ctxOmissionDetail: { fontSize: 11.5, color: "var(--text-muted)" } satisfies CSSProperties,
+
   // ---- Drawer body ----
   footer: { display: "flex", gap: 10 } satisfies CSSProperties,
   tabBody: { paddingTop: 18 } satisfies CSSProperties,

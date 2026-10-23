@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import multipart from '@fastify/multipart';
-import { SkillType } from '@devdigest/shared';
+import { ProjectContextSelectionList, SkillType } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError, ValidationError } from '../../platform/errors.js';
@@ -37,6 +37,7 @@ const CreateSkillBody = z.object({
   source: z.enum(['manual', 'imported_url', 'extracted', 'community']).optional(),
   enabled: z.boolean().optional(),
   evidence_files: z.array(z.string()).optional(),
+  project_context: ProjectContextSelectionList.optional(),
 });
 
 const UpdateSkillBody = z.object({
@@ -45,6 +46,7 @@ const UpdateSkillBody = z.object({
   type: SkillType.optional(),
   body: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
+  project_context: ProjectContextSelectionList.optional(),
 });
 
 const ImportUrlBody = z.object({ url: z.string().url() });

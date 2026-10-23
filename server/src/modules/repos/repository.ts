@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 
@@ -67,6 +67,26 @@ export class RepoRepository {
       .from(t.repos)
       .where(eq(t.repos.id, repoId));
     return row?.workspaceId ?? null;
+  }
+
+  /**
+   * Which of `repoIds` actually belong to `workspaceId` — the shared
+   * "workspace owns this repo" bulk check (L05, TASK-04). Added here (not
+   * duplicated per-module) because `getById`/`workspaceIdFor` above already
+   * own the only `t.repos` ownership query shape in the codebase; a caller
+   * needing to validate several repo-scoped ids at once (e.g. an agent/skill's
+   * `project_context` selections) uses this instead of looping `getById`.
+   * Ids not owned by the workspace (missing or belonging to another one) are
+   * simply absent from the returned set — same "absent, not thrown" shape as
+   * `agentSkillCounts`/`skillAgentCounts` elsewhere in the codebase.
+   */
+  async listOwnedIds(workspaceId: string, repoIds: string[]): Promise<Set<string>> {
+    if (repoIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ id: t.repos.id })
+      .from(t.repos)
+      .where(and(eq(t.repos.workspaceId, workspaceId), inArray(t.repos.id, repoIds)));
+    return new Set(rows.map((r) => r.id));
   }
 
   /** Persist the clone path and bump `last_polled_at` once a clone job completes. */

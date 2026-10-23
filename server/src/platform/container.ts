@@ -15,6 +15,7 @@ import { LocalSecretsProvider } from '../adapters/secrets/local.js';
 import { LocalNoAuthProvider } from '../adapters/auth/local.js';
 import { OctokitGitHubClient } from '../adapters/github/octokit.js';
 import { SimpleGitClient } from '../adapters/git/simple-git.js';
+import { SimpleGitTreeReader, type GitTreeReader } from '../adapters/git/tree-reader.js';
 import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
 import { OpenAIProvider } from '../adapters/llm/openai.js';
 import { AnthropicProvider } from '../adapters/llm/anthropic.js';
@@ -25,12 +26,14 @@ import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
 import { fetchSkillUrl, type UrlImportResult } from '../modules/skills/import/url.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import type postgres from 'postgres';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -53,9 +56,25 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Project Context Folder (L05) — tests inject a mock to avoid shelling out
+   *  to a real git binary; production uses `SimpleGitTreeReader`. */
+  gitTreeReader?: GitTreeReader;
   /** Skill URL-import fetcher — tests inject a stub to avoid a real network/DNS
    *  round trip; production uses the real SSRF-guarded `fetchSkillUrl`. */
   skillsUrlFetch?: (url: string) => Promise<UrlImportResult>;
+  /**
+   * The raw `postgres-js` client behind `db` (L05/TASK-08) — needed ONLY for
+   * `sql.reserve()`, which pins a single dedicated connection so a session-
+   * scoped `pg_try_advisory_lock`/`pg_advisory_unlock` pair is guaranteed to
+   * run on the SAME connection despite `db`'s normal pooled queries (a plain
+   * `db.execute(...)` can pick a different pooled connection per call, which
+   * would make the unlock a silent no-op). `buildApp()` supplies this from
+   * its own `createDb()` handle; a hermetic unit test that never exercises
+   * the real lock path can leave it undefined (see `brief/service.ts`'s
+   * `withGenerationLock` — it degrades to "no locking" rather than throwing
+   * when unset, since no real Postgres is present to lock against anyway).
+   */
+  rawSql?: postgres.Sql;
 }
 
 export class Container {
@@ -78,10 +97,12 @@ export class Container {
   private _agentsRepo?: AgentsRepository;
   private _skillsRepo?: SkillsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _reposRepo?: RepoRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _gitTreeReader?: GitTreeReader;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -106,9 +127,24 @@ export class Container {
     return (this._skillsRepo ??= new SkillsRepository(this.db));
   }
 
+  /**
+   * Shared "does this workspace own repo id X" read (L05, TASK-04) — used by
+   * agent/skill CRUD to validate `project_context` selections without each
+   * module duplicating the `t.repos` ownership query itself.
+   */
+  get reposRepo(): RepoRepository {
+    return (this._reposRepo ??= new RepoRepository(this.db));
+  }
+
   /** Resolve a skill-import URL (SSRF-guarded fetch by default, overridable in tests). */
   skillsUrlFetch(url: string): Promise<UrlImportResult> {
     return (this.overrides.skillsUrlFetch ?? fetchSkillUrl)(url);
+  }
+
+  /** See `ContainerOverrides.rawSql`'s doc comment. `undefined` in a context
+   *  with no real Postgres connection (most hermetic unit tests). */
+  get rawSql(): postgres.Sql | undefined {
+    return this.overrides.rawSql;
   }
 
   get reviewRepo(): ReviewRepository {
@@ -144,6 +180,17 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /**
+   * Content-addressed git tree/blob reader for Project Context Folder (L05) —
+   * see `adapters/git/tree-reader.ts`'s doc comment for why this reads by
+   * object id at a pinned commit instead of a filesystem path.
+   */
+  get gitTreeReader(): GitTreeReader {
+    if (this.overrides.gitTreeReader) return this.overrides.gitTreeReader;
+    this._gitTreeReader ??= new SimpleGitTreeReader(this.config.cloneDir);
+    return this._gitTreeReader;
   }
 
   /**

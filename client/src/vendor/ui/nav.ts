@@ -23,6 +23,13 @@ export const NAV: NavGroup[] = [
     section: "WORKSPACE",
     items: [
       { key: "pulls", label: "Pull Requests", icon: "GitPullRequest", href: "/repos/:repoId/pulls", gKey: "p" },
+      {
+        key: "onboarding-tour",
+        label: "Onboarding Tour",
+        icon: "Compass",
+        href: "/repos/:repoId/onboarding",
+        gKey: "o",
+      },
     ],
   },
   {
@@ -36,6 +43,18 @@ export const NAV: NavGroup[] = [
         icon: "ListChecks",
         href: "/repos/:repoId/conventions",
         gKey: "c",
+      },
+    ],
+  },
+  {
+    section: "GLOBAL",
+    items: [
+      {
+        key: "agent-performance",
+        label: "Agent Performance",
+        icon: "Activity",
+        href: "/agent-performance",
+        gKey: "f",
       },
     ],
   },
@@ -65,9 +84,11 @@ export const SHORTCUTS: ShortcutDef[] = [
   { keys: "⌘K", label: "Open command palette", group: "Global" },
   { keys: "?", label: "Show keyboard shortcuts", group: "Global" },
   { keys: "g p", label: "Go to Pull Requests", group: "Navigation" },
+  { keys: "g o", label: "Go to Onboarding Tour", group: "Navigation" },
   { keys: "g a", label: "Go to Agents", group: "Navigation" },
   { keys: "g s", label: "Go to Skills", group: "Navigation" },
   { keys: "g c", label: "Go to Conventions", group: "Navigation" },
+  { keys: "g f", label: "Go to Agent Performance", group: "Navigation" },
   { keys: "j / k", label: "Next / previous finding", group: "Findings" },
   { keys: "a", label: "Accept finding", group: "Findings" },
   { keys: "d", label: "Dismiss finding", group: "Findings" },

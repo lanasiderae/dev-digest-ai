@@ -19,6 +19,7 @@ const SKILL: Skill = {
   version: 1,
   evidence_files: null,
   injection_detected: false,
+  project_context: [],
 };
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -61,6 +62,16 @@ describe("SkillCard (smoke)", () => {
   it("falls back to 0 agents when agent_count is absent (e.g. a hand-built fixture)", () => {
     renderWithIntl(<SkillCard skill={SKILL} />);
     expect(screen.getByText("0 agents")).toBeInTheDocument();
+  });
+
+  it("shows the real pull frequency when present", () => {
+    renderWithIntl(<SkillCard skill={{ ...SKILL, pull_frequency: 1 }} />);
+    expect(screen.getByText("100% pull freq")).toBeInTheDocument();
+  });
+
+  it("shows '–' (not a fabricated 0%) when pull_frequency is null or absent", () => {
+    renderWithIntl(<SkillCard skill={{ ...SKILL, pull_frequency: null }} />);
+    expect(screen.getByText("– pull freq")).toBeInTheDocument();
   });
 
   it("shows a 'needs vetting' badge for a disabled, non-manual skill", () => {

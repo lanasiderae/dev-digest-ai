@@ -64,6 +64,7 @@ export class OpenRouterProvider implements LLMProvider {
     let tokensOut = 0;
     let costFromApi: number | null = null;
     let lastRaw = '';
+    let lastSchemaError: string | null = null;
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       const res = await this.client.chat.completions.create({
@@ -109,10 +110,14 @@ export class OpenRouterProvider implements LLMProvider {
           attempts: attempt,
         };
       }
+      // Keep the validation path in the surfaced error. The raw model output
+      // can contain repository-derived content, so never include it here.
+      lastSchemaError = parsed.error.slice(0, 1200);
       messages.push({ role: 'assistant', content: lastRaw });
       messages.push({ role: 'user', content: parsed.repromptMessage });
     }
-    throw new Error(`OpenRouter structured output failed schema validation for ${req.schemaName}`);
+    const detail = lastSchemaError ? `: ${lastSchemaError}` : '';
+    throw new Error(`OpenRouter structured output failed schema validation for ${req.schemaName}${detail}`);
   }
 
   /**

@@ -1,18 +1,44 @@
 {
+  "title": "Blast Radius",
+  "summaryLine": "{symbols} {symbolsLabel} · {callers} {callersLabel} · {endpoints} {endpointsLabel} · {crons} {cronsLabel}",
   "stat": {
     "symbols": "symbols",
     "callers": "callers",
     "endpoints": "endpoints",
     "crons": "cron/jobs"
   },
+  "symbol": {
+    "noCallers": "No downstream callers found for this symbol.",
+    "endpointsLabel": "Endpoints",
+    "cronsLabel": "Cron jobs"
+  },
   "view": {
     "tree": "tree",
     "graph": "graph"
   },
-  "callerCount": "{count} callers",
+  "callerCount": "{count, plural, one {# caller} other {# callers}}",
+  "noSymbols": "No changed code symbols.",
   "noDownstream": "{count} changed symbol(s), no downstream callers found.",
+  "degraded": {
+    "title": "Index incomplete",
+    "body": "This blast radius may be missing callers because the repo index isn't fully built.",
+    "reason": {
+      "flagOff": "Repo intelligence is turned off for this workspace.",
+      "indexFailed": "The last indexing run failed.",
+      "indexPartial": "The repo index is only partially built.",
+      "repoTooLarge": "This repo is too large to fully index.",
+      "noData": "No index data is available yet for this repo.",
+      "unknown": "The reason for the incomplete index is unknown."
+    }
+  },
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "history": {
+    "title": "Prior PRs touching these files",
+    "overlapCount": "{count, plural, one {# shared file} other {# shared files}}",
+    "empty": "No prior PRs overlap these files.",
+    "mergedBy": "{author} · merged {date}"
   }
 }

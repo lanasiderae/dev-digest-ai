@@ -1,0 +1,26 @@
+{
+  "name": "Cached PR Brief, grounded focus navigation and reload",
+  "description": "BRIEF-AC-01–06/13: reads a contract-validated cache, shows risks/missing sources, opens the real seeded diff at line 12, and reloads without generation. Does not click Generate or Refresh.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/repos/{REPO_ID}/pulls/483?tab=overview"] },
+    { "cmd": ["wait", "--text", "Generate brief"] },
+    { "cmd": ["open", "{BASE}/repos/{REPO_ID}/pulls/482?tab=overview"] },
+    { "cmd": ["wait", "--text", "Cached smoke brief: inspect configuration before merging."] },
+    { "cmd": ["wait", "--text", "Configuration exposure"] },
+    { "cmd": ["wait", "--text", "Reviewer context not selected."] },
+    { "cmd": ["wait", "--text", "Verify the configuration value at this exact line."] },
+    { "cmd": ["set", "viewport", "1600", "1200"] },
+    { "cmd": ["find", "text", "rateLimit", "click", "--exact"] },
+    { "cmd": ["wait", "--text", "POST /api/public/webhooks"] },
+    { "cmd": ["screenshot", "test-results/l05-brief-overview.png"] },
+    { "cmd": ["find", "role", "button", "click", "--name", "src/config.ts:12", "--exact"] },
+    { "cmd": ["wait", "--url", "tab=diff"] },
+    { "cmd": ["wait", "--url", "file=src%2Fconfig.ts"] },
+    { "cmd": ["wait", "--url", "line=12"] },
+    { "cmd": ["wait", "--text", "fixture-only"] },
+    { "cmd": ["open", "{BASE}/repos/{REPO_ID}/pulls/482?tab=overview"] },
+    { "cmd": ["wait", "--text", "Cached smoke brief: inspect configuration before merging."] },
+    { "cmd": ["reload"] },
+    { "cmd": ["wait", "--text", "Cached smoke brief: inspect configuration before merging."] }
+  ]
+}

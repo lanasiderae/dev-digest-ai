@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   FEATURE_MODELS,
   FeatureModelChoice,
+  DEFAULT_PROJECT_CONTEXT_ROOTS,
   type FeatureModelId,
 } from '@devdigest/shared';
 import type { Container } from '../../platform/container.js';
@@ -54,4 +56,25 @@ export async function resolveFeatureModel(
   id: FeatureModelId,
 ): Promise<FeatureModelChoice> {
   return (await getFeatureModelOverride(container, workspaceId, id)) ?? DEFAULTS[id];
+}
+
+/**
+ * Project Context Folder (L05, C4) — the workspace's configured discovery
+ * roots, or `DEFAULT_PROJECT_CONTEXT_ROOTS` when unset/invalid. Lives here
+ * (next to `getFeatureModelOverride`/`resolveFeatureModel`) rather than as a
+ * new settings-reading mechanism: same shape — read the flat `settings`
+ * key/value rows via `rowsToSettings`, then validate+fall back on the one
+ * nested key this feature cares about.
+ */
+export async function getProjectContextRoots(
+  container: Container,
+  workspaceId: string,
+): Promise<string[]> {
+  const rows = await container.db
+    .select({ key: t.settings.key, value: t.settings.value })
+    .from(t.settings)
+    .where(eq(t.settings.workspaceId, workspaceId));
+  const settings = rowsToSettings(rows) as { project_context?: { roots?: unknown } };
+  const parsed = z.array(z.string()).min(1).safeParse(settings.project_context?.roots);
+  return parsed.success ? parsed.data : DEFAULT_PROJECT_CONTEXT_ROOTS;
 }

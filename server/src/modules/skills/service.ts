@@ -1,10 +1,20 @@
 import type { Container } from '../../platform/container.js';
-import type { Skill, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
+import type {
+  ProjectContextSelectionList,
+  Skill,
+  SkillSource,
+  SkillType,
+  SkillVersion,
+} from '@devdigest/shared';
+import { ValidationError } from '../../platform/errors.js';
 import { SkillsRepository } from './repository.js';
 import { toSkillDto, toSkillVersionDto } from './helpers.js';
 import { extractSkillArchive, type ArchiveImportResult } from './import/archive.js';
 import type { UrlImportResult } from './import/url.js';
 import { detectInjectionPatterns } from './injection-scan.js';
+import { resolveRange } from '../agent-stats/helpers.js';
+import { toBulkPullFrequency } from '../skill-stats/helpers.js';
+import type { SkillRow } from '../../db/rows.js';
 
 /**
  * Skills service. Business logic for skill CRUD + import ingestion.
@@ -22,6 +32,7 @@ export interface CreateSkillInput {
   source?: SkillSource;
   enabled?: boolean;
   evidence_files?: string[];
+  project_context?: ProjectContextSelectionList;
 }
 
 export interface UpdateSkillInput {
@@ -30,6 +41,7 @@ export interface UpdateSkillInput {
   type?: SkillType;
   body?: string;
   enabled?: boolean;
+  project_context?: ProjectContextSelectionList;
 }
 
 export class SkillsService {
@@ -45,14 +57,55 @@ export class SkillsService {
       workspaceId,
       rows.map((r) => r.id),
     );
-    return rows.map((r) => ({ ...toSkillDto(r), agent_count: counts[r.id] ?? 0 }));
+    const pullFreq = await this.bulkPullFrequency(workspaceId, rows);
+    return rows.map((r) => ({
+      ...toSkillDto(r),
+      agent_count: counts[r.id] ?? 0,
+      pull_frequency: pullFreq[r.id] ?? null,
+    }));
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
     const row = await this.repo.getById(workspaceId, id);
     if (!row) return undefined;
     const counts = await this.container.agentsRepo.skillAgentCounts(workspaceId, [row.id]);
-    return { ...toSkillDto(row), agent_count: counts[row.id] ?? 0 };
+    const pullFreq = await this.bulkPullFrequency(workspaceId, [row]);
+    return {
+      ...toSkillDto(row),
+      agent_count: counts[row.id] ?? 0,
+      pull_frequency: pullFreq[row.id] ?? null,
+    };
+  }
+
+  /**
+   * List-view "pull freq" badge: the same metric as the detail Stats tab's
+   * live `GET /skills/:id/stats`, computed cheaply for ALL given skills in
+   * one query pass (`getBulkPullFrequencyRaw` + `toBulkPullFrequency`)
+   * instead of one stats call per skill/card — see those for the metric's
+   * definition. Fixed last-30-days window (no range picker in the list).
+   */
+  private async bulkPullFrequency(
+    workspaceId: string,
+    rows: Pick<SkillRow, 'id' | 'name'>[],
+  ): Promise<Record<string, number | null>> {
+    if (rows.length === 0) return {};
+    const agentIdsBySkill = await this.container.agentsRepo.agentIdsForSkills(
+      workspaceId,
+      rows.map((r) => r.id),
+    );
+    const allAgentIds = [...new Set(Object.values(agentIdsBySkill).flat())];
+    const { from, to } = resolveRange({});
+    const raw = await this.container.reviewRepo.getBulkPullFrequencyRaw(workspaceId, {
+      agentIds: allAgentIds,
+      skillNames: rows.map((r) => r.name),
+      from,
+      to,
+    });
+    return toBulkPullFrequency(
+      rows.map((r) => ({ skillId: r.id, skillName: r.name, agentIds: agentIdsBySkill[r.id] ?? [] })),
+      raw.runs,
+      raw.matchedFindings,
+    );
   }
 
   async delete(workspaceId: string, id: string): Promise<boolean> {
@@ -71,6 +124,7 @@ export class SkillsService {
    * one must never be enabled by construction, manual source or not.
    */
   async create(workspaceId: string, input: CreateSkillInput): Promise<Skill> {
+    await this.assertProjectContextReposOwned(workspaceId, input.project_context);
     const source = input.source ?? 'manual';
     const flagged = detectInjectionPatterns(input.body).length > 0;
     const enabled = !flagged && source === 'manual' ? (input.enabled ?? true) : false;
@@ -83,6 +137,7 @@ export class SkillsService {
       body: input.body,
       enabled,
       evidenceFiles: input.evidence_files ?? null,
+      ...(input.project_context !== undefined ? { projectContext: input.project_context } : {}),
     });
     return toSkillDto(row);
   }
@@ -105,15 +160,47 @@ export class SkillsService {
     id: string,
     patch: UpdateSkillInput,
   ): Promise<Skill | undefined> {
+    await this.assertProjectContextReposOwned(workspaceId, patch.project_context);
     const existing = await this.repo.getById(workspaceId, id);
     if (!existing) return undefined;
 
     const effectiveBody = patch.body ?? existing.body;
     const flagged = detectInjectionPatterns(effectiveBody).length > 0;
-    const gatedPatch: UpdateSkillInput = flagged ? { ...patch, enabled: false } : patch;
 
-    const row = await this.repo.update(workspaceId, id, gatedPatch);
+    const row = await this.repo.update(workspaceId, id, {
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.type !== undefined ? { type: patch.type } : {}),
+      ...(patch.body !== undefined ? { body: patch.body } : {}),
+      ...(patch.project_context !== undefined ? { projectContext: patch.project_context } : {}),
+      ...(flagged
+        ? { enabled: false }
+        : patch.enabled !== undefined
+          ? { enabled: patch.enabled }
+          : {}),
+    });
     return row ? toSkillDto(row) : undefined;
+  }
+
+  /**
+   * Same CTX-AC-04 "approved repository scope" check as `AgentsService`'s
+   * (see its doc comment) — duplicated as a method rather than factored into
+   * a shared base class, matching this codebase's existing per-module
+   * service style (no shared service base class exists today).
+   */
+  private async assertProjectContextReposOwned(
+    workspaceId: string,
+    selections: ProjectContextSelectionList | undefined,
+  ): Promise<void> {
+    if (!selections || selections.length === 0) return;
+    const repoIds = [...new Set(selections.map((s) => s.repo_id))];
+    const owned = await this.container.reposRepo.listOwnedIds(workspaceId, repoIds);
+    const unowned = repoIds.filter((id) => !owned.has(id));
+    if (unowned.length > 0) {
+      throw new ValidationError(
+        `project_context references repositories outside this workspace: ${unowned.join(', ')}`,
+      );
+    }
   }
 
   async listVersions(workspaceId: string, skillId: string): Promise<SkillVersion[] | undefined> {

@@ -62,9 +62,10 @@ Postgres every run, specifically to make this ordering assumption safe.
 Locators in a flow are deterministic only — `--url`, `--text`,
 `find role|text|label` — never `agent-browser`'s AI-driven `chat` command,
 which would break the no-LLM/no-API-key/determinism guarantee this whole
-suite exists to provide (`e2e/AGENTS.md` Conventions). Flows also target
-read-only seeded data (`acme/payments-api`, PR #482, the seeded agents) —
-nothing in `e2e/specs/` should trigger a real model call.
+suite exists to provide (`e2e/AGENTS.md` Conventions). Flows target isolated
+seeded data; L05's context journey saves attachment paths on the seeded agent.
+Nothing in `e2e/specs/` should trigger a real model call. The opt-in fixture
+API entrypoint blocks generation and supplies no secrets.
 
 ## Failure artifacts
 

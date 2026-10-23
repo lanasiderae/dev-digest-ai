@@ -112,6 +112,7 @@
     "vettingTitle": "Untrusted source — vet before enabling",
     "versionLine": "{source} · v{version}",
     "agentCount": "{count, plural, one {# agent} other {# agents}}",
+    "pullFreq": "{value} pull freq",
     "type": {
       "rubric": "rubric",
       "convention": "convention",
@@ -142,10 +143,44 @@
     "version": "v{version}",
     "tabConfig": "Config",
     "tabPreview": "Preview",
+    "tabStats": "Stats",
     "tabVersions": "Versions",
+    "tabContext": "Context",
     "runOnEvals": "Run on evals",
     "runOnEvalsDisabledHint": "Eval pipeline isn't built yet in this course.",
-    "configTitle": "Configuration"
+    "configTitle": "Configuration",
+    "contextTitle": "Project context to use",
+    "contextHint": "Select Markdown documents under the repository's configured context roots (specs/docs/insights) for this skill to carry into an agent's review context. Selection only — documents are never edited here."
+  },
+  "stats": {
+    "title": "Stats",
+    "loadError": "Could not load this skill's stats.",
+    "empty": {
+      "title": "Not linked to any agent",
+      "body": "Attach this skill to an agent to start seeing usage stats."
+    },
+    "range": {
+      "oneDay": "1 day",
+      "thirtyDays": "30 days",
+      "custom": "Custom",
+      "matchedPrs": "{count, plural, one {# PR} other {# PRs}} matched"
+    },
+    "metrics": {
+      "usedBy": "Used by",
+      "usedByValue": "{count, plural, one {# agent} other {# agents}}",
+      "pullFrequency": "Pull frequency",
+      "acceptRate": "Accept rate",
+      "findings": "Findings"
+    },
+    "pullFrequencyNote": "Pull frequency is the share of reviewed PRs with a finding citing this skill — a proxy for actual use, not literal prompt-inclusion tracking.",
+    "lowSample": {
+      "badge": "low sample",
+      "note": "Fewer than {min} accept/dismiss decisions — accept rate may not be reliable yet."
+    },
+    "agentsUsing": "Agents using this skill",
+    "noAgents": "No agent has this skill linked yet.",
+    "open": "Open",
+    "findingsByCategory": "Findings by category"
   },
   "versions": {
     "title": "Version history",

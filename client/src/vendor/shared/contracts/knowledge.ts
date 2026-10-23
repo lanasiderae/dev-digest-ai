@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectContextSelectionList } from './project-context.js';
 
 /**
  * Conformance, Onboarding, Eval, Memory, Conventions, Skills,
@@ -128,10 +129,23 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  // Project Context Folder (L05): this skill's own ordered per-repository
+  // selected document paths (never bodies) — stored on `skills.project_context`,
+  // default empty. Unlike `body`, editing this does NOT bump `version`/
+  // `skill_versions` (that snapshot stays body-only by design — see
+  // `isBodyChange`'s doc comment in `modules/skills/helpers.ts`).
+  project_context: ProjectContextSelectionList,
   // Real count of this workspace's agents that link the skill — computed by
   // SkillsService via container.agentsRepo, not stored on the skills table.
   // Optional: absent on hand-built fixtures (tests, local component state).
   agent_count: z.number().int().optional(),
+  // Share of PRs (reviewed by this skill's linked agents, last 30 days) with
+  // a finding citing this skill (`findings.matched_skill`) — the same metric
+  // as the detail Stats tab's live `pull_frequency`, computed cheaply in bulk
+  // for the whole list instead of one `GET /skills/:id/stats` call per card.
+  // Null = no PR reviewed by a linked agent in that window. Optional: absent
+  // on hand-built fixtures (tests, local component state).
+  pull_frequency: z.number().nullable().optional(),
   // Computed from `body` on every read (injection-scan.ts), not a stored
   // column — a flagged skill is also always `enabled: false` (service-level
   // gate), but the client needs this to explain WHY and to re-check an
@@ -205,6 +219,12 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  // Project Context Folder (L05): this agent's own ordered per-repository
+  // selected document paths (never bodies) — stored on `agents.project_context`,
+  // default empty. Unlike `skill_count` below, this IS a real stored field
+  // (not computed) and DOES participate in the existing config-version bump
+  // (see `isConfigChange`/`AgentVersionConfig` in `modules/agents/helpers.ts`).
+  project_context: ProjectContextSelectionList,
   // Real count of linked skills — computed by AgentsService via
   // AgentsRepository.agentSkillCounts, not stored on the agents table.
   // Optional: absent on hand-built fixtures (tests, local component state).

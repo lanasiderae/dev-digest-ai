@@ -20,11 +20,13 @@ import {
 import type { Skill, SkillType } from "@devdigest/shared";
 import { useUpdateSkill } from "../../../../../lib/hooks/skills";
 import { detectInjectionPatterns } from "../../../../../lib/injection-scan";
+import { ProjectContextSelector } from "../../../../../components/project-context/ProjectContextSelector";
 import { SkillVersionsTab } from "./_components/SkillVersionsTab";
+import { StatsTab } from "./_components/StatsTab";
 import { TYPE_OPTIONS } from "./constants";
 import { s } from "./styles";
 
-type TabKey = "config" | "preview" | "versions";
+type TabKey = "config" | "preview" | "stats" | "versions" | "context";
 
 export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
@@ -36,6 +38,7 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const [type, setType] = React.useState<SkillType>(skill.type);
   const [body, setBody] = React.useState(skill.body);
   const [enabled, setEnabled] = React.useState(skill.enabled);
+  const [contextDraft, setContextDraft] = React.useState(skill.project_context);
 
   const typeOptions = TYPE_OPTIONS.map((v) => ({ value: v, label: t(`listItem.type.${v}`) }));
   const untrusted = skill.source !== "manual" && !enabled;
@@ -63,12 +66,17 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
       // below comes straight from the mutation's own result.
     });
 
+  // Reuses the SAME existing skill update hook/endpoint as `save` above —
+  // not a parallel save path for this one field (CTX-AC-04).
+  const saveContext = () => update.mutate({ id: skill.id, patch: { project_context: contextDraft } });
+
   const resetDraft = () => {
     setName(skill.name);
     setDescription(skill.description);
     setType(skill.type);
     setBody(skill.body);
     setEnabled(skill.enabled);
+    setContextDraft(skill.project_context);
   };
 
   return (
@@ -83,6 +91,9 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
           {skill.enabled ? t("preview.enabled") : t("preview.disabled")}
         </Badge>
         <Badge mono>{t("preview.version", { version: skill.version })}</Badge>
+        <Badge icon="Cpu" color="var(--text-secondary)">
+          {t("listItem.agentCount", { count: skill.agent_count ?? 0 })}
+        </Badge>
         {skill.injection_detected && (
           <Badge color="var(--crit)" icon="AlertOctagon">
             {t("preview.injectionBadge")}
@@ -111,7 +122,9 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
         tabs={[
           { key: "config", label: t("preview.tabConfig"), icon: "Settings" },
           { key: "preview", label: t("preview.tabPreview"), icon: "Eye" },
+          { key: "stats", label: t("preview.tabStats"), icon: "Activity" },
           { key: "versions", label: t("preview.tabVersions"), icon: "History" },
+          { key: "context", label: t("preview.tabContext"), icon: "Folder" },
         ]}
         value={tab}
         onChange={(k) => setTab(k as TabKey)}
@@ -130,7 +143,24 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
           </>
         )}
 
+        {tab === "stats" && <StatsTab skill={skill} />}
+
         {tab === "versions" && <SkillVersionsTab skill={skill} />}
+
+        {tab === "context" && (
+          <>
+            <div style={s.header}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("preview.contextTitle")}</h3>
+              <Button kind="primary" icon="Check" onClick={saveContext} disabled={update.isPending}>
+                {update.isPending ? t("preview.saving") : t("preview.save")}
+              </Button>
+            </div>
+            <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginBottom: 16, lineHeight: 1.5 }}>
+              {t("preview.contextHint")}
+            </p>
+            <ProjectContextSelector value={contextDraft} onChange={setContextDraft} />
+          </>
+        )}
 
         {tab === "config" && (
           <>

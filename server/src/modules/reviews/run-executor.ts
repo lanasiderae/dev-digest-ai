@@ -1,5 +1,14 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type {
+  LLMProvider,
+  ModelInfo,
+  ProjectContextSelectionList,
+  ProjectContextSnapshot,
+  Provider,
+  Review,
+  RunTrace,
+  UnifiedDiff,
+} from '@devdigest/shared';
 import { reviewPullRequest, countBlockers, wrapUntrusted } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
@@ -9,6 +18,14 @@ import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import { IntentService, renderIntentForPrompt } from './pipeline/intent.js';
+import {
+  buildProjectContextAttachment,
+  emptyProjectContextAttachment,
+  resolveProjectContextBudgetTokens,
+  type ProjectContextAttachmentResult,
+} from './pipeline/project-context.js';
+import { resolveProjectContextPaths } from '../project-context/helpers.js';
+import { ProjectContextService } from '../project-context/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -89,12 +106,16 @@ export class ReviewRunExecutor {
         // Skill resolution doesn't depend on the diff, so it's still worth
         // reflecting in the trace even on a pre-diff-load failure.
         const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
-          () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+          () => ({ wrapped: [], names: [], projectContext: [] }) as ResolvedSkills,
         );
+        // Project context resolution hasn't run yet at this pre-work failure
+        // point (it happens inside `runOneAgent`, after the diff is loaded) —
+        // `null`/empty here is the honest answer, not a guess at what WOULD
+        // have been resolved.
         await this.repo
           .saveRunTrace(
             runId,
-            this.traceFromBuffer(runId, pull, agent, '0/0 passed', 0, resolvedSkills.wrapped),
+            this.traceFromBuffer(runId, pull, agent, '0/0 passed', 0, resolvedSkills.wrapped, null),
           )
           .catch(() => undefined);
         this.container.runBus.complete(runId);
@@ -194,11 +215,18 @@ export class ReviewRunExecutor {
     // Resolved OUTSIDE the try so it's available to the catch block's trace
     // too — skill resolution doesn't depend on anything that can fail below.
     const resolvedSkills = await this.resolveAgentSkills(agent.id).catch(
-      () => ({ wrapped: [], names: [] }) as ResolvedSkills,
+      () => ({ wrapped: [], names: [], projectContext: [] }) as ResolvedSkills,
     );
     if (resolvedSkills.names.length > 0) {
       runLog.info(`Skills: ${resolvedSkills.names.length} skill(s) attached to prompt`);
     }
+
+    // CTX-AC-05/06/08/09 — Project Context Folder. Declared OUTSIDE the try
+    // (like `resolvedSkills` above) so a failed/cancelled run's trace can
+    // truthfully report whatever WAS already resolved before the failure
+    // point; starts as "nothing resolved yet" and is overwritten once
+    // `buildProjectContext` actually runs, below.
+    let projectContext: ProjectContextAttachmentResult = emptyProjectContextAttachment();
 
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
@@ -207,6 +235,20 @@ export class ReviewRunExecutor {
         `Resolving ${agent.provider} provider`,
         () => this.container.llm(agent.provider as Provider),
         { kind: 'tool' },
+      );
+
+      // Resolved ONCE per agent run (not once per map-reduce chunk — every
+      // chunk's `assemblePrompt` call reuses the SAME `specs` array via
+      // `reviewPullRequest`'s shared `promptParts`, exactly like `callers`/
+      // `repoMap` above). Deterministic DB + git-object + local tokenizer
+      // reads only — makes zero `llm.complete*` calls.
+      projectContext = await this.buildProjectContext(
+        workspaceId,
+        pull.repoId,
+        agent,
+        resolvedSkills.projectContext,
+        llm,
+        runLog,
       );
 
       // Per-agent repo-intel toggle (Agent editor). When an agent opts out we
@@ -248,6 +290,11 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Project Context Folder (CTX-AC-05) — resolved once above, same
+        // omit-when-empty contract. `assemblePrompt` applies the injection
+        // guard (`wrapUntrusted`) itself; these are RAW document texts, not
+        // pre-wrapped here.
+        ...(projectContext.specs.length ? { specs: projectContext.specs } : {}),
         // Enabled, ordered linked-skill bodies — each already wrapUntrusted()
         // wrapped above (defense-in-depth; reviewer-core itself is untouched).
         // Omitted when the agent has no enabled linked skills.
@@ -336,7 +383,11 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        // CTX-AC-06 — the real resolved-and-included path list, plus the
+        // full snapshot (included/omitted documents, token totals, and the
+        // exact guarded text sent under "## Project context").
+        specs_read: projectContext.snapshot.documents.map((d) => d.path),
+        project_context: projectContext.snapshot,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -367,7 +418,21 @@ export class ReviewRunExecutor {
       await this.repo
         .saveRunTrace(
           runId,
-          this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, resolvedSkills.wrapped),
+          // `projectContext` reflects whatever was ALREADY resolved before
+          // this failure (it's declared before the try and only overwritten
+          // once `buildProjectContext` actually completes) — a failure
+          // during/after that resolution still gets a truthful non-empty
+          // snapshot; a failure before it (e.g. provider resolution) gets
+          // the honest "nothing resolved yet" empty snapshot.
+          this.traceFromBuffer(
+            runId,
+            pull,
+            agent,
+            '0/0 passed',
+            Date.now() - start,
+            resolvedSkills.wrapped,
+            projectContext.snapshot,
+          ),
         )
         .catch(() => undefined);
       this.container.runBus.complete(runId);
@@ -474,6 +539,7 @@ export class ReviewRunExecutor {
     grounding: string,
     durationMs = 0,
     skills: string[] = [],
+    projectContext: ProjectContextSnapshot | null = null,
   ): RunTrace {
     return {
       config: {
@@ -492,13 +558,18 @@ export class ReviewRunExecutor {
         // have been sent.
         skills: skills.length > 0 ? skills.join('\n\n') : null,
         memory: null,
-        specs: null,
+        specs: projectContext?.attached_specs ?? null,
         user: '',
       },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],
-      specs_read: [],
+      // Truthful, not guessed: `null`/[] when project context resolution
+      // never ran before this failure (e.g. a pre-diff-load failure); the
+      // caller passes whatever WAS already resolved otherwise (CTX-AC-06 —
+      // "failed/cancelled traces retain known context truthfully").
+      specs_read: projectContext?.documents.map((d) => d.path) ?? [],
+      project_context: projectContext,
       log: this.container.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
     };
   }
@@ -518,11 +589,112 @@ export class ReviewRunExecutor {
     return {
       wrapped: enabled.map((l) => wrapUntrusted(l.skill.name, l.skill.body)),
       names: enabled.map((l) => l.skill.name),
+      // Each enabled skill's OWN project-context selection list, in the
+      // same configured order as `wrapped`/`names` above — consumed by
+      // `buildProjectContext` below (CTX-AC-05's "direct-agent, then
+      // enabled safe skills in order" union). Reusing this same
+      // `linkedSkills` call (rather than a second query via
+      // AgentsService.resolveProjectContext) avoids a duplicate DB round
+      // trip for data already being fetched here.
+      projectContext: enabled.map((l) => l.skill.projectContext as ProjectContextSelectionList),
     };
+  }
+
+  /**
+   * CTX-AC-05/06/08/09 — resolve this review's `## Project context` section
+   * ONCE per agent run: union the agent's own + enabled skills' selections
+   * (`resolveProjectContextPaths`, same ordered-union/dedup rule as
+   * AgentsService.resolveProjectContext, inlined here to reuse `agent`/
+   * `resolvedSkills` already in scope instead of a second DB round trip),
+   * read each resolved path's actual text (`ProjectContextService.
+   * resolveDocuments` — git-object reads, workspace/repo-scoped), then
+   * apply the C5/C7 attached-block token budget (`buildProjectContextAttachment`)
+   * dropping whole documents from the tail. Deterministic I/O only — makes
+   * NO `llm.complete*`/`completeStructured` call (only `llm.listModels()`,
+   * a metadata read, to size the budget against the agent's actual model).
+   * Never throws: any failure degrades to an omission-carrying empty
+   * attachment, same "never let an enrichment break the run" contract as
+   * `buildCallersDigest`/`buildRepoMapDigest` above.
+   */
+  private async buildProjectContext(
+    workspaceId: string,
+    repoId: string,
+    agent: AgentRow,
+    skillSelections: ProjectContextSelectionList[],
+    llm: LLMProvider,
+    runLog: RunLogger,
+  ): Promise<ProjectContextAttachmentResult> {
+    const resolved = resolveProjectContextPaths({
+      repoId,
+      agentSelections: agent.projectContext as ProjectContextSelectionList,
+      skillSelections,
+    });
+    if (resolved.paths.length === 0) {
+      if (resolved.omissions.length > 0) {
+        runLog.info(`project context: ${resolved.omissions.length} selection(s) excluded (cross-repo/duplicate)`);
+      }
+      return emptyProjectContextAttachment(resolved.omissions);
+    }
+
+    let readResult;
+    try {
+      readResult = await new ProjectContextService(this.container).resolveDocuments(
+        workspaceId,
+        repoId,
+        resolved.paths,
+      );
+    } catch (err) {
+      runLog.info(`project context: document read failed — ${(err as Error).message}`);
+      return emptyProjectContextAttachment(resolved.omissions);
+    }
+
+    const omissionsSoFar = [...resolved.omissions, ...readResult.omissions];
+    if (readResult.documents.length === 0) {
+      if (omissionsSoFar.length > 0) {
+        runLog.info(`project context: ${omissionsSoFar.length} selection(s) omitted — nothing eligible to attach`);
+      }
+      return emptyProjectContextAttachment(omissionsSoFar);
+    }
+
+    const modelInfo = await this.resolveModelInfo(agent, llm);
+    const budgetTokens = resolveProjectContextBudgetTokens(modelInfo);
+    const result = buildProjectContextAttachment(
+      readResult.documents,
+      omissionsSoFar,
+      budgetTokens,
+      this.container.tokenizer,
+    );
+
+    const droppedForBudget = result.snapshot.omissions.length - omissionsSoFar.length;
+    if (droppedForBudget > 0) {
+      runLog.info(`project context: dropped ${droppedForBudget} document(s) to fit the ${budgetTokens}-token budget`);
+    }
+    runLog.info(
+      `project context: ${result.snapshot.documents.length} document(s) attached (${result.snapshot.total_tokens} token(s))`,
+    );
+    return result;
+  }
+
+  /**
+   * Best-effort `ModelInfo` lookup for the agent's own configured model, via
+   * the already-resolved provider's `listModels()` — a metadata read, not a
+   * completion call. Returns `undefined` (never throws) when the provider
+   * doesn't expose model metadata or the specific model id isn't listed;
+   * `resolveProjectContextBudgetTokens` treats that the same as "unknown
+   * window" (16,000-token fallback budget).
+   */
+  private async resolveModelInfo(agent: AgentRow, llm: LLMProvider): Promise<ModelInfo | undefined> {
+    try {
+      const models = await llm.listModels();
+      return models.find((m) => m.id === agent.model);
+    } catch {
+      return undefined;
+    }
   }
 }
 
 interface ResolvedSkills {
   wrapped: string[];
   names: string[];
+  projectContext: ProjectContextSelectionList[];
 }

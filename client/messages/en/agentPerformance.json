@@ -1,15 +1,24 @@
 {
   "title": "Agent Performance",
-  "subtitle": "Accept-rate is the headline quality signal · cost shown as a breakdown",
+  "subtitle": "Accept-rate is the headline quality signal · cost is a DevDigest estimate, shown as a breakdown",
   "loadError": "Could not load agent performance.",
   "summary": {
     "totalRuns": "Total runs",
     "avgAcceptRate": "Avg accept-rate",
     "totalCost": "Total cost",
-    "mostActive": "Most active"
+    "mostActive": "Most active",
+    "noAgent": "—",
+    "decisionsMatched": "{count, plural, one {# decision} other {# decisions}}"
+  },
+  "range": {
+    "oneDay": "1 day",
+    "thirtyDays": "30 days",
+    "custom": "Custom",
+    "matched": "{count, plural, one {# run} other {# runs}} matched"
   },
   "costByAgent": "Cost by agent",
   "costByModel": "Cost by model",
+  "costEstimateNote": "Cost is a DevDigest estimate (via PriceBook, from recorded token usage) — not reconciled provider billing.",
   "noCost": "No cost recorded yet.",
   "sort": {
     "acceptRate": "accept-rate",
@@ -22,7 +31,15 @@
     "runs": "Runs",
     "findings": "Findings",
     "cost": "Cost",
-    "trend": "Trend"
+    "duration": "Avg duration",
+    "lastRun": "Last run",
+    "trend": "Trend",
+    "view": "View",
+    "never": "Never"
+  },
+  "lowSample": {
+    "badge": "Low sample",
+    "note": "Fewer than {min} decisions — accept rate may not be reliable yet."
   },
   "empty": {
     "title": "No agent runs yet",

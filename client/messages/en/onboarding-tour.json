@@ -1,0 +1,63 @@
+{
+  "title": "Onboarding Tour",
+  "subtitle": "A guided, evidence-backed tour of this repository's architecture, critical paths, setup, reading order and first tasks.",
+  "generate": "Generate tour",
+  "refresh": "Refresh",
+  "generating": "Generating…",
+  "error": "Couldn't generate the tour. The previous tour, if any, is unchanged.",
+  "retry": "Retry",
+  "refreshFailed": "Refresh failed; showing the last successful tour.",
+  "empty": {
+    "title": "No tour yet",
+    "body": "Generate a guided tour grounded in this repository's indexed facts.",
+    "cta": "Generate tour"
+  },
+  "loadError": {
+    "title": "Couldn't load the onboarding tour"
+  },
+  "status": {
+    "title": "Status",
+    "complete": "Complete",
+    "partial": "Partial",
+    "skeleton": "Skeleton",
+    "failed": "Failed",
+    "revision": "Index revision: {revision}",
+    "revisionUnknown": "Index revision unknown"
+  },
+  "attempt": {
+    "title": "Last attempt",
+    "notCalled": "No model call was made for this generation.",
+    "calls": "{count} model call",
+    "model": "Model: {model}",
+    "provider": "Provider: {provider}",
+    "tokensIn": "Input tokens: {count}",
+    "tokensOut": "Output tokens: {count}",
+    "cost": "Cost: {cost}",
+    "costUnknown": "unknown",
+    "attemptedAt": "Attempted at {at}"
+  },
+  "omissions": {
+    "title": "Omissions",
+    "empty": "Nothing was omitted.",
+    "reason": {
+      "index_unavailable": "Repository index unavailable",
+      "index_partial": "Repository index partial",
+      "budget": "Exceeded the input token budget",
+      "missing": "Referenced path no longer exists at the pinned revision"
+    }
+  },
+  "sections": {
+    "architecture_overview": "Architecture overview",
+    "critical_paths": "Critical execution paths",
+    "local_setup": "Local setup",
+    "reading_order": "Recommended reading order",
+    "first_tasks": "Suggested first tasks",
+    "status": {
+      "generated": "Generated",
+      "skeleton": "Skeleton — deterministic fallback",
+      "unavailable": "Unavailable"
+    },
+    "evidence": "Evidence",
+    "noEvidence": "No evidence available."
+  }
+}

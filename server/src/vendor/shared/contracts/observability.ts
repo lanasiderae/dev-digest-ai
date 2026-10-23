@@ -119,6 +119,48 @@ export const AgentStats = z.object({
 export type AgentStats = z.infer<typeof AgentStats>;
 
 // ---------------------------------------------------------------------------
+// Per-skill Stats (GET /skills/:id/stats)
+// ---------------------------------------------------------------------------
+
+/** One agent that has this skill linked, for the "agents using this skill" list. */
+export const SkillStatsAgent = z.object({
+  agent_id: z.string(),
+  agent_name: z.string(),
+});
+export type SkillStatsAgent = z.infer<typeof SkillStatsAgent>;
+
+export const SkillStats = z.object({
+  skill_id: z.string(),
+  skill_name: z.string(),
+  /** Total agents with this skill linked. */
+  agents_linked: z.number().int(),
+  /** Of those, how many had ≥1 run in the selected range. */
+  agents_active: z.number().int(),
+  /** Share of PRs reviewed (by linked agents, in range) that have ≥1 finding
+   *  citing this skill (`findings.matched_skill`). Null if no PRs in range. */
+  pull_frequency: z.number().nullable(),
+  prs_matched: z.number().int(),
+  prs_total: z.number().int(),
+  /** accept / (accept + dismiss) over this skill's own findings only. */
+  accept_rate: z.number().nullable(),
+  /** Raw decision counts behind `accept_rate` — lets the client flag a
+   *  low-sample rate (too few decisions to trust at face value) the same
+   *  way `AgentPerfRow.accepted`/`dismissed` do for the Agent dashboard. */
+  accepted: z.number().int(),
+  dismissed: z.number().int(),
+  findings_total: z.number().int(),
+  findings_by_category: z.object({
+    bug: z.number().int(),
+    security: z.number().int(),
+    perf: z.number().int(),
+    style: z.number().int(),
+    test: z.number().int(),
+  }),
+  agents_using: z.array(SkillStatsAgent),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
+
+// ---------------------------------------------------------------------------
 // Cross-session memory curator
 // ---------------------------------------------------------------------------
 

@@ -25,8 +25,107 @@
   `server/src/adapters/mocks.ts` (`MockLLMOptions.structuredBySchema` doc
   comment), `server/src/modules/conventions/service.ts`,
   `server/src/modules/conventions/constants.ts` (`EXTRACTION_SCHEMA_NAME`).
+- **2026-10-22** — L05/TASK-04 added `project_context` to the server's
+  `Agent`/`Skill` DTOs in `vendor/shared/contracts/knowledge.ts` and
+  `disableTransportRetry` to `CompletionRequest`/`StructuredRequest` in
+  `vendor/shared/adapters.ts`, but did NOT mirror either change into
+  `client/src/vendor/shared/*` — this task ran under an explicit "backend-only,
+  never touch `client/**`" constraint (a separate frontend worker was
+  concurrently active on `client/**` in the same checkout) that overrode the
+  usual "both vendored copies change together" convention. The client copies
+  of both files were already non-byte-identical to the server's before this
+  session (confirmed: client's `knowledge.ts` omits `AgentVersionConfig`/
+  `AgentVersion` entirely per this file's 2026-10-22 entry below, and client's
+  `adapters.ts` omits `sessionId`/`commitFiles`/`sync`/etc.), so this is a
+  widening of an existing gap, not a new kind of drift — but it still needs a
+  follow-up hand-edit to `client/src/vendor/shared/contracts/knowledge.ts`
+  (add `project_context: ProjectContextSelectionList` to its `Agent`/`Skill`)
+  before any client code (e.g. TASK-05's `ProjectContextSelector`) can read
+  that field with a type-checked contract. `adapters.ts`'s
+  `disableTransportRetry` has no client consumer in this slice (TASK-08/10 are
+  server-only callers), so mirroring it is lower-urgency but still owed for
+  parity. Evidence: `server/src/vendor/shared/contracts/knowledge.ts` vs.
+  `client/src/vendor/shared/contracts/knowledge.ts` (diff after this session),
+  same pair for `adapters.ts`.
+- **2026-10-23** — L05/TASK-08 added `BriefReadQuery`/`BriefReadResponse`/
+  `BriefGenerateRequest` route contracts to the SERVER copy of
+  `vendor/shared/contracts/brief.ts` only, under the same backend-only
+  "never touch `client/**`" constraint as the TASK-04 entry above (a
+  concurrent frontend worker owned `client/**` in the same checkout) — but
+  unlike that entry, `brief.ts` was previously one of the files
+  `test/vendor-contracts-parity.test.ts` keeps strictly byte-identical (see
+  this file's "The two vendored `knowledge.ts` copies are NOT byte-identical,
+  unlike `brief.ts`/`trace.ts`/`platform.ts`/`index.ts`" entry below), so this
+  is a NEW parity gap, not a widening of an existing one. Confirmed:
+  `pnpm exec vitest run --exclude '**/*.it.test.ts'` goes from all-green to
+  exactly one failing assertion, in `vendor-contracts-parity.test.ts`, for
+  `brief.ts`'s diff. Needs a follow-up hand-edit mirroring the same three
+  exports into `client/src/vendor/shared/contracts/brief.ts` (TASK-09's brief
+  UI/hooks need them type-checked) before that test is green again. Evidence:
+  `server/src/vendor/shared/contracts/brief.ts` ("Route contracts (TASK-08)"
+  section) vs. the unchanged client copy; `server/test/vendor-contracts-parity.test.ts`.
+- **2026-10-23** — L05/TASK-10 added `OnboardingReadResponse`/
+  `OnboardingGenerateResponse` route contracts to the SERVER copy of
+  `vendor/shared/contracts/onboarding.ts` only, under the same backend-only
+  constraint as the TASK-08 entry immediately above — same shape, a second
+  instance of the same gap: `onboarding.ts` was ALSO one of the
+  `test/vendor-contracts-parity.test.ts` byte-identical files, so
+  `pnpm exec vitest run --exclude '**/*.it.test.ts'` now has exactly ONE
+  failing assertion (confirmed: 402 passed / 1 failed, same single
+  `vendor-contracts-parity.test.ts` file, now failing on `onboarding.ts`'s
+  diff in addition to `brief.ts`'s pre-existing one — both diffs together
+  still produce only the one assertion failure per file pair). Needs a
+  follow-up hand-edit mirroring the same two exports into
+  `client/src/vendor/shared/contracts/onboarding.ts` (TASK-11's tour UI/hooks
+  need them type-checked) before that test is green again. Evidence:
+  `server/src/vendor/shared/contracts/onboarding.ts` ("Route contracts
+  (TASK-10)" section) vs. the unchanged client copy (which already has the
+  TASK-02 base contract, just not these two route additions).
 
 ## Codebase Patterns
+
+- **2026-10-22** — No shared "does this workspace own repo id X" helper existed
+  anywhere in the codebase before L05/TASK-04 — `repo-intel/repository.ts`'s
+  `getRepoBasics(repoId)` is deliberately tenant-agnostic (its own comment says
+  so), and `project-context/repository.ts`'s `getOwnedRepo` is scoped to that
+  one module. Agent/skill CRUD needed to validate a `project_context`
+  selection's `repo_id` against workspace ownership, so TASK-04 added
+  `RepoRepository.listOwnedIds(workspaceId, repoIds): Promise<Set<string>>`
+  (bulk `inArray` check, same shape as `agentSkillCounts`/`skillAgentCounts`)
+  and exposed it as `container.reposRepo`, following the exact
+  `agentsRepo`/`skillsRepo`/`reviewRepo` lazy-getter precedent. Any future
+  module needing the same "workspace owns repo X" check should reuse this
+  rather than adding a fourth near-duplicate query. Evidence:
+  `server/src/modules/repos/repository.ts` (`listOwnedIds`),
+  `server/src/platform/container.ts` (`reposRepo` getter),
+  `server/src/modules/agents/service.ts`/`modules/skills/service.ts`
+  (`assertProjectContextReposOwned`).
+- **2026-10-22** — Agents' and skills' `project_context` field participates in
+  their version-bump rule DIFFERENTLY, by design, matching each module's
+  pre-existing versioning semantics: agents' `isConfigChange` bumps
+  `agent_versions` on any genuine `project_context` content change (same
+  bucket as `provider`/`model`/`strategy`, compared via a `JSON.stringify`
+  equality check — `projectContextEqual` — so resubmitting an
+  object-identity-different-but-content-same array doesn't spuriously bump
+  it); skills' `isBodyChange` never looks at `project_context` at all, since
+  `skill_versions` is deliberately body-only (per its own doc comment, editing
+  name/description/type/enabled already doesn't version a skill, and
+  `project_context` joins that same unversioned bucket). Don't assume the two
+  modules' "does this field bump the version" rule is symmetric when adding a
+  new field to either. Evidence: `server/src/modules/agents/helpers.ts`
+  (`isConfigChange`, `projectContextEqual`), `server/src/modules/skills/helpers.ts`
+  (`isBodyChange`'s doc comment), `server/test/agents-helpers-project-context.test.ts`,
+  `server/test/skills-project-context.test.ts`.
+- **2026-10-22** — `pull_requests` has no dedicated merge-timestamp column —
+  `status` ('open'/'merged'/'closed') IS the GitHub merge state (confirmed
+  by `pulls/status.ts:89`'s `ghStatus === 'merged'` check), and `updated_at`
+  is the closest available timestamp to "when it merged", not an exact one.
+  A feature needing "when was this PR merged" (e.g. the new
+  `history`/`getPriorPrsWithFileOverlap` feature) must fall back through
+  `updatedAt ?? openedAt ?? null` rather than assuming a real merge
+  timestamp exists. Evidence: `server/src/db/schema/pulls.ts:5-34` (no
+  `mergedAt` field), `server/src/modules/history/helpers.ts`
+  (`toPrHistoryItem`'s fallback chain).
 
 - **2026-09-29** — Not every GET route's response is Zod-validated despite
   `server/AGENTS.md`'s "schema-first... one definition drives both request
@@ -141,6 +240,289 @@
   `groundFindings`. Evidence: `server/src/modules/pulls/routes.ts`
   (the smart-diff handler's `eq(t.findings.kind, 'finding')` filter).
 
+- **2026-10-22** — Blast Radius's caller-dedup must be scoped PER changed-symbol
+  group (`viaSymbol`), not globally across `result.callers`: the same
+  `file|symbol|line` caller location can legitimately appear under two
+  different changed symbols when one function calls both of them (e.g. a
+  caller invoking both `symA` and `symB` from the same line of its own body).
+  A dedup key of just `file|symbol|line` silently drops that caller from the
+  second group; the key must include `viaSymbol` as its first segment.
+  Evidence: `server/src/modules/blast/helpers.ts:44` (the four-part key),
+  `server/test/blast-grouping.test.ts` ("a caller row reaching two different
+  changed symbols from the same file/symbol/line survives in both groups").
+
+- **2026-10-22** — The two vendored `vendor/shared/contracts/knowledge.ts`
+  copies are NOT byte-identical, unlike `brief.ts`/`trace.ts`/`platform.ts`/
+  `index.ts` (which this session kept byte-identical copies for): the client's
+  copy omits `AgentVersionConfig`/`AgentVersion` entirely and has a narrower
+  `provider` enum comment / different `ci_fail_on` wording, because the
+  client UI never replays an agent's versioned config snapshot. A future edit
+  to `Agent`/`Skill`/`AgentVersionConfig` in `knowledge.ts` must be mirrored
+  field-by-field by hand into the client copy, not via `cp`, unlike the four
+  files above where a straight copy is correct. Evidence: `diff
+  server/src/vendor/shared/contracts/knowledge.ts
+  client/src/vendor/shared/contracts/knowledge.ts` (lines 227–251 of the
+  server copy, `AgentVersionConfig`/`AgentVersion`, absent from client's).
+- **2026-10-22** — Adding a new `.notNull().default(...)` jsonb column to
+  `agents`/`skills` and then also adding the matching *required* field to the
+  public `Agent`/`Skill` Zod DTOs in `knowledge.ts` immediately breaks
+  `tsc --noEmit` in `modules/agents/helpers.ts` (`toAgentDto`) and
+  `modules/skills/helpers.ts` (`toSkillDto`) — their pure row→DTO mapper
+  literals now miss the new required property, even though those files
+  contain no business logic and aren't routes. A schema-freeze task that adds
+  a DB column should land the column plus a standalone Zod type for the new
+  value (e.g. an exported `FooSelectionList`) and stop there; wiring it into
+  the public `Agent`/`Skill` DTO (and fixing the two mapper functions) belongs
+  to whichever task actually implements the CRUD/mapping, not the schema task
+  — otherwise a "contracts/schema only" task silently expands into editing
+  service-layer files. Evidence: `tsc --noEmit -p tsconfig.json` error
+  `TS2741: Property 'project_context' is missing in type` at
+  `src/modules/agents/helpers.ts:13` and `src/modules/skills/helpers.ts:12`
+  when `Agent.project_context`/`Skill.project_context` were added, resolved
+  by reverting those two DTO fields and keeping only the DB columns +
+  `ProjectContextSelectionList` (`contracts/project-context.ts`).
+
+- **2026-10-22** — The repo-intel indexer pipelines (`pipeline/full.ts:262`,
+  `pipeline/incremental.ts:251`) already write a `hotnessAvailable: false`
+  key into `repo_index_state.stats` (JSONB) on every run — but
+  `RepoIntelRepository.tryGetIndexState` only ever projects `stats.durationMs`
+  and `stats.reason` out of that blob; every other key (including
+  `hotnessAvailable`) is silently dropped before it reaches the stable
+  `IndexState` shape. A caller needing `hotnessAvailable` (or any other
+  pipeline-written stat) must read `repo_index_state.stats` directly rather
+  than assuming `getIndexState()`/`tryGetIndexState()` exposes it — added a
+  narrow `getIndexStateStats(repoId)` repository method for this rather than
+  widening `IndexState` (which has many existing callers). Evidence:
+  `server/src/modules/repo-intel/repository.ts` (`tryGetIndexState`'s
+  `stats.durationMs`/`stats.reason` projection vs. the new
+  `getIndexStateStats`), `server/src/modules/repo-intel/pipeline/full.ts:262`,
+  `server/src/modules/repo-intel/pipeline/incremental.ts:251`.
+- **2026-10-22** — `server/tsconfig.json`'s `include: ["src/**/*.ts"]` means
+  `pnpm typecheck` (`tsc --noEmit -p tsconfig.json`) never type-checks
+  anything under `server/test/`, and `vitest run` doesn't type-check either
+  (esbuild strips types without checking) — so a `*.it.test.ts` file whose
+  stub class does `implements SomeInterface` (e.g. `test/blast.it.test.ts`'s
+  `StubRepoIntel implements RepoIntel`) can silently fall out of sync with
+  that interface after a non-test-file change adds a new required method:
+  neither `pnpm typecheck` nor `pnpm exec vitest run` catches the missing
+  method, confirmed by running `tsc --noEmit` directly against the file
+  (`error TS2420: Class 'StubRepoIntel' incorrectly implements interface
+  'RepoIntel'. Property '<new method>' is missing`) after adding
+  `RepoIntel.getRankedFilesWithHotness` without touching the stub. Anyone
+  adding a method to a facade interface (`RepoIntel`, or similarly-shaped
+  ones) must manually `grep -rln "implements <Interface>"` across `test/`
+  too, not just `src/`, since the toolchain won't flag the gap. Evidence:
+  `server/tsconfig.json` (`include`), `server/test/blast.it.test.ts`
+  (`StubRepoIntel`).
+
+- **2026-10-22** — A narrow adapter interface that only ONE server module needs
+  (not shared with `reviewer-core`/client the way `GitClient`/`LLMProvider` in
+  `vendor/shared/adapters.ts` are) belongs beside its own adapter file, not in
+  `vendor/shared/adapters.ts` — `adapters/tokenizer/index.ts`'s `Tokenizer`
+  interface already does this (confirmed by grep: it's defined there, not in
+  `vendor/shared`), and the new project-context `GitTreeReader`/`GitTreeEntry`
+  (`adapters/git/tree-reader.ts`) followed the same precedent rather than
+  adding to the mirrored-to-client `vendor/shared/adapters.ts` file (which
+  would have required a byte-identical client-copy edit for an interface the
+  client never calls). Check whether an interface is cross-package before
+  picking its home. Evidence: `server/src/adapters/tokenizer/index.ts`
+  (`export interface Tokenizer`), `server/src/adapters/git/tree-reader.ts`.
+- **2026-10-22** — `GitClient.readFile` (`adapters/git/simple-git.ts`) validates
+  an untrusted path with `resolve()` + `realpath()` against the clone root
+  BEFORE reading — safe in the common case, but it's a check-then-use over a
+  MUTABLE working-tree directory (a concurrent `git reset --hard`/fetch, or a
+  symlink swap, could in principle change what the path resolves to between
+  the check and the `fs.readFile`). For a feature that reads untrusted
+  repo-relative paths more adversarially (L05's Project Context Folder), the
+  new `GitTreeReader` (`adapters/git/tree-reader.ts`) instead resolves content
+  by content-addressed git OBJECT ID (`git ls-tree -r -l -z <pinned-commit>`
+  → exact-string match in memory → `git cat-file -s`/`-p <oid>`) — no
+  filesystem path is ever joined/resolved against user input, so there is no
+  parent-directory TOCTOU window at all, not just a narrowed one. Reach for
+  this pattern (not `readFile`) for any future untrusted-path read that needs
+  a stronger guarantee than "safe in the common case". Evidence:
+  `server/src/adapters/git/tree-reader.ts`'s doc comment,
+  `server/src/adapters/git/tree-reader.test.ts`'s "immune to a TOCTOU swap of
+  the working-tree file after listing" test (swaps the committed file for a
+  symlink to `/etc/hosts` AFTER `listTree()`, then shows `readBlob` still
+  returns the original committed content).
+
+- **2026-10-23** — L05/TASK-06 needed `run-executor.ts` (reviews module) to resolve
+  project-context documents, which required BOTH `AgentsService`-shaped union
+  logic AND `ProjectContextService`'s git-object read path — a genuine
+  cross-module (`project-context/service.ts`) call from `reviews/`. No
+  container getter exists for either service (only repositories —
+  `agentsRepo`/`reposRepo`/`skillsRepo`/`reviewRepo` — are container-exposed
+  singletons); the only existing precedent for "construct a service inline
+  inside another module's orchestration code" is `run-executor.ts`'s own
+  `new IntentService(this.container, this.repo)` call, which is INTRA-module
+  (`reviews/pipeline/intent.ts`). TASK-06 extended that same inline-construction
+  pattern across a module boundary (`new ProjectContextService(this.container)`
+  inside `reviews/run-executor.ts`) rather than adding a container getter
+  (container/module registration is TASK-02's sole-owner territory per the
+  plan) — and avoided needing `AgentsService` at all by inlining the pure
+  `resolveProjectContextPaths` helper directly against `agent.projectContext`
+  (already on the `AgentRow` the executor already has) and the SAME
+  `agents.linkedSkills()` call `resolveAgentSkills` already makes (added a
+  `projectContext: ProjectContextSelectionList[]` field to `ResolvedSkills`
+  rather than querying twice). Flagged for the architecture reviewer: this is
+  the first cross-module `service.ts`-class construction in this codebase: a
+  container-getter shouldn't be added for it without touching the
+  TASK-02-owned container file, but it's worth that reviewer explicitly
+  deciding whether it crosses onion-architecture's "other services via the
+  container" guidance enough to need one. Evidence:
+  `server/src/modules/reviews/run-executor.ts` (`buildProjectContext`,
+  `resolveAgentSkills`), `server/src/modules/project-context/service.ts`
+  (`resolveDocuments`).
+- **2026-10-23** — The approved spec's C5 budget rule ("Attached-block budget
+  is 20% of the selected model context window, clamped to 4,000–32,000
+  tokens, falling back to 16,000 when unknown") is ambiguous about WHICH
+  number the 16,000 fallback actually produces: naively composing it as
+  `clamp(0.2 * resolveContextWindowTokens(modelInfo), 4000, 32000)` — i.e.
+  piping the tokenizer adapter's own existing 16,000 "unknown window"
+  fallback through the SAME 20%/clamp formula used for a known window — gives
+  `0.2 * 16000 = 3200`, which the 4,000 floor then clamps UP to **4,000**,
+  never actually producing the literal 16,000 the spec names. Implemented
+  instead as: apply the 20%/clamp formula only when `modelInfo.contextLength`
+  is a real known positive number; when it is not, use
+  `resolveContextWindowTokens`'s 16,000 fallback directly AS the budget,
+  bypassing the clamp formula entirely. Any other caller composing
+  `resolveContextWindowTokens` with a budget-sizing clamp should check this
+  same trap before assuming "pipe the window through the usual formula" is
+  correct. Evidence: `server/src/modules/reviews/pipeline/project-context.ts`
+  (`resolveProjectContextBudgetTokens`'s doc comment),
+  `server/test/review-project-context-budget.test.ts` ("falls back to 16,000
+  (not 4,000) when the model/window is entirely unknown").
+- **2026-10-23** — L05/TASK-08's PR Brief budget is a FIXED 8,000-token input
+  cap (C7), unlike TASK-06's review-time attached-block budget (20% of the
+  model's context window, clamped 4k-32k, via
+  `resolveProjectContextBudgetTokens`) — the two must not share a budget
+  NUMBER function. The underlying drop-whole-documents-from-the-tail
+  ALGORITHM (`buildProjectContextAttachment`/`emptyProjectContextAttachment`,
+  `reviews/pipeline/project-context.ts`) IS generic (`budgetTokens` is a
+  plain parameter, no model-window logic baked in), so `brief/service.ts`
+  reuses it directly, computing its own `budgetTokens` as
+  `BRIEF_INPUT_TOKEN_CAP` minus the mandatory (never-dropped) section's token
+  count, rather than forking the function. A future feature with its own
+  fixed/different budget rule should reuse `buildProjectContextAttachment`
+  the same way, not copy it. Evidence: `server/src/modules/brief/service.ts`
+  (`generate`'s budget section), `server/src/modules/brief/constants.ts`
+  (`BRIEF_INPUT_TOKEN_CAP = 8_000`).
+- **2026-10-23** — L05/TASK-08 is the first code in this repo using a
+  Postgres session-scoped advisory lock (`pg_try_advisory_lock`/
+  `pg_advisory_unlock`, confirmed via `grep -rn advisory server/src` — no
+  prior hits). A session-scoped lock's acquire/release pair MUST run on the
+  SAME physical connection; a plain Drizzle `db.execute(...)` over the
+  pooled `postgres-js` client does NOT guarantee that (each call can land on
+  a different pooled connection, silently turning the unlock into a no-op
+  that never releases the real lock). Fixed by exposing the RAW
+  `postgres-js` client (distinct from the Drizzle-wrapped `db`) as
+  `ContainerOverrides.rawSql`/`Container.rawSql`, wired from `buildApp()`'s
+  own `createDb()` handle, and using `rawSql.reserve()` (postgres-js's
+  dedicated-connection API, NOT a DB transaction — reserving pins a
+  connection without starting a transaction, which matters because the plan
+  forbids holding a transaction open across the slow model call) for the
+  lock's lifetime, released via `conn.release()` in a `finally`. A test that
+  builds its own `db` (most `.it.test.ts` files) must separately pass
+  `overrides.rawSql` (e.g. `pg.handle.sql`) to exercise the real lock, not
+  just the real `db`. Separately: `postgres-js` has no `bigint`
+  query-parameter binding at all (confirmed via `tsc`: `Argument of type
+  'bigint' is not assignable to parameter of type 'ParameterOrFragment<never>'`)
+  — a `bigint` lock key must be sent as a string with a server-side
+  `::bigint` cast (`` sql`select pg_try_advisory_lock(${key}::bigint)` ``),
+  not interpolated directly. Evidence: `server/src/platform/container.ts`
+  (`ContainerOverrides.rawSql`, `Container.rawSql`), `server/src/app.ts`
+  (wiring from `handle.sql`), `server/src/modules/brief/service.ts`
+  (`withGenerationLock`), `server/src/modules/brief/helpers.ts`
+  (`advisoryLockKeyForPr`), `server/test/brief-lock.test.ts` (hermetic proof
+  via a fake global-flag `rawSql`), `server/test/brief.it.test.ts` (same
+  behavior against real Postgres — ran and passed in this session; Docker
+  was actually available in this environment).
+- **2026-10-23** — `ReviewRunExecutor` (`reviews/run-executor.ts`) had NO
+  hermetic (non-`.it.test.ts`) test coverage before this session — confirmed
+  by `grep -rln "ReviewRunExecutor" server/test server/src` returning only
+  `.it.test.ts` files and the production code itself — because its
+  constructor takes a real `ReviewRepository`/`Container['agentsRepo']`
+  previously assumed to need a live Postgres. A private orchestration method
+  that only touches `container.{db,git,gitTreeReader,tokenizer}` and
+  `agents.linkedSkills()` (not the full `executeRuns`/`runOneAgent` DB-write
+  path) CAN be unit-tested without Docker: construct the executor with a
+  plain object implementing just `{linkedSkills}` cast to
+  `Container['agentsRepo']`, a minimal chainable `{select: () => ({from: () =>
+  ({where: async () => [row]})})}` stub standing in for the ONE Drizzle query
+  `ProjectContextRepository.getOwnedRepo` runs through `container.db`, and
+  `MockGitClient`/`MockGitTreeReader` from `adapters/mocks.ts` — then call the
+  private method via `executor as unknown as {theMethod: ...}`, the same
+  private-method-cast convention `project-context-service.test.ts` already
+  uses for `.repo`/`.getRoots` overrides. Evidence:
+  `server/test/review-executor-project-context.test.ts` (`makeExecutor`).
+- **2026-10-23** — L05/TASK-10 (Onboarding Tour) needed a THIRD read path over
+  untrusted repo content, distinct from both Project Context's (`.md`-only,
+  rooted under `**/{specs,docs,insights}/**/*.md`) and the review pipeline's
+  repo-map/diff reads: setup-evidence documents (`README.md`,
+  `package.json`, `Dockerfile`, …) that Project Context's own eligibility
+  check deliberately EXCLUDES (wrong extension/root entirely). Rather than
+  reusing `ProjectContextService`/`isEligibleMarkdownPath` (wrong shape) or
+  building a new filesystem reader (unsafe, see the TOCTOU entry above for
+  `GitClient.readFile`), `onboarding-tour/service.ts`'s own
+  `collectSetupEvidence` calls the SAME safe primitives one layer down —
+  `container.git.currentHead` + `container.gitTreeReader.listTree/readBlob`
+  directly — with its OWN narrow basename allowlist/denylist
+  (`onboarding-tour/constants.ts`'s `SETUP_EVIDENCE_BASENAMES`/
+  `_EXCLUDED_BASENAMES`) and its own bounds (20 docs, 64 KiB/doc, smaller
+  than Project Context's 256 KiB since these compete for the SAME
+  24,000-token whole-input budget as the repo map/critical paths/ranked
+  files). A future feature needing a third "which untrusted files are
+  eligible" rule should go to this same layer (`container.gitTreeReader`
+  directly, own allowlist) rather than stretching Project Context's
+  markdown-only check to fit. Evidence: `server/src/modules/onboarding-tour/
+  service.ts` (`collectSetupEvidence`), `server/src/modules/onboarding-tour/
+  constants.ts`.
+- **2026-10-23** — L05/TASK-10's plan text ("Ineligible/incomplete index
+  (flag off, no data, failed/partial): deterministic 5-section skeleton,
+  ZERO model calls") and the `OnboardingTour` contract's own doc comment for
+  `OnboardingTourStatus.partial` ("Some sections generated, others
+  skeleton/unavailable (e.g. partial index)") read as mutually exclusive at
+  first glance — the plan says a `partial` INDEX gets zero calls, but the
+  contract comment's parenthetical example names "partial index" as a cause
+  of the top-level `partial` STATUS, which by definition only exists on the
+  one-call path. Reconciled by treating them as two DIFFERENT meanings of
+  "partial" that happen to share a word: `repo_index_state.status ===
+  'partial'` is NOT "eligible" for a model attempt in this module (it takes
+  the zero-call skeleton branch, same as `failed`/`degraded`/no-data/flag-off
+  — eligibility is `status === 'full' && !degraded`, full stop); the
+  top-level `OnboardingTour.status === 'partial'` instead arises from a
+  SUCCESSFUL one-call attempt where a specific SECTION (today: `local_setup`)
+  gets force-downgraded to `'unavailable'` because its own evidence category
+  (setup docs/manifests) was empty, even though the index itself was
+  complete. A future reader should not assume the contract comment's
+  "partial index" parenthetical describes this module's actual branching —
+  check `service.ts`'s `describeIneligible`/eligibility-gate code, not just
+  the contract doc comment, before changing either. Evidence:
+  `server/src/modules/onboarding-tour/service.ts` (the `eligible` check and
+  the `setupDocuments.length === 0` downgrade), `server/src/vendor/shared/
+  contracts/onboarding.ts` (`OnboardingTourStatus`'s doc comments),
+  `server/test/onboarding-tour-generate.test.ts` ("partial index: zero model
+  calls" and "downgrades local_setup... and the top status to 'partial'").
+
+- **2026-10-23** — `LocalNoAuthProvider.currentWorkspace()`
+  (`adapters/auth/local.ts`) always resolves the ONE seeded default
+  workspace for every request — it ignores its `req` argument entirely, so
+  there is no per-request workspace override via the HTTP API. A route that
+  aggregates "everything in the caller's workspace" with no `:id` scoping
+  (e.g. L08's `GET /agents/performance`) therefore sees every OTHER
+  `.it.test.ts`'s seeded rows sharing the same Postgres fixture/workspace;
+  `history.it.test.ts`'s `seedRepo({ otherWorkspace: true })` isolation trick
+  doesn't help here, since it only isolates rows inserted directly via the
+  DB, not rows created through a route that resolves workspace via this
+  provider. Fix used: scope the test's OWN query window tightly to just its
+  own freshly-seeded timestamps (capture `const windowStart = new Date()`
+  right before seeding, then query `from=windowStart&to=windowStart+10s`)
+  instead of relying on a wide preset like `range=30d`. Evidence:
+  `server/src/adapters/auth/local.ts:28-37`,
+  `server/test/agent-stats.it.test.ts` ("GET /agents/performance reconciles
+  cost_by_agent/cost_by_model with summary.total_cost_usd").
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
@@ -172,6 +554,65 @@
   `zipfile.openReadStreamPromise`) over the callback API shown in most
   yauzl examples — much less boilerplate. Evidence:
   `server/src/modules/skills/import/archive.ts`.
+- **2026-10-22** — `git ls-tree`'s TYPE column for a symlink entry is `blob`,
+  not a distinct "symlink" type — only the separate MODE column (`120000`)
+  tells you it's a symlink; a symlink's "content" (readable via `cat-file -p`
+  on its oid, same as any other blob) is the link-target text, not file data.
+  Any code branching on `ls-tree` output to decide "is this readable document
+  content" must check `mode === '120000'` first and treat it as its own
+  case — checking `type === 'blob'` alone will treat a symlink exactly like a
+  real file. Evidence: `server/src/adapters/git/tree-reader.ts`
+  (`parseLsTreeLongLine`'s `mode === MODE_SYMLINK` check, which must run
+  before the `type === 'blob'` branch), `server/src/adapters/git/tree-reader.test.ts`
+  ("reports a symlink entry by kind, distinct from a real blob").
+
+## What Works
+
+- **2026-10-22** — A `new Service(container)`-style class whose method calls a
+  free function (not a container adapter) for one of its dependencies — e.g.
+  `settings/feature-models.ts`'s `getProjectContextRoots(container,
+  workspaceId)` — can still be made hermetically testable without a
+  chainable-Drizzle mock: wrap the call in an instance property
+  (`private getRoots = (workspaceId) => getProjectContextRoots(this.container,
+  workspaceId)`) instead of calling the import directly inside the method body,
+  then override that property post-construction in tests
+  (`(service as unknown as {getRoots: Fn}).getRoots = async () => [...]`) —
+  the exact same technique `test/repo-intel-resync.test.ts` already uses for
+  `.repo`, extended to a plain function dependency instead of a class one.
+  Avoids needing to fake `container.db.select().from().where()` chains just to
+  unit-test a method that reads one settings key. Evidence:
+  `server/src/modules/project-context/service.ts` (`private getRoots`),
+  `server/test/project-context-service.test.ts` (the `getRoots` override in
+  `makeService`).
+- **2026-10-22** — Extending `Tokenizer.count()` with encoding-aware metadata
+  (`'cl100k_base'` vs `'heuristic'`) without touching `count()`'s own frozen
+  signature: added a wider sibling interface `TokenizerWithEstimate extends
+  Tokenizer { estimate(text): TokenEstimate }`, implemented by
+  `TiktokenTokenizer` (whose `count()` now just delegates to
+  `estimate().tokens`, so there's exactly one try/catch/sticky-`broken` code
+  path, not two), plus a free function `estimateWithEncoding(tokenizer, text)`
+  that duck-checks for `.estimate` and falls back to `{tokens: count(),
+  encoding: 'heuristic'}` for an opaque/mock tokenizer. This was necessary
+  because `test/repo-intel-rank-map.test.ts`'s `charTokenizer: Tokenizer = {
+  count: (t) => t.length }` is a literal object satisfying exactly the narrow
+  interface — adding a new REQUIRED method to `Tokenizer` itself would have
+  broken that fixture's type (even though `server/test/` isn't covered by
+  `pnpm typecheck`, per this file's existing `tsconfig.json include` gotcha).
+  Evidence: `server/src/adapters/tokenizer/index.ts` (`TokenizerWithEstimate`,
+  `estimateWithEncoding`), `server/test/tokenizer-estimate.test.ts`.
+
+- **2026-10-23** — `agent_runs.findings_count` is already persisted per run
+  by the existing `completeAgentRun` write path
+  (`reviews/repository/run.repo.ts`), so a per-run trend/sparkline (L08's
+  `AgentStats.trend`/`AgentPerfRow.trend`) needs no join through
+  `reviews`/`findings` at all — only the accept/dismiss/severity breakdown
+  needs that join (keyed via `reviews.run_id`, since `findings` has no
+  direct `run_id` or `workspace_id` column, only `review_id`). Evidence:
+  `server/src/modules/agent-stats/helpers.ts` (`buildTrend`/
+  `buildNumericTrend` read `r.findingsCount` directly off the `agent_runs`
+  row), `server/src/modules/reviews/repository/stats.repo.ts` (two separate
+  queries, not one 3-way join, specifically to avoid fanning out run-level
+  columns once per finding on that run).
 
 ## Recurring Errors & Fixes
 
@@ -217,3 +658,61 @@
   `server/test/pulls-smart-diff.it.test.ts` (each file's `openrouter:`
   override line), `server/test/helpers/runs.ts` (`waitForPrRuns`'s 10s
   default `timeoutMs`).
+- **2026-10-22** — `waitForPrRuns` only polled `agent_runs.status`, but
+  `ReviewRunExecutor` persists a terminal `status` and the run's
+  `run_traces` document as two sequential, non-transactional awaits
+  (status first — `specs/review-flow.md` documents this as steps 3 then 4
+  deliberately, so don't "fix" it by reordering production code). A caller
+  can observe the terminal status before the trace row exists; the window
+  is normally sub-millisecond so it rarely loses, but widened enough on a
+  CI runner to fail `review-run-skills.it.test.ts` with "Cannot read
+  properties of undefined (reading 'skills')" on `trace.prompt_assembly`,
+  right after the identical server code passed on the prior CI run.
+  `reviews.it.test.ts` has the same `waitForPrRuns` → `GET /runs/:id/trace`
+  pattern and carries the same latent risk. Fixed by making
+  `waitForPrRuns` also poll `run_traces` for each terminal run id before
+  returning. Evidence: `server/src/modules/reviews/run-executor.ts:300-345`
+  (`completeAgentRun` before `saveRunTrace`, same order in the `failAll`
+  and catch branches), `server/test/helpers/runs.ts` (`tracesExist`).
+- **2026-10-22** — Before L05/TASK-04, `AnthropicProvider`/`OpenAIProvider`'s
+  `completeStructured` reprompt loop had no `try/catch` around the per-attempt
+  API call — a transport failure on attempt 2+ (after attempt 1 already
+  returned a response that merely failed schema validation, accumulating real
+  `tokensIn`/`tokensOut`) propagated the RAW SDK error straight out of
+  `completeStructured`, silently dropping that already-accumulated usage with
+  no way for a caller to log it. Fixed by wrapping each attempt's API call in
+  its own `try/catch` that rethrows an `ExternalServiceError` carrying
+  `{ usage: usageKnown ? { tokensIn, tokensOut } : 'unknown' }` — `usageKnown`
+  flips true only after at least one attempt actually received a response, so
+  a failure before any response is honestly labeled `'unknown'` rather than
+  `{tokensIn: 0, tokensOut: 0}` (which would read as a confirmed free call —
+  same "never guess a cost/usage number" principle `PriceBook.estimate`
+  already follows for pricing, per `server/docs/architecture.md`). Any other
+  multi-attempt LLM call site added later should check for this same
+  swallowed-usage-on-transport-failure shape. Evidence:
+  `server/src/adapters/llm/openai.ts`/`anthropic.ts` (`completeStructured`'s
+  per-attempt `try/catch`), `server/test/llm-disable-retry.test.ts` ("preserves
+  real accumulated usage on failure when an earlier attempt DID respond",
+  "labels failure usage 'unknown' when no response was ever received").
+- **2026-10-23** — Agent Performance Dashboard's `cost_by_model` (and, via
+  the old `total_cost_usd` derivation, `cost_by_agent` too) could drift from
+  `summary.total_cost_usd` by whole cents on ordinary data — not
+  floating-point noise but "sum of independently-rounded subtotals != round
+  of the raw sum" (two agents each raw-summing to $0.015 round to $0.02
+  apiece = $0.04, while the true $0.03 raw total rounds once to $0.03).
+  `PriceBook.estimate()` returns arbitrary-precision floats with no
+  rounding, so sub-cent per-run costs are the normal case — the original
+  integration test masked this by hand-picking a $0.60-exactly-per-run
+  token count "so reconciliation assertions need no fuzzy rounding
+  tolerance" (`server/test/agent-stats.it.test.ts:24-28`), so it never
+  exercised the bug. Fixed with largest-remainder apportionment: round
+  every segment down to the cent, then hand the leftover pennies to the
+  segments with the largest fractional remainder, so a breakdown's
+  segments sum EXACTLY to the displayed total rather than approximately.
+  General rule: any "breakdown that must sum to a displayed rounded
+  total" needs this apportionment pattern, not independent per-segment
+  `round2` — plain rounding only coincidentally reconciles on round-number
+  test fixtures. Evidence: `server/src/modules/agent-stats/helpers.ts`
+  (`allocateCents`, `buildRawCostByAgent`), regression test in
+  `server/test/agent-stats-helpers.test.ts` ("reconciles exactly even when
+  per-agent subtotals straddle a rounding boundary").

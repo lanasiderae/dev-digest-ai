@@ -1,12 +1,51 @@
 import { describe, it, expect } from 'vitest';
-import type { LLMProvider, StructuredResult } from '@devdigest/shared';
-import { MockLLMProvider, MockGitClient } from '../../server/src/adapters/mocks.js';
+import type { LLMProvider, StructuredRequest, StructuredResult, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest } from '../src/index.js';
+
+const DIFF: UnifiedDiff = {
+  raw: 'diff --git a/src/config.ts b/src/config.ts\n--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,0 +11 @@\n+  stripeKey: "sk_live_xxx",',
+  files: [
+    {
+      path: 'src/config.ts',
+      additions: 1,
+      deletions: 0,
+      hunks: [{ file: 'src/config.ts', oldStart: 10, oldLines: 0, newStart: 11, newLines: 1, newLineNumbers: [11] }],
+    },
+  ],
+};
+
+function mockLlm(structured: unknown): LLMProvider {
+  return {
+    id: 'openai',
+    async listModels() {
+      return [];
+    },
+    async complete() {
+      throw new Error('complete is not used by this test');
+    },
+    async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
+      const data = req.schema.parse(structured);
+      return {
+        data,
+        model: req.model,
+        tokensIn: 100,
+        tokensOut: 50,
+        costUsd: 0.001,
+        raw: JSON.stringify(structured),
+        attempts: 1,
+      };
+    },
+    async embed() {
+      return [];
+    },
+  };
+}
 
 /**
  * Engine-level test for reviewPullRequest (the core lifted out of the server's
- * runOneAgent). Uses the server's mock LLM + git so we exercise the real
- * assemble → completeStructured → reduce → grounding pipeline with no DB/SSE.
+ * runOneAgent). Uses test-local LLM and diff fixtures so we exercise the real
+ * assemble → completeStructured → reduce → grounding pipeline with no server
+ * adapters, DB, network, or SSE dependencies.
  */
 describe('reviewPullRequest (engine)', () => {
   // One grounded finding (line 11 is in the MockGitClient diff) + one
@@ -44,8 +83,8 @@ describe('reviewPullRequest (engine)', () => {
   };
 
   it('single-pass: assembles, grounds, drops the hallucinated finding', async () => {
-    const llm = new MockLLMProvider('openai', { structured: fixture });
-    const diff = await new MockGitClient().diff();
+    const llm = mockLlm(fixture);
+    const diff = DIFF;
 
     const events: string[] = [];
     const outcome = await reviewPullRequest({
@@ -73,8 +112,8 @@ describe('reviewPullRequest (engine)', () => {
     // Model "approves" but reports a nonsense low score (the cheap-model bug).
     // The engine must ignore that and score the zero findings as a perfect 100.
     const clean = { verdict: 'approve', summary: 'looks good', score: 10, findings: [] };
-    const llm = new MockLLMProvider('openai', { structured: clean });
-    const diff = await new MockGitClient().diff();
+    const llm = mockLlm(clean);
+    const diff = DIFF;
 
     const outcome = await reviewPullRequest({
       systemPrompt: 'security reviewer',
@@ -89,8 +128,8 @@ describe('reviewPullRequest (engine)', () => {
   });
 
   it('checkCancelled throwing aborts before the LLM call', async () => {
-    const llm = new MockLLMProvider('openai', { structured: fixture });
-    const diff = await new MockGitClient().diff();
+    const llm = mockLlm(fixture);
+    const diff = DIFF;
     await expect(
       reviewPullRequest({
         systemPrompt: 's',
@@ -130,8 +169,7 @@ describe('reviewPullRequest (engine)', () => {
         return [];
       },
     };
-    const diff = await new MockGitClient().diff();
-    await reviewPullRequest({ systemPrompt: 's', model: 'm', diff, llm: recorder, sessionId: 'sess-abc' });
+    await reviewPullRequest({ systemPrompt: 's', model: 'm', diff: DIFF, llm: recorder, sessionId: 'sess-abc' });
     expect(seen.length).toBeGreaterThan(0);
     expect(seen.every((s) => s === 'sess-abc')).toBe(true);
   });

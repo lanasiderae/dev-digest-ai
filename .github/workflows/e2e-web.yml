@@ -82,10 +82,16 @@ jobs:
       - name: Start API (:3001)
         working-directory: server
         run: |
+          echo "E2E_FIXTURE_ROOT=$RUNNER_TEMP/l05-fixtures" >> "$GITHUB_ENV"
+          echo "E2E_FIXTURES=1" >> "$GITHUB_ENV"
+          echo "DEVDIGEST_CLONE_DIR=$RUNNER_TEMP/l05-fixtures/clones" >> "$GITHUB_ENV"
+          export E2E_FIXTURE_ROOT="$RUNNER_TEMP/l05-fixtures" E2E_FIXTURES=1
+          export DEVDIGEST_CLONE_DIR="$E2E_FIXTURE_ROOT/clones"
+          pnpm exec tsx src/db/seed-e2e.ts
           # tsx directly (not `pnpm start`): the committed package.json's start
           # is `node dist/server.js`, which would need a build first. tsx runs
           # the TS entrypoint as dev does. (server/package.json is skip-worktree.)
-          nohup pnpm exec tsx src/server.ts > "$RUNNER_TEMP/api.log" 2>&1 &
+          nohup pnpm exec tsx src/e2e-server.ts > "$RUNNER_TEMP/api.log" 2>&1 &
           echo "waiting for API /health…"
           for i in $(seq 1 30); do
             curl -fsS http://localhost:3001/health >/dev/null 2>&1 && { echo "api up"; break; }
@@ -117,6 +123,7 @@ jobs:
         working-directory: e2e
         run: |
           npm ci
+          npm audit
           npm test
 
       - name: Upload failure artifacts

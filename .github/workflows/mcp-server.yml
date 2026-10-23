@@ -1,0 +1,66 @@
+# mcp-server suite — the local stdio MCP server (@devdigest/mcp-server).
+# A thin HTTP client of the DevDigest API; tests stub fetchImpl / use an
+# in-memory MCP transport, so this is hermetic (no DB, no real network).
+# Uses npm (package-lock.json).
+#
+# server/src/vendor/shared/** is in the path filter because mcp-server
+# aliases @devdigest/shared to it at type-check time. That alias resolves
+# the bare `zod` import from vendor/shared's own file location, so
+# typecheck needs server/node_modules/zod on disk (see mcp-server/AGENTS.md
+# Gotchas — the explicit tsconfig `zod` path alias other packages use
+# trips a TS2589 here, so this package relies on ambient resolution
+# instead). Install server's deps (pnpm, its own package manager) before
+# typecheck, same pattern e2e-web.yml uses for reviewer-core's deps.
+name: mcp-server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcp-server/**'
+      - 'server/src/vendor/shared/**'
+      - '.github/workflows/mcp-server.yml'
+  pull_request:
+    paths:
+      - 'mcp-server/**'
+      - 'server/src/vendor/shared/**'
+      - '.github/workflows/mcp-server.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - run: npm ci
+
+      - run: npm audit
+
+      - name: Install server deps (zod, for the @devdigest/shared alias)
+        working-directory: server
+        run: pnpm install --frozen-lockfile
+
+      - run: npm run typecheck
+
+      - run: npm test

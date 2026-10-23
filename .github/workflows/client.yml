@@ -44,6 +44,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Report-only for now: client carries pre-existing vulnerabilities that
+      # need dependency bumps (some breaking) to clear, tracked separately.
+      # continue-on-error keeps this visible without failing every PR.
+      - run: pnpm audit
+        continue-on-error: true
+
       - run: pnpm typecheck
 
       - run: pnpm test

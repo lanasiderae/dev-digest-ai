@@ -1,0 +1,31 @@
+{
+  "selector": {
+    "rootsHint": "Discovering under: {roots}",
+    "repoLabel": "Repository",
+    "repoPlaceholder": "Select a repository…",
+    "noRepos": "Import a repository first to select project context.",
+    "searchPlaceholder": "Search documents…",
+    "loadError": "Could not load discovered documents.",
+    "empty": "No Markdown documents found under the configured roots.",
+    "noMatch": "No documents match your search.",
+    "truncatedWarning": "Showing the first {max} discovered documents — narrow your search to find more.",
+    "oversizedBadge": "too large (over {maxKb} KiB)",
+    "missingWarning": "{count, plural, one {# selected document is} other {# selected documents are}} no longer found in this repository and will be skipped: {paths}",
+    "remove": "Remove",
+    "attachmentCapWarning": "At most {max} attached documents total — remove a selection to add another.",
+    "selectedCount": "{count, plural, one {# document selected} other {# documents selected}}",
+    "tokensTotal": "~{tokens} tokens",
+    "tokensUnknown": "({count, plural, one {# pending} other {# pending}})",
+    "preview": "Preview",
+    "previewTitle": "Preview — {path}",
+    "previewClose": "Close preview",
+    "previewLoadError": "Could not load this document.",
+    "previewTokens": "~{tokens} tokens",
+    "type": {
+      "specs": "specs",
+      "docs": "docs",
+      "insights": "insights",
+      "custom": "custom"
+    }
+  }
+}

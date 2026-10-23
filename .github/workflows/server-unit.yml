@@ -86,6 +86,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Report-only for now: server carries pre-existing vulnerabilities that
+      # need dependency bumps (some breaking) to clear, tracked separately.
+      # continue-on-error keeps this visible without failing every PR.
+      - run: pnpm audit
+        continue-on-error: true
+
       # The unit tests load server src, which imports @devdigest/reviewer-core
       # (../reviewer-core/src) → which imports `openai`/`zod`. Install reviewer-core's
       # deps so those resolve at module load. reviewer-core uses npm (see reviewer-core.yml).

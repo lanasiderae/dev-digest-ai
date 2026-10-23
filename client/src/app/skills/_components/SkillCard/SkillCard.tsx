@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Icon, Badge, Toggle, ConfirmModal, Tooltip } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useDeleteSkill } from "../../../../lib/hooks/skills";
+import { formatPercent } from "../../../../lib/format-stats";
 import { typeColor } from "./helpers";
 import { s } from "./styles";
 
@@ -85,6 +86,8 @@ export function SkillCard({
         <div style={s.statsRow}>
           <Icon.Cpu size={12} />
           <span>{t("listItem.agentCount", { count: skill.agent_count ?? 0 })}</span>
+          <span>·</span>
+          <span>{t("listItem.pullFreq", { value: formatPercent(skill.pull_frequency ?? null) })}</span>
         </div>
       </div>
 

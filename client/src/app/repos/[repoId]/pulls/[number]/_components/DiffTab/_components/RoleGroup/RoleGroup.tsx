@@ -15,17 +15,29 @@ export function RoleGroup({
   group,
   commenting,
   findings,
+  focusTarget,
 }: {
   group: MergedGroup;
   commenting?: DiffCommentApi;
   findings?: DiffFindingApi;
+  /** External "jump to this file/line" target (e.g. PR Brief's review focus/
+   *  risk navigation — BRIEF-AC-05/13/16) — forces this group open and wins
+   *  over the local findings-badge jump target when it belongs to this group. */
+  focusTarget?: { path: string; lineKey?: string; nonce: number } | null;
 }) {
   const t = useTranslations("prReview");
   const isEmpty = group.files.length === 0;
+  const belongsHere = !!focusTarget && group.files.some((f) => f.path === focusTarget.path);
   const [open, setOpen] = React.useState(!COLLAPSED_BY_DEFAULT.includes(group.role));
+  // An external focus target (PR Brief navigation) forces this group open
+  // without needing its own effect+setState: it's a plain derived value, so
+  // a later param change that no longer belongs here just falls back to
+  // whatever the user last toggled `open` to.
+  const isOpen = open || belongsHere;
   const [scrollTarget, setScrollTarget] = React.useState<{ path: string; lineKey?: string; nonce: number } | null>(
     null,
   );
+
   // Which stop in `jumpTargets` the next click goes to — lets repeated clicks
   // on the same badge step through every open finding, not just the first.
   const [jumpIndex, setJumpIndex] = React.useState(0);
@@ -58,7 +70,7 @@ export function RoleGroup({
       <div
         role="button"
         tabIndex={isEmpty ? -1 : 0}
-        aria-expanded={!isEmpty && open}
+        aria-expanded={!isEmpty && isOpen}
         aria-disabled={isEmpty}
         onClick={() => !isEmpty && setOpen((o) => !o)}
         onKeyDown={(e) => {
@@ -66,7 +78,7 @@ export function RoleGroup({
         }}
         style={s.header}
       >
-        <Icon.ChevronRight size={14} style={chevronFor(open)} />
+        <Icon.ChevronRight size={14} style={chevronFor(isOpen)} />
         <span aria-hidden="true" style={{ ...s.roleDot, background: ROLE_COLOR[group.role] }} />
         <span style={s.label}>{t(ROLE_LABEL_KEY[group.role])}</span>
         <span style={s.description}>{t(ROLE_DESCRIPTION_KEY[group.role])}</span>
@@ -92,8 +104,13 @@ export function RoleGroup({
         <span style={s.count}>{t("smartDiff.filesCount", { count: group.files.length })}</span>
         <Icon.ChevronsUpDown aria-hidden="true" size={14} style={s.sortIcon} />
       </div>
-      {open && !isEmpty && (
-        <DiffViewer files={group.files} commenting={commenting} findings={findings} scrollTarget={scrollTarget} />
+      {isOpen && !isEmpty && (
+        <DiffViewer
+          files={group.files}
+          commenting={commenting}
+          findings={findings}
+          scrollTarget={belongsHere ? focusTarget : scrollTarget}
+        />
       )}
     </div>
   );
