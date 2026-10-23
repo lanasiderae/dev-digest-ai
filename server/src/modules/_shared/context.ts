@@ -15,6 +15,7 @@ export async function getContext(
   container: Container,
   req: FastifyRequest,
 ): Promise<RequestContext> {
+  // User and workspace resolution are independent, so resolve them concurrently.
   const [user, workspace] = await Promise.all([
     container.auth.currentUser(req),
     container.auth.currentWorkspace(req),
