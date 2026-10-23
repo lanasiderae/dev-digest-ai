@@ -16,7 +16,7 @@ Current checkpoint:
 - Specification was approved by the user's current-session “yes” to C2/C4/C7;
   approval/preflight commit: `062ae53`.
 - Implementation-planner generated `docs/sdd/l05/plan.md`; all 49 AC IDs are mapped exactly once.
-- Cross-model review was launched read-only through Claude Sonnet with a $2 cap, tools/MCP disabled. At checkpoint its result is still pending; inspect `/private/tmp/devdigest-l05-plan-review/review-result.json` before launching a duplicate. The active tool session is 59174 (process 56344). Save any result to `docs/sdd/l05/plan-review.md`, address findings, then obtain distinct user approval of the reviewed plan.
+- Cross-model review finished with REVISION_NEEDED. Read `docs/sdd/l05/plan-review.md` and its receipt; do not relaunch the completed review. Findings have not yet been applied. Distinct user approval of the revised plan remains required.
 - No product implementation has started. Check Git and these artifacts for
   newer progress before resuming; this checkpoint may have been updated.
 
@@ -44,5 +44,5 @@ and preserve implementation details when updating a PR description. Run
 workflow-retro only when explicitly invoked; its ledger is
 `docs/retro/ledger.md`. Do not invent usage, test, approval or video evidence.
 
-Next: collect the running cross-family review result, save the actual review note,
-then present the concrete plan for approval before product implementation.
+Next: address the saved review findings, reconcile the AC/task matrix and dependencies,
+then present the revised plan for approval before product implementation.

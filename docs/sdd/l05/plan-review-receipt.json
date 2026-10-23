@@ -1,0 +1,74 @@
+{
+  "subtype": "success",
+  "is_error": false,
+  "total_cost_usd": 0.405565,
+  "duration_ms": 310109,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 23565,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 29491,
+    "output_tokens_details": {
+      "thinking_tokens": 25557
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 23565,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 29491,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 23565,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 23565
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 16296,
+      "outputTokens": 19,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.016391000000000003,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-sonnet-5": {
+      "inputTokens": 2,
+      "outputTokens": 29491,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 23565,
+      "webSearchRequests": 0,
+      "costUSD": 0.389174,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 25557,
+      "canonicalModel": "claude-sonnet-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "cost_note": "CLI-reported list-price usage estimate, not a billing invoice. Includes an auxiliary Haiku entry reported by the CLI.",
+  "documents_sha256": {
+    "specs/2026-10-22-l05-context-brief-onboarding.md": "e8ad73caab0c00cb1555f33f292eb7889592fef52e06d2579ae65694d6c39b04",
+    "docs/sdd/l05/plan.md": "00c66ad9b758f387872f79570c980415d1bc5dad42cbe01608c918325dc08f4a"
+  }
+}
