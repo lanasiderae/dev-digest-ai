@@ -23,6 +23,7 @@
     "refresh": "Refresh",
     "stale": "This brief is out of date.",
     "error": "Couldn't generate the brief. The previous brief, if any, is unchanged.",
+    "providerHint": "Check Settings → Models → Risk Brief and verify the selected provider's API key.",
     "retry": "Retry",
     "reviewer": {
       "label": "Reviewer context",

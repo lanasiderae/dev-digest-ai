@@ -14,6 +14,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Icon, SectionLabel, SelectInput, Skeleton } from "@devdigest/ui";
 import type { BriefSource, BriefSources, PrFile, Risk, RiskSeverity } from "@devdigest/shared";
+import { ApiError } from "@/lib/api";
 import { useAgents } from "@/lib/hooks/agents";
 import { usePrReviews } from "@/lib/hooks/reviews";
 import { useBrief, useGenerateBrief } from "@/lib/hooks/brief";
@@ -156,7 +157,16 @@ export function PrBriefCard({
     </div>
   );
   const generationError = generate.isError && (
-    <div style={s.inlineNote}><Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} /><span>{t("card.error")}</span></div>
+    <div style={s.inlineNote} role="alert">
+      <Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} />
+      <span>
+        {generate.error instanceof ApiError ? generate.error.message : t("card.error")}
+        {generate.error instanceof ApiError &&
+          (generate.error.code === "config_error" || generate.error.code === "external_service_error") && (
+            <> {t("card.providerHint")}</>
+          )}
+      </span>
+    </div>
   );
 
   if (!brief) {

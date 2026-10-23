@@ -82,6 +82,7 @@ function mockFetch(opts: {
   agents?: { id: string; name: string }[];
   reviews?: unknown[];
   briefPost?: PrBrief | null;
+  briefPostError?: { error: { code?: string; message: string } };
 }) {
   const state = { briefGet: opts.briefGet, briefPost: opts.briefPost ?? null };
   const calls: { url: string; method: string }[] = [];
@@ -91,7 +92,7 @@ function mockFetch(opts: {
     calls.push({ url, method });
     if (url.includes("/brief") && method === "GET") return jsonResponse(state.briefGet);
     if (url.includes("/brief") && method === "POST") {
-      if (!state.briefPost) return jsonResponse({ error: { message: "generation failed" } }, 500);
+      if (!state.briefPost) return jsonResponse(opts.briefPostError ?? { error: { message: "generation failed" } }, 500);
       // Mirrors the real server: a persisted generation is what the NEXT GET
       // sees too — a test only needs to set `briefPost`, not keep `briefGet`
       // in sync by hand (a test may still override `state.briefGet` itself
@@ -258,5 +259,21 @@ describe("PrBriefCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     // Retry triggers another fetch attempt without throwing inside the component.
     await waitFor(() => expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBeforeRetry));
+  });
+
+  it("shows the API failure and model-settings hint when brief generation fails", async () => {
+    mockFetch({
+      briefGet: NO_BRIEF,
+      briefPostError: {
+        error: { code: "config_error", message: "OPENAI_API_KEY is not configured" },
+      },
+    });
+    renderCard();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /generate brief/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /generate brief/i }));
+
+    expect(await screen.findByText(/OPENAI_API_KEY is not configured/)).toBeInTheDocument();
+    expect(screen.getByText(/Settings → Models → Risk Brief/)).toBeInTheDocument();
   });
 });
