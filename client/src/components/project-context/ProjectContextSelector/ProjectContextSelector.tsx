@@ -20,7 +20,7 @@ import {
   MAX_PROJECT_CONTEXT_ATTACHMENTS,
   MAX_PROJECT_CONTEXT_DOCUMENT_BYTES,
   MAX_PROJECT_CONTEXT_DISCOVERED_DOCUMENTS,
-} from "@devdigest/shared";
+} from "@/vendor/shared/contracts/project-context";
 import type { ProjectContextSelectionList } from "@devdigest/shared";
 import { useRepos, useSettings } from "../../../lib/hooks";
 import { useProjectContextDiscovery, useProjectContextDocument } from "../../../lib/hooks/project-context";

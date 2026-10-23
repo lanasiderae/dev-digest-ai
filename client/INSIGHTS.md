@@ -326,3 +326,12 @@
   `useRouter` (e.g. `ConfigTab` doesn't, but a new tab added alongside it
   that links elsewhere will). Evidence:
   `client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/SkillsTab.test.tsx`.
+- **2026-10-23** — Runtime imports from the shared barrel resolve its `.js`
+  re-exports under Next's bundler and fail on these vendored TypeScript files;
+  import runtime constants directly from the extensionless contract module.
+  Type-only barrel imports remain safe. Browser smoke caught this in
+  `ProjectContextSelector.tsx` and `OnboardingTourPanel.tsx` despite passing unit tests.
+- **2026-10-23** — Adding a tab to `AgentEditor/constants.ts` is insufficient:
+  `app/agents/[id]/page.tsx` independently filters the query through `VALID_TABS`.
+  Include new tab keys there or deep links and clicks silently render Config;
+  the L05 context browser flow caught this missing route-level wiring.

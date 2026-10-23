@@ -32,8 +32,9 @@ A spec lives in `specs/NN-name.flow.json`:
 - Locators are deterministic only (`--url`, `--text`, `find role|text|label`).
   We never use the AI `chat` command, so runs are stable and key-free.
 
-Flows target **read-only seeded data** (the demo repo `acme/payments-api`, PR
-#482, the seeded agents), so nothing triggers a model call.
+Flows target seeded data. L05's context flow saves attachment paths on the
+isolated seeded agent; the other flows are read-only. Nothing triggers a model
+call. The test-only API entrypoint supplies no secrets and blocks generation.
 
 > **Precondition: a freshly-seeded DB.** Flow `02` follows the home redirect to
 > the *first* repo, so it assumes the seeded demo repo is the only one. CI
@@ -70,13 +71,12 @@ exactly what flows 02/04/05 need.
 
 ### Against your own running stack
 
-Only safe if your dev DB contains *only* the seeded repo (see precondition
-above). Otherwise prefer the hermetic runner.
+The full suite now requires opt-in L05 fixtures and `E2E_FIXTURE_ROOT`; use
+the hermetic runner. Do not apply `seed-e2e.ts` to a development database.
+CI provisions its own temporary fixture directory before starting the API.
 
-```sh
-./scripts/dev.sh          # Postgres + API :3001 + web :3000 (seeded)
-cd e2e && npm install && npm test
-```
+For a manually provisioned isolated stack, export `E2E_FIXTURE_ROOT` to the
+same directory used by its opt-in fixture setup before running `npm test`.
 
 Env knobs:
 
@@ -100,3 +100,14 @@ a CI artifact by `.github/workflows/e2e-web.yml`).
 | `05-pr-diff` | PR #482 → Files changed tab → seeded file renders in the diff viewer |
 | `06-onboarding` | `/onboarding` → add-repository form renders (no submit) |
 | `07-settings` | `/settings/api-keys` + `/settings/models` → section titles render |
+| `08-project-context` | Context tab → discover/preview/select/save/reload → static trace snapshot |
+| `09-pr-brief` | empty-cache Generate button → cached risks/focus → diff line → cached reload |
+| `10-onboarding-tour` | five cached sections/reload → separate incomplete-index skeleton → add-repo screen |
+
+L05 fixtures use real API/DB routes and a tiny local Git repository under a
+temporary directory, never `server/clones`. `server/src/db/seed-e2e.ts` requires
+explicit opt-in and refuses databases with existing clones, runs or repositories
+other than the fresh demo seed. Its JSON caches and historical trace are
+synthetic UI fixtures, not evidence of generation, model usage or rule detection.
+The runner loads `{REPO_ID}`, `{AGENT_ID}` and `{FALLBACK_REPO_ID}` from the
+temporary `variables.json`; existing `{BASE}` substitution is unchanged.

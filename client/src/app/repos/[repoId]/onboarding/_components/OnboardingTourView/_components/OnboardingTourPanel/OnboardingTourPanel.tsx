@@ -17,7 +17,7 @@ import {
   type OnboardingTourSection,
   type OnboardingTourSectionStatus,
   type OnboardingTourStatus,
-} from "@devdigest/shared";
+} from "@/vendor/shared/contracts/onboarding";
 import { useGenerateOnboardingTour, useOnboardingTour } from "@/lib/hooks/onboarding-tour";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { ApiError } from "@/lib/api";

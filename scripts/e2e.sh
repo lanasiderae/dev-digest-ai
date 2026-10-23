@@ -41,6 +41,10 @@ export DATABASE_URL="postgres://${PG_USER}:${PG_PASS}@127.0.0.1:${PG_PORT}/${PG_
 export API_PORT WEB_PORT
 export NEXT_PUBLIC_API_BASE="http://localhost:${API_PORT}"
 export E2E_BASE_URL="http://localhost:${WEB_PORT}"
+export E2E_FIXTURES=1
+E2E_FIXTURE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/devdigest-e2e.XXXXXX")"
+export E2E_FIXTURE_ROOT
+export DEVDIGEST_CLONE_DIR="$E2E_FIXTURE_ROOT/clones"
 
 log()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m! %s\033[0m\n' "$*"; }
@@ -77,6 +81,7 @@ cleanup() {
     [ -n "$pids" ] && kill $pids 2>/dev/null || true
   done
   docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
+  rm -rf "$E2E_FIXTURE_ROOT"
   exit "$code"
 }
 trap cleanup EXIT INT TERM
@@ -126,12 +131,13 @@ log "applying migrations (isolated db)"
 (cd server && pnpm db:migrate)
 log "seeding demo data (isolated db)"
 (cd server && pnpm db:seed)
+(cd server && pnpm exec tsx src/db/seed-e2e.ts)
 
 # --- API on :$API_PORT -------------------------------------------------------
 # tsx directly (not `pnpm start`, which needs a build; not `tsx watch`, to avoid
 # a mid-suite watcher restart).
 log "starting API on :$API_PORT"
-(cd server && pnpm exec tsx src/server.ts) &
+(cd server && pnpm exec tsx src/e2e-server.ts) &
 SERVER_PID=$!
 log "waiting for API /health"
 api_up=0

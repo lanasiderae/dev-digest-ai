@@ -1,0 +1,22 @@
+{
+  "name": "Project context selection, preview, persistence and trace",
+  "description": "CTX-AC-02/04/06: select a real temporary git document, preview and save its path, reload and inspect a static historical trace. No review is executed.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/agents/{AGENT_ID}?tab=context"], "label": "open the seeded agent Context tab" },
+    { "cmd": ["wait", "--text", "specs/smoke.md"] },
+    { "cmd": ["find", "role", "button", "click", "--name", "Preview", "--exact"] },
+    { "cmd": ["wait", "--text", "The api/ module must not import db/ directly."] },
+    { "cmd": ["find", "role", "checkbox", "click"] },
+    { "cmd": ["wait", "--text", "1 document selected"] },
+    { "cmd": ["find", "role", "button", "click", "--name", "Save context", "--exact"] },
+    { "cmd": ["wait", "--text", "Saved (v2)"] },
+    { "cmd": ["reload"] },
+    { "cmd": ["wait", "--text", "1 document selected"] },
+    { "cmd": ["open", "{BASE}/repos/{REPO_ID}/pulls/482?tab=findings"] },
+    { "cmd": ["wait", "--text", "static-smoke-fixture"] },
+    { "cmd": ["find", "role", "button", "click", "--name", "Open run trace & logs", "--exact"] },
+    { "cmd": ["wait", "--text", "project context attached specs"] },
+    { "cmd": ["find", "text", "project context attached specs", "click", "--exact"] },
+    { "cmd": ["wait", "--text", "The api/ module must not import db/ directly."] }
+  ]
+}
