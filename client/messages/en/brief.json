@@ -15,5 +15,43 @@
     "blame": "blame",
     "noHistory": "No history available for this line.",
     "noCommits": "No commits found for this line."
+  },
+
+  "card": {
+    "title": "PR Brief",
+    "generate": "Generate brief",
+    "refresh": "Refresh",
+    "stale": "This brief is out of date.",
+    "error": "Couldn't generate the brief. The previous brief, if any, is unchanged.",
+    "retry": "Retry",
+    "reviewer": {
+      "label": "Reviewer context",
+      "none": "No reviewer",
+      "generatedWith": "Generated with: {name}",
+      "generatedWithNone": "Reviewer context not selected."
+    },
+    "sources": {
+      "title": "Sources",
+      "intent": "Intent",
+      "blast": "Blast radius",
+      "issue": "Linked issue",
+      "reviewer_context": "Reviewer context",
+      "documents": "Project documents"
+    },
+    "risks": {
+      "title": "Risk areas",
+      "empty": "No notable risks flagged."
+    },
+    "focus": {
+      "title": "Review focus",
+      "empty": "No specific review focus identified."
+    },
+    "navigation": {
+      "notInDiff": "File not in this PR's diff"
+    },
+    "verdict": {
+      "title": "Verdict",
+      "unreviewed": "Not reviewed yet."
+    }
   }
 }

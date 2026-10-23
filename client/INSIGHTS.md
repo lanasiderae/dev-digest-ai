@@ -124,6 +124,21 @@
   component. Evidence: `client/src/components/diff-viewer/findings.ts`
   (`DiffFindingApi`), `client/src/components/diff-viewer/comments.ts`
   (`DiffCommentApi`).
+- **2026-10-23** — `DiffViewer`'s `scrollTarget`/`FileCardScrollTarget`
+  "jump to file/line" mechanism (`${SIDE}:${line}` keys, e.g. `RIGHT:42`)
+  already existed, but `RoleGroup` only fed it from its OWN internal
+  findings-badge jump state — there was no way for an ancestor (e.g. a
+  query-param-driven navigation from outside the diff tab, like PR Brief's
+  `?tab=diff&file=&line=` links) to force a specific group open and scroll
+  to a target. Fix: add an optional external `focusTarget` prop to
+  `RoleGroup`, derive `isOpen = open || belongsHere` (a plain boolean, not a
+  synced-via-effect one — see the React-Compiler lint entry below), and pick
+  `belongsHere ? focusTarget : <local jump state>` as the `scrollTarget` it
+  passes down. Reusable whenever a new feature needs to navigate into the
+  diff from outside `DiffTab` itself. Evidence:
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.tsx`,
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/DiffTab.tsx`
+  (`focusTarget` computed from `useSearchParams().get("file"/"line")`).
 
 ## Tool & Library Notes
 
@@ -175,6 +190,47 @@
   `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/ProjectContextSection/ProjectContextSection.test.tsx`
   ("collapses the attached-specs section by default and reveals the exact
   text, unmodified, on expand").
+- **2026-10-23** — `@testing-library/user-event` is NOT a devDependency of
+  this package (only `@testing-library/react` + `@testing-library/jest-dom`
+  are) — importing it in a new test fails Vite import-analysis with "Failed
+  to resolve import". Existing tests in this codebase all drive interaction
+  via `fireEvent` (e.g. `IntentCard.test.tsx`); follow that, don't add
+  `userEvent` to a single test file without first adding the package
+  dependency project-wide. Evidence: `client/package.json`'s
+  `devDependencies` (no `@testing-library/user-event` entry).
+- **2026-10-23** — TanStack Query's `isLoading` goes back to `true` (hiding
+  already-rendered content behind a full loading skeleton) the instant a
+  `useQuery`'s `queryKey` changes to a combination that has no cached data
+  yet — e.g. a hook keyed on `[..., agentId]` where `agentId` is live UI
+  state (a reviewer-selector dropdown) flashes back to loading on every
+  selection change, even though there's nothing actually wrong. Fix:
+  `placeholderData: keepPreviousData` (from `@tanstack/react-query`) keeps
+  the previous key's data on screen (`isPlaceholderData: true`) while the
+  new key's request is in flight. Caught by a component test where
+  selecting a dropdown option, then immediately clicking a button that was
+  visible a moment ago, intermittently couldn't find it. Evidence:
+  `client/src/lib/hooks/brief.ts` (`useBrief`'s `placeholderData`).
+- **2026-10-23** — This client's ESLint config enforces two
+  `eslint-plugin-react-hooks` (React Compiler) rules not seen elsewhere in
+  this file yet: `react-hooks/purity` rejects calling an impure function
+  (`Date.now()`, `Math.random()`, …) inside a component body/`useMemo` —
+  compute any "must differ per distinct input" value (e.g. a scroll/jump
+  "nonce") as a pure function of its actual inputs instead (e.g.
+  `file.length * 1_000_000 + line`), not a clock read. `react-hooks/set-
+  state-in-effect` rejects `useEffect(() => { if (cond) setState(x) },
+  [cond])` — prefer deriving the value during render (`const isOpen = open
+  || externalCondition`) or, when real one-time state adjustment from a prop/
+  query result is needed, the "adjust state during render" pattern (call
+  `setState` directly in the render body guarded by a tracking variable
+  compared each render, per
+  https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes) —
+  not a `useEffect`. Evidence:
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/DiffTab.tsx`
+  (`focusTarget`'s pure `nonce`),
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.tsx`
+  (`isOpen = open || belongsHere`),
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/OverviewTab/_components/PrBriefCard/PrBriefCard.tsx`
+  (`seededForPrId` render-time guard replacing a `useEffect`).
 
 ## Recurring Errors & Fixes
 
