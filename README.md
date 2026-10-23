@@ -159,3 +159,9 @@ Postgres); everything else is hermetic. The browser e2e flows live in
   make sure migrations ran against the Dockerized DB, not a different one.
 - **Reset everything** — `docker compose down -v` drops the volume, then re-run
   `./scripts/dev.sh`.
+
+## Blast Radius demo fixtures
+
+A documentation-only PR has no changed code symbols. With a healthy repository
+index, its empty impact map is a no-callers result; an incomplete or unavailable
+index is a separate degraded state and must retain its reason.
