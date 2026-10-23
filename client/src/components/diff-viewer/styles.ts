@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { SEV, type Severity } from "@devdigest/ui";
 import type { Line } from "./helpers";
 
 /** Co-located styles for the DiffViewer (extracted from inline styles). */
@@ -10,6 +11,7 @@ export const s = {
     borderRadius: 7,
     overflow: "hidden",
     background: "var(--bg-elevated)",
+    scrollMarginTop: 16,
   } satisfies CSSProperties,
   fileHeader: {
     display: "flex",
@@ -31,6 +33,13 @@ export const s = {
   fileStat: { fontSize: 12 } satisfies CSSProperties,
   addText: { color: "var(--code-add-text)" } satisfies CSSProperties,
   delText: { color: "var(--code-del-text)" } satisfies CSSProperties,
+  findingsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 99,
+    background: "var(--crit)",
+    flexShrink: 0,
+  } satisfies CSSProperties,
   fileBody: {
     borderTop: "1px solid var(--border)",
     padding: "8px 0",
@@ -75,10 +84,22 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
-/** Row background per line kind (add/del tinted, others transparent). */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+/**
+ * Row background per line kind (add/del tinted, others transparent), plus a
+ * colored left-edge marker (AC25) when the line has a review finding — the
+ * row's highest-severity finding wins the color. Reuses `@devdigest/ui`'s
+ * `SEV` tokens, not a new palette.
+ */
+export function lineRowFor(kind: Line["kind"], findingSeverity?: Severity): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
-  return { display: "flex", alignItems: "stretch", fontSize: 13, lineHeight: "20px", background };
+  return {
+    display: "flex",
+    alignItems: "stretch",
+    fontSize: 13,
+    lineHeight: "20px",
+    background,
+    ...(findingSeverity ? { borderLeft: `3px solid ${SEV[findingSeverity].c}` } : undefined),
+  };
 }
 
 /** Gutter sign colour per line kind. */

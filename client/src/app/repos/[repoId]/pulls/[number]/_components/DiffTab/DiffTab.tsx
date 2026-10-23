@@ -1,11 +1,17 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
-import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
+import { DiffViewer, type DiffCommentApi, type DiffFindingApi } from "@/components/diff-viewer";
+import { usePrComments, useCreatePrComment, useFindingAction, usePrReviews, useSmartDiff } from "@/lib/hooks";
 import { notify } from "@/lib/toast";
 import type { PrFile } from "@devdigest/shared";
+import { FindingCard } from "../FindingCard";
+import { OrderToggle, type DiffOrder } from "./_components/OrderToggle";
+import { RoleGroup } from "./_components/RoleGroup";
+import { latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
+import { s } from "./styles";
 
 interface DiffTabProps {
   prId: string | null;
@@ -13,15 +19,29 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  repoFullName?: string | null;
+  headSha?: string | null;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+export function DiffTab({ prId, filesCount, files, canComment, repoFullName, headSha }: DiffTabProps) {
+  const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
+  const { data: smartDiff } = useSmartDiff(prId);
+  const { data: reviews } = usePrReviews(prId);
+  const action = useFindingAction();
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
+  const [findingsVisible, setFindingsVisible] = React.useState(true);
+  const [order, setOrder] = React.useState<DiffOrder>("smart");
 
   const commentCount = comments?.length ?? 0;
+
+  const findingsByPath = React.useMemo(() => latestFindingsByPath(reviews ?? []), [reviews]);
+  const openFindingCount = React.useMemo(
+    () => [...findingsByPath.values()].flat().filter((f) => !f.dismissed_at).length,
+    [findingsByPath],
+  );
 
   const commenting: DiffCommentApi = {
     comments: comments ?? [],
@@ -40,26 +60,86 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
     },
   };
 
+  const findings: DiffFindingApi = {
+    forPath: (path) => findingsByPath.get(path) ?? [],
+    visible: findingsVisible,
+    renderFinding: (f) => (
+      <FindingCard
+        f={f}
+        defaultExpanded
+        pending={action.isPending}
+        repoFullName={repoFullName}
+        headSha={headSha}
+        onAction={(a) => action.mutate({ findingId: f.id, action: a, prId: prId ?? undefined })}
+      />
+    ),
+  };
+
+  // Smart order needs the smart-diff response; while it loads/errors, fall
+  // back to the original (GitHub) order (AC19 also reachable manually).
+  const groups = React.useMemo(() => (smartDiff ? mergeSmartOrder(files, smartDiff) : null), [files, smartDiff]);
+  const split = smartDiff?.split_suggestion;
+  const stats = React.useMemo(() => sumDiffStats(files), [files]);
+
   return (
     <section>
       <SectionLabel
         icon="Code"
         right={
-          commentCount > 0 ? (
-            <Button
-              kind="ghost"
-              size="sm"
-              icon={showComments ? "EyeOff" : "Eye"}
-              onClick={() => setShowComments((v) => !v)}
-            >
-              {showComments ? "Hide comments" : "Show comments"} ({commentCount})
-            </Button>
-          ) : undefined
+          <span style={s.headerRight}>
+            {commentCount > 0 && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon={showComments ? "EyeOff" : "Eye"}
+                onClick={() => setShowComments((v) => !v)}
+              >
+                {showComments ? "Hide comments" : "Show comments"} ({commentCount})
+              </Button>
+            )}
+            {groups && <OrderToggle order={order} onChange={setOrder} />}
+            {openFindingCount > 0 && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon={findingsVisible ? "EyeOff" : "Eye"}
+                onClick={() => setFindingsVisible((v) => !v)}
+              >
+                {t(findingsVisible ? "smartDiff.hideFindings" : "smartDiff.showFindings", {
+                  count: openFindingCount,
+                })}
+              </Button>
+            )}
+          </span>
         }
       >
         Files changed · {filesCount} files
       </SectionLabel>
-      <DiffViewer files={files} commenting={commenting} />
+
+      <div className="mono tnum" style={s.stats}>
+        {t("smartDiff.filesCount", { count: filesCount })} ·{" "}
+        <span style={{ color: "var(--code-add-text)" }}>+{stats.additions}</span>{" "}
+        <span style={{ color: "var(--code-del-text)" }}>−{stats.deletions}</span>
+      </div>
+
+      {/* Only Smart order groups files by role; Original order has nothing
+          for the split suggestion to act on, so the warning is scoped to
+          Smart order only. */}
+      {split?.too_big && order === "smart" && (
+        <div role="note" style={s.notice}>
+          <div style={s.noticeTitle}>{t("smartDiff.largeTitle", { lines: split.total_lines })}</div>
+        </div>
+      )}
+
+      {groups && order === "smart" ? (
+        <div style={s.groups}>
+          {groups.map((g) => (
+            <RoleGroup key={g.role} group={g} commenting={commenting} findings={findings} />
+          ))}
+        </div>
+      ) : (
+        <DiffViewer files={files} commenting={commenting} findings={findings} />
+      )}
     </section>
   );
 }

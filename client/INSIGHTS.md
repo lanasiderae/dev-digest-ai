@@ -50,6 +50,29 @@
   instead. Evidence:
   `client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:102`,
   `client/src/app/repos/[repoId]/pulls/_components/FindingsCell/FindingsCell.tsx:27`.
+- **2026-10-22** — Correction/extension to the entry directly above: Smart Diff
+  added a THIRD independent client-side reimplementation of the same "latest
+  review per agent, `kind='review'` only" rule —
+  `DiffTab/helpers.ts`'s `latestFindingsByPath` — needed to render inline
+  findings in the diff viewer. The server side stayed single-implementation
+  (the new `/pulls/:id/smart-diff` handler reuses the existing
+  `latestReviewPerAgent` helper rather than reimplementing it), but client-side
+  there are now two independent copies of the same agent-dedup logic
+  (`FindingsPopover/helpers.ts` and `DiffTab/helpers.ts`) with no type-level
+  check that they agree. A shared client helper, mirroring the server's
+  reusable one, would remove this. Evidence:
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/helpers.ts`
+  (`latestFindingsByPath`).
+- **2026-10-22** — A shared cross-route component (`client/src/components/diff-viewer/`)
+  needs a render-prop to show a route-owned presentational component, since
+  importing it directly would violate `frontend-ui-architecture`'s
+  no-cross-route-`_components`-import rule. `DiffFindingApi.renderFinding:
+  (f) => ReactNode` follows the exact same shape as the pre-existing
+  `DiffCommentApi.onSubmit` for GitHub comments — the general pattern for
+  letting a shared `components/` piece delegate rendering to a route's own
+  component. Evidence: `client/src/components/diff-viewer/findings.ts`
+  (`DiffFindingApi`), `client/src/components/diff-viewer/comments.ts`
+  (`DiffCommentApi`).
 
 ## Tool & Library Notes
 
@@ -62,6 +85,15 @@
   (the working `container.querySelector("textarea")` form, after
   `getByDisplayValue("# Rule\nFlag secrets.")` failed to find the same
   element).
+- **2026-10-22** — jsdom doesn't implement `Element.prototype.scrollIntoView`
+  (calling it throws `"... scrollIntoView is not a function"`) — several
+  "jump to X" affordances (`FileCard`, `RoleGroup`'s findings-badge cycling,
+  `ReviewRunAccordion`) call it unconditionally, so any test exercising that
+  path crashes unless stubbed. A global no-op stub was added to
+  `client/src/test/setup.ts` (mirroring the existing `ResizeObserver` stub),
+  which is what lets a test actually assert which element got scrolled into
+  view. Evidence: `client/src/test/setup.ts`,
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.test.tsx`.
 
 ## Recurring Errors & Fixes
 

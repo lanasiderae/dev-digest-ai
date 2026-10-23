@@ -1,0 +1,168 @@
+import { describe, it, expect } from "vitest";
+import type { FindingRecord, PrFile, ReviewRecord, SmartDiff } from "@/lib/types";
+import { filesWithFindingsCount, findingJumpTargets, latestFindingsByPath, mergeSmartOrder, sumDiffStats } from "./helpers";
+
+function prFile(path: string): PrFile {
+  return { path, additions: 1, deletions: 0, patch: null };
+}
+
+describe("sumDiffStats", () => {
+  it("sums additions and deletions across all files", () => {
+    const files: PrFile[] = [
+      { path: "a.ts", additions: 13, deletions: 2, patch: null },
+      { path: "b.ts", additions: 5, deletions: 8, patch: null },
+    ];
+    expect(sumDiffStats(files)).toEqual({ additions: 18, deletions: 10 });
+  });
+
+  it("returns zeroes for an empty file list", () => {
+    expect(sumDiffStats([])).toEqual({ additions: 0, deletions: 0 });
+  });
+});
+
+describe("mergeSmartOrder", () => {
+  it("returns every role in order, including empty ones", () => {
+    const smartDiff: SmartDiff = {
+      groups: [{ role: "core", files: [{ path: "a.ts", additions: 1, deletions: 0, finding_lines: [] }] }],
+      split_suggestion: { too_big: false, total_lines: 1, proposed_splits: [] },
+    };
+    const groups = mergeSmartOrder([prFile("a.ts")], smartDiff);
+    expect(groups.map((g) => g.role)).toEqual(["core", "tests", "wiring", "docs", "boilerplate"]);
+    expect(groups.find((g) => g.role === "tests")!.files).toEqual([]);
+  });
+
+  it("appends a PR file the smart-diff doesn't know about to the core fallback group", () => {
+    const smartDiff: SmartDiff = {
+      groups: [],
+      split_suggestion: { too_big: false, total_lines: 0, proposed_splits: [] },
+    };
+    const groups = mergeSmartOrder([prFile("mystery.ts")], smartDiff);
+    expect(groups.find((g) => g.role === "core")!.files.map((f) => f.path)).toEqual(["mystery.ts"]);
+  });
+
+  it("drops a smart-diff path that isn't actually in the PR's files", () => {
+    const smartDiff: SmartDiff = {
+      groups: [{ role: "core", files: [{ path: "gone.ts", additions: 1, deletions: 0, finding_lines: [] }] }],
+      split_suggestion: { too_big: false, total_lines: 1, proposed_splits: [] },
+    };
+    const groups = mergeSmartOrder([], smartDiff);
+    expect(groups.find((g) => g.role === "core")!.files).toEqual([]);
+  });
+
+  it("flags a file with finding_lines so filesWithFindingsCount counts it", () => {
+    const smartDiff: SmartDiff = {
+      groups: [
+        {
+          role: "core",
+          files: [
+            { path: "a.ts", additions: 1, deletions: 0, finding_lines: [5] },
+            { path: "b.ts", additions: 1, deletions: 0, finding_lines: [] },
+          ],
+        },
+      ],
+      split_suggestion: { too_big: false, total_lines: 2, proposed_splits: [] },
+    };
+    const group = mergeSmartOrder([prFile("a.ts"), prFile("b.ts")], smartDiff).find((g) => g.role === "core")!;
+    expect(filesWithFindingsCount(group)).toBe(1);
+  });
+});
+
+function finding(overrides: Partial<FindingRecord> = {}): FindingRecord {
+  return {
+    id: "f1",
+    severity: "WARNING",
+    category: "bug",
+    title: "t",
+    file: "a.ts",
+    start_line: 1,
+    end_line: 1,
+    rationale: "r",
+    suggestion: null,
+    confidence: 0.5,
+    kind: "finding",
+    trifecta_components: null,
+    evidence: null,
+    matched_skill: null,
+    review_id: "rev1",
+    accepted_at: null,
+    dismissed_at: null,
+    ...overrides,
+  };
+}
+
+function review(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
+  return {
+    id: "rev1",
+    pr_id: "pr1",
+    agent_id: "agent1",
+    run_id: null,
+    agent_name: "Agent",
+    kind: "review",
+    verdict: "comment",
+    summary: null,
+    score: 90,
+    model: "gpt",
+    cost: null,
+    grounding: null,
+    created_at: "2026-01-01T00:00:00Z",
+    findings: [finding()],
+    ...overrides,
+  };
+}
+
+describe("latestFindingsByPath", () => {
+  it("keeps only each agent's latest review, newest first", () => {
+    const older = review({ id: "rev-old", created_at: "2026-01-01T00:00:00Z", findings: [finding({ id: "old" })] });
+    const newer = review({ id: "rev-new", created_at: "2026-01-02T00:00:00Z", findings: [finding({ id: "new" })] });
+    const byPath = latestFindingsByPath([older, newer]);
+    expect(byPath.get("a.ts")!.map((f) => f.id)).toEqual(["new"]);
+  });
+
+  it("ignores a non-review (summary) kind entirely", () => {
+    const summary = review({ kind: "summary", findings: [finding({ id: "s" })] });
+    expect(latestFindingsByPath([summary]).size).toBe(0);
+  });
+
+  it("keeps dismissed findings (muted rendering happens downstream, not here)", () => {
+    const r = review({ findings: [finding({ id: "d", dismissed_at: "2026-01-03T00:00:00Z" })] });
+    expect(latestFindingsByPath([r]).get("a.ts")!.map((f) => f.id)).toEqual(["d"]);
+  });
+});
+
+describe("findingJumpTargets", () => {
+  function forPathFrom(byPath: Record<string, FindingRecord[]>) {
+    return (path: string) => byPath[path] ?? [];
+  }
+
+  it("orders targets by file order, then ascending line", () => {
+    const files = [prFile("a.ts"), prFile("b.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [finding({ id: "a2", start_line: 20 }), finding({ id: "a1", start_line: 5 })],
+      "b.ts": [finding({ id: "b1", start_line: 1 })],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([
+      { path: "a.ts", lineKey: "RIGHT:5" },
+      { path: "a.ts", lineKey: "RIGHT:20" },
+      { path: "b.ts", lineKey: "RIGHT:1" },
+    ]);
+  });
+
+  it("drops dismissed findings", () => {
+    const files = [prFile("a.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [finding({ id: "a1", dismissed_at: "2026-01-01T00:00:00Z" })],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([]);
+  });
+
+  it("dedupes multiple findings anchored to the same line into one stop", () => {
+    const files = [prFile("a.ts")];
+    const forPath = forPathFrom({
+      "a.ts": [
+        finding({ id: "a1", start_line: 5 }),
+        finding({ id: "a2", start_line: 5 }),
+      ],
+    });
+    expect(findingJumpTargets(files, forPath)).toEqual([{ path: "a.ts", lineKey: "RIGHT:5" }]);
+  });
+});

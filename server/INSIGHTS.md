@@ -112,6 +112,35 @@
   `Container.skillsUrlFetch`), `server/src/modules/skills/service.ts`
   (`importFromUrl`), `server/test/skills-import.it.test.ts`.
 
+- **2026-10-22** — `prIntent`/`prBrief` DB tables and `ReviewRepository.upsertIntent`/
+  `getIntent` already existed, fully wired to the `Intent` zod contract, before
+  any Intent Layer code was written for this session's L03 work — pre-built
+  scaffolding for this exact lesson, migrated in `0000_init`, so persisting a
+  derived intent needed zero new migration. The `review_intent` `FeatureModelId`
+  likewise already resolved end-to-end via `settings/feature-models.ts`; it
+  just defaulted to `openai/gpt-4.1` (not low-cost) until changed to
+  `openrouter/deepseek-v4-flash`, matching the existing `onboarding` feature's
+  pattern — a wrong default, not a missing feature. `run-executor.ts`'s own
+  class docstring already said "Loads the diff + intent once" before intent
+  loading was actually implemented — the same "docstring ahead of the code"
+  pattern as the `d45ab0d` entry above, worth checking for elsewhere before
+  assuming a described behavior is unbuilt. Evidence:
+  `server/src/db/schema/reviews.ts:49-63`,
+  `server/src/modules/reviews/repository.ts:137-143`,
+  `server/src/modules/reviews/repository/pull.repo.ts:49-68`,
+  `server/src/vendor/shared/contracts/platform.ts` (`FEATURE_MODELS`).
+- **2026-10-22** — The `findings` table's `kind` column isn't only `'finding'`
+  — `groundFindings` (reviewer-core) also produces `secret_leak`/
+  `lethal_trifecta`/`phantom`/`hook` kinds exempt from line-range grounding
+  (see `reviewer-core/INSIGHTS.md`'s matching entry). Smart Diff's
+  `finding_lines` anchoring (`GET /pulls/:id/smart-diff`) explicitly filters
+  to `kind='finding'` only — those other kinds don't anchor to one reliable
+  line the way a diff finding does, so including them would put an arbitrary
+  line number into the file-count badge. Any new finding `kind` added later
+  should be checked against this filter too, not just against
+  `groundFindings`. Evidence: `server/src/modules/pulls/routes.ts`
+  (the smart-diff handler's `eq(t.findings.kind, 'finding')` filter).
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
@@ -143,3 +172,48 @@
   `zipfile.openReadStreamPromise`) over the callback API shown in most
   yauzl examples — much less boilerplate. Evidence:
   `server/src/modules/skills/import/archive.ts`.
+
+## Recurring Errors & Fixes
+
+- **2026-10-22** — A pre-work step that needs its progress visible in the
+  Live Log UI must be passed `RunLogger` itself (signature
+  `.info(msg, data?)`), not the plain pino request logger
+  (`.info(obj, msg?)`) — the two have incompatible argument orders, and
+  passing the wrong one compiles fine but the step's detail lines only ever
+  reach server stdout, never the SSE-streamed panel the user actually
+  watches. Caught by comparing the intent-derivation step's Live Log output
+  against a reference screenshot that showed sub-step lines (token estimate,
+  provider/model called) this session's first version never emitted.
+  `IntentService`'s logger type was narrowed to `{ info: (msg: string, data?:
+  unknown) => void }` so `run-executor.ts` can pass its real `RunLogger`
+  directly; the one caller stuck with a pino logger (`service.ts`'s manual
+  regenerate route) now wraps it in a one-line adapter closure to the same
+  shape. Evidence: `server/src/modules/reviews/run-executor.ts` (`runLog`
+  passed into `IntentService.ensure`), `server/src/modules/reviews/pipeline/intent.ts`
+  (`IntentLogger`), `server/src/modules/reviews/service.ts` (`regenerateIntent`'s
+  adapter).
+- **2026-10-22** — Any new `.it.test.ts` that triggers `POST /pulls/:id/review`
+  must mock `llm.openrouter` in its `appWith()`-style harness, not just
+  whichever provider(s) its own review-agent fixture uses — the review
+  pipeline's eager intent pre-work independently resolves
+  `container.llm('openrouter')` (the `review_intent` feature's default
+  provider) on every run. Missing that mock is silent and harmless on a
+  machine with no `OPENROUTER_API_KEY` configured (fails fast with
+  `ConfigError`, intent just comes back `unavailable_reason`), but on a dev
+  machine that DOES have a real key configured (true for local dev, not CI)
+  it makes the test hit the real network instead — observed turning one
+  previously-~5s test file into ~41s and intermittently timing out
+  `waitForPrRuns`'s 10s default budget before the run even reached its
+  terminal status, so `GET /pulls/:id/reviews` came back empty and a
+  downstream assertion threw `Cannot read properties of undefined`. Fix
+  pattern: `openrouter: new MockLLMProvider('openai', { structuredBySchema:
+  { PrIntent: <Intent fixture> } })` (the `'openai'` constructor id is
+  cosmetic — only the override map's key, not the instance's own `.id`,
+  determines which `container.llm(...)` call resolves to it).
+  `MockLLMOptions.structuredBySchema` already existed for a different
+  multi-call-fixture purpose (see the Open Questions entry above) and is
+  reused here. Evidence: `server/test/reviews.it.test.ts`,
+  `server/test/review-run-skills.it.test.ts`,
+  `server/test/pulls-smart-diff.it.test.ts` (each file's `openrouter:`
+  override line), `server/test/helpers/runs.ts` (`waitForPrRuns`'s 10s
+  default `timeoutMs`).

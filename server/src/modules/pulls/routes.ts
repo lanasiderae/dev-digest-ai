@@ -2,20 +2,24 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
-import { PrCommentInput } from '@devdigest/shared';
+import { PrCommentInput, SmartDiffResponse } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus, latestReviewPerAgent, rollupSeverities } from './status.js';
 import { computeRunCost } from '../reviews/helpers.js';
+import { getSmartDiff } from './service.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
- *   GET /repos/:id/pulls → list PRs for a repo (open + recently merged/closed,
- *                          synced from GitHub, persisted). `status` is GitHub's
- *                          merge state (open/merged/closed).
- *   GET /pulls/:id       → full PR detail (diff/files, commits, body, linked issue)
+ *   GET /repos/:id/pulls     → list PRs for a repo (open + recently merged/closed,
+ *                              synced from GitHub, persisted). `status` is GitHub's
+ *                              merge state (open/merged/closed).
+ *   GET /pulls/:id           → full PR detail (diff/files, commits, body, linked issue)
+ *   GET /pulls/:id/smart-diff → files grouped by role (core/tests/wiring/docs/
+ *                              boilerplate) with open-finding lines + split
+ *                              suggestion; DB-only, no model call (AC24).
  *
  * Import is idempotent (unique repo_id+number). Review trigger is MANUAL
  * and owned by A2 — this module only imports/reads.
@@ -370,6 +374,20 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       };
     }
   });
+
+  // ---- Smart Diff -----------------------------------------------------------
+  // Files grouped by role + open-finding lines, derived entirely from
+  // persisted data (pr_files + each agent's latest review's findings) — no
+  // GitHub call, no model call. Available before the first review runs (the
+  // grouping itself needs none); finding_lines are simply empty until one does.
+  app.get(
+    '/pulls/:id/smart-diff',
+    { schema: { params: IdParams, response: { 200: SmartDiffResponse } } },
+    async (req): Promise<SmartDiffResponse> => {
+      const { workspaceId } = await getContext(container, req);
+      return getSmartDiff(container, workspaceId, req.params.id);
+    },
+  );
 
   // ---- Inline review comments (Files changed tab) -------------------------
   // Proxied live to GitHub (no local persistence): GET reflects existing PR

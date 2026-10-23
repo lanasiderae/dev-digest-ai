@@ -14,6 +14,8 @@ import { ReviewService } from './service.js';
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
+ *   GET    /pulls/:id/intent                           → cached PR intent (never generates)
+ *   POST   /pulls/:id/intent                           → derive/regenerate the PR's intent
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 export default async function reviewsRoutes(appBase: FastifyInstance) {
@@ -138,6 +140,21 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     if (!ok) throw new NotFoundError('Review not found');
     return { ok: true };
   });
+
+  // ---- Intent Layer --------------------------------------------------------
+  app.get('/pulls/:id/intent', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return service.getIntent(workspaceId, req.params.id);
+  });
+
+  app.post(
+    '/pulls/:id/intent',
+    { schema: { params: IdParams }, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.regenerateIntent(workspaceId, req.params.id, req.log);
+    },
+  );
 
   // ---- Finding actions (accept / dismiss) ---------------------------------
   for (const action of FINDING_ACTIONS) {
