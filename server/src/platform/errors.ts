@@ -39,3 +39,13 @@ export class ConfigError extends AppError {
     super('config_error', message, 500, details);
   }
 }
+
+/** A request conflicts with the resource's current state — e.g. a
+ *  concurrent generation already in flight for the same resource, or a
+ *  generation that finished against a now-superseded PR head. Actionable
+ *  (the caller should retry), distinct from a generic 400/422. */
+export class ConflictError extends AppError {
+  constructor(message = 'Conflict', details?: unknown) {
+    super('conflict', message, 409, details);
+  }
+}

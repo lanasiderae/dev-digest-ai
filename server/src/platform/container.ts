@@ -33,6 +33,7 @@ import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import type postgres from 'postgres';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -61,6 +62,19 @@ export interface ContainerOverrides {
   /** Skill URL-import fetcher — tests inject a stub to avoid a real network/DNS
    *  round trip; production uses the real SSRF-guarded `fetchSkillUrl`. */
   skillsUrlFetch?: (url: string) => Promise<UrlImportResult>;
+  /**
+   * The raw `postgres-js` client behind `db` (L05/TASK-08) — needed ONLY for
+   * `sql.reserve()`, which pins a single dedicated connection so a session-
+   * scoped `pg_try_advisory_lock`/`pg_advisory_unlock` pair is guaranteed to
+   * run on the SAME connection despite `db`'s normal pooled queries (a plain
+   * `db.execute(...)` can pick a different pooled connection per call, which
+   * would make the unlock a silent no-op). `buildApp()` supplies this from
+   * its own `createDb()` handle; a hermetic unit test that never exercises
+   * the real lock path can leave it undefined (see `brief/service.ts`'s
+   * `withGenerationLock` — it degrades to "no locking" rather than throwing
+   * when unset, since no real Postgres is present to lock against anyway).
+   */
+  rawSql?: postgres.Sql;
 }
 
 export class Container {
@@ -125,6 +139,12 @@ export class Container {
   /** Resolve a skill-import URL (SSRF-guarded fetch by default, overridable in tests). */
   skillsUrlFetch(url: string): Promise<UrlImportResult> {
     return (this.overrides.skillsUrlFetch ?? fetchSkillUrl)(url);
+  }
+
+  /** See `ContainerOverrides.rawSql`'s doc comment. `undefined` in a context
+   *  with no real Postgres connection (most hermetic unit tests). */
+  get rawSql(): postgres.Sql | undefined {
+    return this.overrides.rawSql;
   }
 
   get reviewRepo(): ReviewRepository {

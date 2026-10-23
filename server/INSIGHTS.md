@@ -47,6 +47,23 @@
   parity. Evidence: `server/src/vendor/shared/contracts/knowledge.ts` vs.
   `client/src/vendor/shared/contracts/knowledge.ts` (diff after this session),
   same pair for `adapters.ts`.
+- **2026-10-23** — L05/TASK-08 added `BriefReadQuery`/`BriefReadResponse`/
+  `BriefGenerateRequest` route contracts to the SERVER copy of
+  `vendor/shared/contracts/brief.ts` only, under the same backend-only
+  "never touch `client/**`" constraint as the TASK-04 entry above (a
+  concurrent frontend worker owned `client/**` in the same checkout) — but
+  unlike that entry, `brief.ts` was previously one of the files
+  `test/vendor-contracts-parity.test.ts` keeps strictly byte-identical (see
+  this file's "The two vendored `knowledge.ts` copies are NOT byte-identical,
+  unlike `brief.ts`/`trace.ts`/`platform.ts`/`index.ts`" entry below), so this
+  is a NEW parity gap, not a widening of an existing one. Confirmed:
+  `pnpm exec vitest run --exclude '**/*.it.test.ts'` goes from all-green to
+  exactly one failing assertion, in `vendor-contracts-parity.test.ts`, for
+  `brief.ts`'s diff. Needs a follow-up hand-edit mirroring the same three
+  exports into `client/src/vendor/shared/contracts/brief.ts` (TASK-09's brief
+  UI/hooks need them type-checked) before that test is green again. Evidence:
+  `server/src/vendor/shared/contracts/brief.ts` ("Route contracts (TASK-08)"
+  section) vs. the unchanged client copy; `server/test/vendor-contracts-parity.test.ts`.
 
 ## Codebase Patterns
 
@@ -359,6 +376,51 @@
   (`resolveProjectContextBudgetTokens`'s doc comment),
   `server/test/review-project-context-budget.test.ts` ("falls back to 16,000
   (not 4,000) when the model/window is entirely unknown").
+- **2026-10-23** — L05/TASK-08's PR Brief budget is a FIXED 8,000-token input
+  cap (C7), unlike TASK-06's review-time attached-block budget (20% of the
+  model's context window, clamped 4k-32k, via
+  `resolveProjectContextBudgetTokens`) — the two must not share a budget
+  NUMBER function. The underlying drop-whole-documents-from-the-tail
+  ALGORITHM (`buildProjectContextAttachment`/`emptyProjectContextAttachment`,
+  `reviews/pipeline/project-context.ts`) IS generic (`budgetTokens` is a
+  plain parameter, no model-window logic baked in), so `brief/service.ts`
+  reuses it directly, computing its own `budgetTokens` as
+  `BRIEF_INPUT_TOKEN_CAP` minus the mandatory (never-dropped) section's token
+  count, rather than forking the function. A future feature with its own
+  fixed/different budget rule should reuse `buildProjectContextAttachment`
+  the same way, not copy it. Evidence: `server/src/modules/brief/service.ts`
+  (`generate`'s budget section), `server/src/modules/brief/constants.ts`
+  (`BRIEF_INPUT_TOKEN_CAP = 8_000`).
+- **2026-10-23** — L05/TASK-08 is the first code in this repo using a
+  Postgres session-scoped advisory lock (`pg_try_advisory_lock`/
+  `pg_advisory_unlock`, confirmed via `grep -rn advisory server/src` — no
+  prior hits). A session-scoped lock's acquire/release pair MUST run on the
+  SAME physical connection; a plain Drizzle `db.execute(...)` over the
+  pooled `postgres-js` client does NOT guarantee that (each call can land on
+  a different pooled connection, silently turning the unlock into a no-op
+  that never releases the real lock). Fixed by exposing the RAW
+  `postgres-js` client (distinct from the Drizzle-wrapped `db`) as
+  `ContainerOverrides.rawSql`/`Container.rawSql`, wired from `buildApp()`'s
+  own `createDb()` handle, and using `rawSql.reserve()` (postgres-js's
+  dedicated-connection API, NOT a DB transaction — reserving pins a
+  connection without starting a transaction, which matters because the plan
+  forbids holding a transaction open across the slow model call) for the
+  lock's lifetime, released via `conn.release()` in a `finally`. A test that
+  builds its own `db` (most `.it.test.ts` files) must separately pass
+  `overrides.rawSql` (e.g. `pg.handle.sql`) to exercise the real lock, not
+  just the real `db`. Separately: `postgres-js` has no `bigint`
+  query-parameter binding at all (confirmed via `tsc`: `Argument of type
+  'bigint' is not assignable to parameter of type 'ParameterOrFragment<never>'`)
+  — a `bigint` lock key must be sent as a string with a server-side
+  `::bigint` cast (`` sql`select pg_try_advisory_lock(${key}::bigint)` ``),
+  not interpolated directly. Evidence: `server/src/platform/container.ts`
+  (`ContainerOverrides.rawSql`, `Container.rawSql`), `server/src/app.ts`
+  (wiring from `handle.sql`), `server/src/modules/brief/service.ts`
+  (`withGenerationLock`), `server/src/modules/brief/helpers.ts`
+  (`advisoryLockKeyForPr`), `server/test/brief-lock.test.ts` (hermetic proof
+  via a fake global-flag `rawSql`), `server/test/brief.it.test.ts` (same
+  behavior against real Postgres — ran and passed in this session; Docker
+  was actually available in this environment).
 - **2026-10-23** — `ReviewRunExecutor` (`reviews/run-executor.ts`) had NO
   hermetic (non-`.it.test.ts`) test coverage before this session — confirmed
   by `grep -rln "ReviewRunExecutor" server/test server/src` returning only

@@ -200,3 +200,37 @@ export const PrBrief = z.object({
   provenance: BriefProvenance,
 });
 export type PrBrief = z.infer<typeof PrBrief>;
+
+// ---- Route contracts (TASK-08) ----
+
+/** `GET /pulls/:id/brief?agent_id=...` query. `agent_id` omitted means
+    "just hydrate the cached generation's own provenance for display"; an
+    explicit value is additionally compared against that cached provenance
+    to help the caller detect staleness (distinct from the live
+    reviewer-selector state for the NEXT `POST` — see `BriefProvenance`'s
+    doc comment, plan finding D1). */
+export const BriefReadQuery = z.object({
+  agent_id: z.string().uuid().optional(),
+});
+export type BriefReadQuery = z.infer<typeof BriefReadQuery>;
+
+/** `GET /pulls/:id/brief` response — a pure cache read, never a generation. */
+export const BriefReadResponse = z.object({
+  brief: PrBrief.nullable(),
+  stale: z.boolean(),
+  /** Machine-readable reasons, e.g. `head_sha_changed`/`reviewer_changed`/
+      `context_changed`; empty when `stale` is false. */
+  stale_reasons: z.array(z.string()),
+});
+export type BriefReadResponse = z.infer<typeof BriefReadResponse>;
+
+/** `POST /pulls/:id/brief` body. `agent_id` is REQUIRED (not optional) so a
+    client must send either a uuid or explicit `null` — there is no "omitted"
+    state for a generation request: omitting the key is a 422, not a
+    silent "same as null" (C2 — never infer the last reviewer). Explicit
+    `null` means "no reviewer" (project-context documents are limited to any
+    explicit, eligible PR-linked spec), distinct from naming an agent id. */
+export const BriefGenerateRequest = z.object({
+  agent_id: z.string().uuid().nullable(),
+});
+export type BriefGenerateRequest = z.infer<typeof BriefGenerateRequest>;
