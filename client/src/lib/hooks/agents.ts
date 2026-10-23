@@ -3,7 +3,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type {
+  Agent,
+  AgentSkillLink,
+  ModelInfo,
+  ProjectContextSelectionList,
+  Provider,
+  ReviewStrategy,
+} from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -55,7 +62,12 @@ export interface UpdateAgentInput {
       | "repo_intel"
       | "enabled"
     >
-  >;
+    // `project_context` (L05 CTX-AC-04) isn't on the `Agent` contract yet —
+    // CRUD threading lands in TASK-04. Carried here as a forward-compatible
+    // extra field on the SAME existing PUT /agents/:id call (not a parallel
+    // save path) so the Context tab (TASK-05) has one save hook to call;
+    // the backend ignores/accepts it once that lands.
+  > & { project_context?: ProjectContextSelectionList };
 }
 
 export function useUpdateAgent() {

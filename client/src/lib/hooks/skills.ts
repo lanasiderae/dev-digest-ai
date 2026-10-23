@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Skill, SkillSource, SkillType, SkillVersion } from "@devdigest/shared";
+import type { ProjectContextSelectionList, Skill, SkillSource, SkillType, SkillVersion } from "@devdigest/shared";
 
 export function useSkills() {
   return useQuery({
@@ -58,7 +58,14 @@ export function useCreateSkill() {
 
 export interface UpdateSkillInput {
   id: string;
-  patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled">>;
+  patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled">> & {
+    // `project_context` (L05 CTX-AC-04) isn't on the `Skill` contract yet —
+    // CRUD threading lands in TASK-04. Carried here as a forward-compatible
+    // extra field on the SAME existing PUT /skills/:id call (not a parallel
+    // save path), matching `UpdateAgentInput`'s identical note in
+    // lib/hooks/agents.ts.
+    project_context?: ProjectContextSelectionList;
+  };
 }
 
 export function useUpdateSkill() {

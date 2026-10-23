@@ -46,6 +46,7 @@
     "tabs": {
       "config": "Config",
       "skills": "Skills",
+      "context": "Context",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
@@ -86,6 +87,11 @@
     "saving": "Saving…",
     "saved": "Saved (v{version})",
     "savedToast": "Agent saved (v{version})"
+  },
+  "context": {
+    "title": "Project context",
+    "hint": "Select Markdown documents under the repository's configured context roots (specs/docs/insights) for this agent to read as grounding context during a review. Selection only — documents are never edited here.",
+    "save": "Save context"
   },
   "skills": {
     "title": "Skills",

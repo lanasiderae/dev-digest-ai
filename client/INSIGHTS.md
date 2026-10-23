@@ -27,6 +27,47 @@
 
 ## Codebase Patterns
 
+- **2026-10-22** — L05 TASK-02 added `agents.project_context`/`skills.project_context`
+  jsonb DB columns and the standalone `project-context.ts` contract, but
+  deliberately left `contracts/knowledge.ts`'s `Agent`/`Skill` Zod objects
+  untouched (CRUD threading is TASK-04's job, not yet landed as of this
+  entry) — so `agent.project_context`/`skill.project_context` do NOT exist on
+  those types yet even though the DB column does. A consumer that needs to
+  read/write the field before TASK-04 lands should widen locally with an
+  intersection type (`Agent & { project_context?: ProjectContextSelectionList }`)
+  rather than editing the shared vendored contract out of turn — the field
+  will be unioned into the "real" `Agent`/`Skill` contract and a `Pick`-based
+  patch type once CRUD threading is actually implemented, at which point this
+  local widening should be deleted, not layered on top of a formal field.
+  Evidence: `client/src/lib/hooks/project-context.ts` (`WithProjectContext<T>`,
+  `readProjectContext`), `client/src/lib/hooks/agents.ts`'s
+  `UpdateAgentInput.patch` and the identical note in
+  `client/src/lib/hooks/skills.ts`'s `UpdateSkillInput.patch`.
+- **2026-10-22** — There is a pre-existing, UNRELATED "Project Context" feature
+  already in the codebase: `lib/hooks/core.ts`'s `useContextFiles`/
+  `useReindexContext` (repo-intel's code-chunk embedding/indexing pipeline,
+  `SpecFile`/`IndexStatus` types) and `messages/en/context.json` (currently
+  unconsumed — no `useTranslations("context")` call anywhere). L05's Project
+  Context Folder feature (manual Markdown-document selection,
+  `contracts/project-context.ts`) is a completely different feature that
+  happens to share the English name. Do not reuse `context.json` or
+  `useContextFiles` for L05 work — the new feature's shared selector uses its
+  own `messages/en/project-context.json` namespace and
+  `lib/hooks/project-context.ts`. Evidence:
+  `client/src/vendor/shared/contracts/project-context.ts`'s own doc comment
+  already calls this out; `client/messages/en/context.json`.
+- **2026-10-22** — When a document-selection UI supports server-side search
+  filtering, detecting "a previously selected document no longer exists"
+  needs an UNFILTERED discovery query, not the search-filtered one — a
+  selected document that simply doesn't match the current search text would
+  otherwise look identically "missing" to one that's actually gone. Running
+  both an unfiltered and a filtered query against the same React Query cache
+  costs nothing extra when the search box is empty (identical query key,
+  deduped automatically) and only adds a real second request while the user
+  is actively typing a search term. Evidence:
+  `client/src/components/project-context/ProjectContextSelector/ProjectContextSelector.tsx`
+  (`baseline`/`filtered` discovery queries).
+
 - **2026-09-29** — This UI uses two visually-similar-but-distinct dash glyphs
   for "empty" states in the same row: en dash `–` (U+2013) for "no data" (e.g.
   `formatCost(null)`) vs em dash `—` (U+2014) for other "n/a" fallbacks (e.g.
