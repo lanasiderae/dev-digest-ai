@@ -37,12 +37,16 @@ export function BlastRadiusCard({
   prId,
   repoFullName,
   headSha,
+  embedded = false,
 }: {
   prId: string | null | undefined;
   repoFullName: string | null | undefined;
   headSha: string | null | undefined;
+  embedded?: boolean;
 }) {
   const t = useTranslations("blast");
+  const cardStyle = embedded ? { ...s.card, border: 0, padding: 0, background: "transparent" } : s.card;
+  const labelStyle = embedded ? { ...s.labelRow, minHeight: 26 } : s.labelRow;
   const { data, isLoading, isError } = useBlastRadius(prId);
   // Every symbol starts collapsed — a changed-heavy PR can have dozens of
   // symbols, most with zero or one caller; a wall of expanded blocks buries
@@ -64,7 +68,7 @@ export function BlastRadiusCard({
   if (isLoading) {
     return (
       <section style={s.root}>
-        <div style={s.labelRow}>
+        <div style={labelStyle}>
           <SectionLabel icon="Zap">{t("title")}</SectionLabel>
         </div>
         <Skeleton height={110} />
@@ -83,10 +87,10 @@ export function BlastRadiusCard({
 
   return (
     <section style={s.root}>
-      <div style={s.labelRow}>
+      <div style={labelStyle}>
         <SectionLabel icon="Zap">{t("title")}</SectionLabel>
       </div>
-      <div style={s.card}>
+      <div style={cardStyle}>
         <div style={s.summaryLine}>
           {t("summaryLine", {
             symbols: counts.symbols,

@@ -191,7 +191,7 @@ describe("PrBriefCard", () => {
     expect(sp.get("trace")).toBe("run1"); // preserved
 
     // The downstream-only focus item is explicitly labelled, not a dead link.
-    expect(screen.getByText(/File not in this PR's diff/)).toBeInTheDocument();
+    expect(screen.getAllByText(/File not in this PR's diff/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /downstream-only\.ts/ })).not.toBeInTheDocument();
 
     // Expand the risk and click its in-diff file ref (no line for risk refs).
@@ -224,6 +224,28 @@ describe("PrBriefCard", () => {
     await waitFor(() => expect(screen.getByText("Updated after refresh.")).toBeInTheDocument());
     expect(screen.queryByText("This brief is out of date.")).not.toBeInTheDocument();
     expect(calls.some((c) => c.method === "POST")).toBe(true);
+  });
+
+  it("keeps risk files visible while collapsed and composes context beside Blast above full-width focus", async () => {
+    mockFetch({ briefGet: { brief: makeBrief(), stale: false, stale_reasons: [] } });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <NextIntlClientProvider locale="en" messages={{ brief: briefMessages }}>
+          <PrBriefCard prId="pr1" files={FILES} intent={<div>Existing Intent</div>} blast={<div>Existing Blast</div>} />
+        </NextIntlClientProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Possible auth bypass")).toBeInTheDocument());
+    const left = screen.getByTestId("brief-intent-risks");
+    const grid = screen.getByTestId("brief-facts-grid");
+    const focus = screen.getByTestId("brief-review-focus");
+    expect(within(left).getByText("Existing Intent")).toBeInTheDocument();
+    expect(within(left).getByRole("button", { name: "src/a.ts" })).toBeVisible();
+    expect(within(grid).getByText("Existing Blast")).toBeInTheDocument();
+    expect(screen.queryByText("The middleware order changed, which could skip the auth check.")).not.toBeInTheDocument();
+    expect(grid).not.toContainElement(focus);
+    expect(grid.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows an explicit error with Retry on a hard GET failure, and still fetches on retry", async () => {

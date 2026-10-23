@@ -54,12 +54,17 @@ function SourceRow({ labelKey, source }: { labelKey: string; source: BriefSource
 export function PrBriefCard({
   prId,
   files,
+  intent,
+  blast,
 }: {
   prId: string | null | undefined;
   /** This PR's actual changed files — grounds navigation targets (BRIEF-AC-17):
    *  a risk/focus file reference absent from this list is a legitimate
    *  downstream/caller path, not a broken link. */
   files: PrFile[];
+  /** Existing Overview facts are composed here without duplicating queries. */
+  intent?: React.ReactNode;
+  blast?: React.ReactNode;
 }) {
   const t = useTranslations("brief");
   const router = useRouter();
@@ -108,30 +113,31 @@ export function PrBriefCard({
     router.push(buildDiffNavUrl(pathname, searchParams.toString(), file, line));
   };
 
+  const facts = (risks?: React.ReactNode) => (intent || blast || risks) ? (
+    <div style={s.factsGrid} data-testid="brief-facts-grid">
+      <div style={s.contextCard} data-testid="brief-intent-risks">
+        {intent}
+        {risks}
+      </div>
+      {blast && <div style={s.contextCard}>{blast}</div>}
+    </div>
+  ) : null;
+
+  const heading = <SectionLabel icon="FileText">{t("card.title")}</SectionLabel>;
+
   if (isLoading) {
-    return (
-      <section style={s.root}>
-        <div style={s.labelRow}>
-          <SectionLabel icon="FileText">{t("card.title")}</SectionLabel>
-        </div>
-        <Skeleton height={140} />
-      </section>
-    );
+    return <section style={s.root}><div style={s.labelRow}>{heading}</div><Skeleton height={140} />{facts()}</section>;
   }
 
   if (isError || !data) {
     return (
       <section style={s.root}>
-        <div style={s.labelRow}>
-          <SectionLabel icon="FileText">{t("card.title")}</SectionLabel>
-        </div>
+        <div style={s.labelRow}>{heading}</div>
         <div style={s.inlineNote}>
-          <Icon.AlertTriangle size={14} />
-          <span>{t("card.error")}</span>
-          <Button kind="secondary" size="sm" icon="RefreshCw" onClick={() => refetch()}>
-            {t("card.retry")}
-          </Button>
+          <Icon.AlertTriangle size={14} /><span>{t("card.error")}</span>
+          <Button kind="secondary" size="sm" icon="RefreshCw" onClick={() => refetch()}>{t("card.retry")}</Button>
         </div>
+        {facts()}
       </section>
     );
   }
@@ -141,238 +147,120 @@ export function PrBriefCard({
     { value: "", label: t("card.reviewer.none") },
     ...(agents ?? []).map((a) => ({ value: a.id, label: a.name })),
   ];
-
   const reviewerSelector = (
     <div style={s.reviewerField}>
       <span style={s.fieldLabel}>{t("card.reviewer.label")}</span>
       <div style={s.select}>
-        <SelectInput
-          value={selectedAgentId ?? ""}
-          onChange={(v) => setSelectedAgentId(v === "" ? null : v)}
-          options={agentOptions}
-          mono={false}
-        />
+        <SelectInput value={selectedAgentId ?? ""} onChange={(v) => setSelectedAgentId(v === "" ? null : v)} options={agentOptions} mono={false} />
       </div>
     </div>
   );
+  const generationError = generate.isError && (
+    <div style={s.inlineNote}><Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} /><span>{t("card.error")}</span></div>
+  );
 
-  // ---- Empty cache: Generate (BRIEF-AC-01) ----
   if (!brief) {
     return (
       <section style={s.root}>
-        <div style={s.labelRow}>
-          <SectionLabel icon="FileText">{t("card.title")}</SectionLabel>
-        </div>
+        <div style={s.labelRow}>{heading}</div>
         <div style={s.card}>
-          {generate.isPending ? (
-            <Skeleton height={140} />
-          ) : (
+          {generate.isPending ? <Skeleton height={140} /> : (
             <div style={s.emptyRow}>
               {reviewerSelector}
-              <Button
-                kind="primary"
-                size="sm"
-                icon="Sparkles"
-                loading={generate.isPending}
-                onClick={() => generate.mutate(selectedAgentId)}
-              >
-                {t("card.generate")}
-              </Button>
+              <Button kind="primary" size="sm" icon="Sparkles" loading={generate.isPending} onClick={() => generate.mutate(selectedAgentId)}>{t("card.generate")}</Button>
             </div>
           )}
-          {generate.isError && (
-            <div style={s.inlineNote}>
-              <Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} />
-              <span>{t("card.error")}</span>
-            </div>
-          )}
+          {generationError}
         </div>
+        {facts()}
       </section>
     );
   }
 
   const cachedReviewerName = agentNameFor(brief.provenance.reviewer_agent_id, agents ?? []);
-  const cachedReviewerLabel =
-    cachedReviewerName != null
-      ? t("card.reviewer.generatedWith", { name: cachedReviewerName })
-      : brief.sources.reviewer_context.reason ?? t("card.reviewer.generatedWithNone");
-
+  const cachedReviewerLabel = cachedReviewerName != null
+    ? t("card.reviewer.generatedWith", { name: cachedReviewerName })
+    : brief.sources.reviewer_context.reason ?? t("card.reviewer.generatedWithNone");
   const latestReview = latestVerdictReview(reviews ?? []);
+  const missingSources = (Object.keys(brief.sources) as (keyof BriefSources)[])
+    .filter((key) => brief.sources[key].status !== "available")
+    .filter((key) => key !== "reviewer_context" || brief.sources[key].reason !== cachedReviewerLabel);
+
+  const refreshButton = <Button kind="secondary" size="sm" icon="RefreshCw" loading={generate.isPending} onClick={() => generate.mutate(selectedAgentId)}>{t("card.refresh")}</Button>;
+
+  const risks = (
+    <div style={{ ...s.risksSection, borderTop: intent ? "1px solid var(--border)" : undefined }}>
+      <div style={s.sectionHeading}><Icon.AlertTriangle size={13} /><span>{t("card.risks.title")}</span></div>
+      {brief.risks.risks.length === 0 ? <span style={s.muted}>{t("card.risks.empty")}</span> : (
+        <div style={s.riskList}>
+          {brief.risks.risks.map((risk: Risk, i: number) => {
+            const open = openRisks.has(i);
+            return (
+              <div key={`${risk.kind}-${i}`} style={s.riskBlock}>
+                <button type="button" aria-expanded={open} onClick={() => toggleRisk(i)} style={s.riskHeader}>
+                  <Icon.Shield size={14} style={{ color: RISK_COLOR[risk.severity], flexShrink: 0 }} />
+                  <span style={s.riskTitle}>{risk.title}</span>
+                  <Badge color={RISK_COLOR[risk.severity]} bg="transparent">{risk.severity}</Badge>
+                  <Icon.ChevronRight size={13} style={{ transform: open ? "rotate(90deg)" : "none", flexShrink: 0 }} />
+                </button>
+                <div style={s.refList}>
+                  {risk.file_refs.map((path) => isFileInDiff(path, files) ? (
+                    <button key={path} type="button" className="mono" style={s.fileLink} onClick={() => navigateTo(path)}>{path}</button>
+                  ) : (
+                    <span key={path} className="mono" style={s.notInDiff}>{path} — {t("card.navigation.notInDiff")}</span>
+                  ))}
+                </div>
+                {open && <div style={s.riskBody}><p style={s.riskExplanation}>{risk.explanation}</p></div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <section style={s.root}>
       <div style={s.labelRow}>
-        <SectionLabel icon="FileText">{t("card.title")}</SectionLabel>
+        {heading}
+        <div style={s.headingControls}>{reviewerSelector}{refreshButton}</div>
       </div>
-
-      <div style={s.card}>
-        {generate.isPending ? (
-          <Skeleton height={220} />
-        ) : (
+      <div style={s.card} data-testid="brief-summary">
+        {generate.isPending ? <Skeleton height={160} /> : (
           <>
-            {data.stale && (
-              <div style={s.staleBanner}>
-                <Icon.AlertTriangle size={15} style={{ color: "var(--warn)", flexShrink: 0 }} />
-                <span style={s.staleText}>{t("card.stale")}</span>
-                <Button
-                  kind="secondary"
-                  size="sm"
-                  icon="RefreshCw"
-                  loading={generate.isPending}
-                  onClick={() => generate.mutate(selectedAgentId)}
-                >
-                  {t("card.refresh")}
-                </Button>
-              </div>
+            {latestReview?.verdict ? (
+              <VerdictBanner verdict={latestReview.verdict} summary={brief.summary} score={latestReview.score} severityCounts={latestVerdictCounts(latestReview)} agentName={latestReview.agent_name} embedded />
+            ) : (
+              <div style={s.summaryRow}><Icon.FileText size={20} style={{ color: "var(--text-muted)", flexShrink: 0 }} /><div><p style={s.summary}>{brief.summary}</p><span style={s.muted}>{t("card.verdict.unreviewed")}</span></div></div>
             )}
-
-            <div style={s.reviewerRow}>
-              {reviewerSelector}
-              {/* Read-only cached-generation provenance — a visibly distinct
-                  element from the live selector above, even when it names
-                  the same reviewer (plan finding D1). */}
-              <span data-testid="brief-cached-reviewer" style={s.cachedReviewer}>
-                {cachedReviewerLabel}
-              </span>
+            <div style={s.provenanceRow}>
+              <span data-testid="brief-cached-reviewer" style={s.cachedReviewer}>{cachedReviewerLabel}</span>
+              {missingSources.map((key) => <SourceRow key={key} labelKey={key} source={brief.sources[key]} />)}
             </div>
-
-            <p style={s.summary}>{brief.summary}</p>
-
-            <div>
-              <div style={s.sectionLabel}>{t("card.sources.title")}</div>
-              <div style={s.sourcesGrid}>
-                {(Object.keys(brief.sources) as (keyof BriefSources)[]).map((key) => (
-                  <SourceRow key={key} labelKey={key} source={brief.sources[key]} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={s.sectionLabel}>{t("card.risks.title")}</div>
-              {brief.risks.risks.length === 0 ? (
-                <span style={s.muted}>{t("card.risks.empty")}</span>
-              ) : (
-                <div style={s.riskList}>
-                  {brief.risks.risks.map((risk: Risk, i: number) => {
-                    const open = openRisks.has(i);
-                    return (
-                      <div key={`${risk.kind}-${i}`} style={s.riskBlock}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={open}
-                          onClick={() => toggleRisk(i)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleRisk(i);
-                            }
-                          }}
-                          style={s.riskHeader}
-                        >
-                          <Icon.ChevronRight
-                            size={14}
-                            style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .12s" }}
-                          />
-                          <Badge color={RISK_COLOR[risk.severity]} bg="transparent">
-                            {risk.severity}
-                          </Badge>
-                          <span style={s.riskTitle}>{risk.title}</span>
-                        </div>
-                        {open && (
-                          <div style={s.riskBody}>
-                            <p style={s.riskExplanation}>{risk.explanation}</p>
-                            <div style={s.refList}>
-                              {risk.file_refs.map((path) =>
-                                isFileInDiff(path, files) ? (
-                                  <Button key={path} kind="ghost" size="sm" icon="FileText" onClick={() => navigateTo(path)}>
-                                    {path}
-                                  </Button>
-                                ) : (
-                                  <span key={path} className="mono" style={s.notInDiff}>
-                                    {path} — {t("card.navigation.notInDiff")}
-                                  </span>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div style={s.sectionLabel}>{t("card.focus.title")}</div>
-              {brief.review_focus.length === 0 ? (
-                <span style={s.muted}>{t("card.focus.empty")}</span>
-              ) : (
-                <ol style={{ ...s.focusList, margin: 0, padding: 0, listStyle: "none" }}>
-                  {brief.review_focus.map((item, i) => {
-                    const inDiff = isFileInDiff(item.file, files);
-                    return (
-                      <li key={`${item.file}:${item.line}:${i}`} style={s.focusRow}>
-                        <span style={s.focusOrdinal}>{i + 1}.</span>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                          {inDiff ? (
-                            <Button
-                              kind="ghost"
-                              size="sm"
-                              icon="FileText"
-                              onClick={() => navigateTo(item.file, item.line)}
-                            >
-                              {`${item.file}:${item.line}`}
-                            </Button>
-                          ) : (
-                            <span className="mono" style={s.notInDiff}>
-                              {`${item.file}:${item.line}`} — {t("card.navigation.notInDiff")}
-                            </span>
-                          )}
-                          <span style={s.focusReason}>{item.reason}</span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
-            </div>
-
-            <div>
-              <div style={s.sectionLabel}>{t("card.verdict.title")}</div>
-              {latestReview && latestReview.verdict ? (
-                <VerdictBanner
-                  verdict={latestReview.verdict}
-                  summary={latestReview.summary}
-                  score={latestReview.score}
-                  severityCounts={latestVerdictCounts(latestReview)}
-                  agentName={latestReview.agent_name}
-                />
-              ) : (
-                <span style={s.muted}>{t("card.verdict.unreviewed")}</span>
-              )}
-            </div>
-
-            <div style={s.footerRow}>
-              <Button
-                kind="secondary"
-                size="sm"
-                icon="RefreshCw"
-                loading={generate.isPending}
-                onClick={() => generate.mutate(selectedAgentId)}
-              >
-                {t("card.refresh")}
-              </Button>
-            </div>
+            {data.stale && <div style={s.staleBanner}><Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} /><span style={s.staleText}>{t("card.stale")}</span></div>}
           </>
         )}
+        {generationError}
+      </div>
 
-        {generate.isError && (
-          <div style={s.inlineNote}>
-            <Icon.AlertTriangle size={14} style={{ color: "var(--warn)" }} />
-            <span>{t("card.error")}</span>
-          </div>
+      {facts(risks)}
+
+      <div style={s.focusCard} data-testid="brief-review-focus">
+        <div style={s.sectionHeading}><Icon.ListChecks size={13} /><span>{t("card.focus.title")}</span><Badge color="var(--accent-text)" bg="var(--accent-bg)">{brief.review_focus.length}</Badge></div>
+        {brief.review_focus.length === 0 ? <span style={s.muted}>{t("card.focus.empty")}</span> : (
+          <ol style={s.focusList}>
+            {brief.review_focus.map((item, i) => (
+              <li key={`${item.file}:${item.line}:${i}`} style={s.focusRow}>
+                <span style={s.focusOrdinal}>▸</span>
+                <div style={s.focusContent}>
+                  {isFileInDiff(item.file, files) ? (
+                    <button type="button" className="mono" style={s.fileLink} onClick={() => navigateTo(item.file, item.line)}>{`${item.file}:${item.line}`}</button>
+                  ) : <span className="mono" style={s.notInDiff}>{`${item.file}:${item.line}`} — {t("card.navigation.notInDiff")}</span>}
+                  <span style={s.focusReason}>— {item.reason}</span>
+                </div>
+              </li>
+            ))}
+          </ol>
         )}
       </div>
     </section>

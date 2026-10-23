@@ -21,12 +21,12 @@ interface OverviewTabProps {
 export function OverviewTab({ prId, prBody, repoFullName, headSha, files = [] }: OverviewTabProps) {
   return (
     <>
-      <PrBriefCard prId={prId} files={files} />
-
-      <div style={s.grid}>
-        <IntentCard prId={prId} />
-        <BlastRadiusCard prId={prId} repoFullName={repoFullName} headSha={headSha} />
-      </div>
+      <PrBriefCard
+        prId={prId}
+        files={files}
+        intent={<IntentCard prId={prId} embedded />}
+        blast={<BlastRadiusCard prId={prId} repoFullName={repoFullName} headSha={headSha} embedded />}
+      />
 
       {prBody && (
         <section>

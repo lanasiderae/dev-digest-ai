@@ -101,6 +101,7 @@ async function runFlow(file: string, flow: Flow): Promise<FlowResult> {
 
 async function main(): Promise<void> {
   console.log(`DevDigest e2e — base=${BASE} bin=${BIN}`);
+  mkdirSync(RESULTS_DIR, { recursive: true });
   const flows = loadFlows();
   if (flows.length === 0) {
     console.error(`No specs found in ${SPECS_DIR}`);

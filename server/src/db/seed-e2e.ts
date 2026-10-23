@@ -10,6 +10,8 @@ import { OnboardingTour, ONBOARDING_TOUR_SECTION_KEYS } from '../vendor/shared/c
 import { RunTrace } from '../vendor/shared/contracts/trace.js';
 import { buildProjectContextAttachment } from '../modules/reviews/pipeline/project-context.js';
 import { TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { INDEXER_VERSION } from '../modules/repo-intel/constants.js';
+import { toBlastRadius } from '../modules/blast/helpers.js';
 
 const root = process.env.E2E_FIXTURE_ROOT;
 if (process.env.E2E_FIXTURES !== '1' || !root || !process.env.DATABASE_URL) {
@@ -36,6 +38,12 @@ try {
   const content = '# Smoke architecture rule\nThe api/ module must not import db/ directly.\n';
   await mkdir(join(clone, 'specs'), { recursive: true });
   await writeFile(join(clone, path), content);
+  // Tiny, inspectable source behind the static impact-map screenshot.
+  await mkdir(join(clone, 'src/middleware'), { recursive: true });
+  await mkdir(join(clone, 'src/api/public'), { recursive: true });
+  await writeFile(join(clone, 'src/middleware/ratelimit.ts'), 'export function rateLimit() { return 429; }\n');
+  await writeFile(join(clone, 'src/server.ts'), 'import { rateLimit } from "./middleware/ratelimit";\nexport function serve() { return rateLimit(); }\n');
+  await writeFile(join(clone, 'src/api/public/webhooks.ts'), 'import { rateLimit } from "../../middleware/ratelimit";\nexport function webhook() { return rateLimit(); }\n');
   const git = (...args: string[]) => execFileSync('git', ['-C', clone, ...args], { encoding: 'utf8' }).trim();
   git('init', '-q');
   git('add', '.');
@@ -46,13 +54,38 @@ try {
     patch: '@@ -10,0 +11,3 @@\n+export const port = 3001;\n+export const secret = "fixture-only";\n+export const timeout = 1000;',
   }).where(and(eq(t.prFiles.prId, pr.id), eq(t.prFiles.path, 'src/config.ts')));
 
+  const intent = {
+    intent: 'Add rate limiting to public API endpoints to prevent abuse from unauthenticated clients.',
+    in_scope: ['Add middleware for rate limiting', 'Apply it to public API routes', 'Return 429 when the request budget is exhausted'],
+    out_of_scope: ['Authentication changes', 'Adding new endpoints'],
+  };
+  await handle.db.insert(t.prIntent).values({ prId: pr.id, intent: intent.intent, inScope: intent.in_scope, outOfScope: intent.out_of_scope, headSha: pr.headSha });
+  await handle.db.insert(t.repoIndexState).values({ repoId: repo.id, lastIndexedSha: pr.headSha, indexerVersion: INDEXER_VERSION, status: 'full', filesIndexed: 3 });
+  await handle.db.insert(t.symbols).values({ repoId: repo.id, path: 'src/middleware/ratelimit.ts', name: 'rateLimit', kind: 'function', line: 1 });
+  const callers = ['src/server.ts', 'src/api/public/webhooks.ts'];
+  await handle.db.insert(t.fileRank).values(callers.map((filePath) => ({ repoId: repo.id, filePath, pagerank: 0.5, hotness: 0, rank: 0.5, percentile: 50 })));
+  await handle.db.insert(t.references).values(callers.map((fromPath) => ({ repoId: repo.id, fromPath, toSymbol: 'rateLimit', declFile: 'src/middleware/ratelimit.ts', line: 2 })));
+  await handle.db.insert(t.fileFacts).values([
+    { repoId: repo.id, filePath: callers[0]!, endpoints: ['GET /api/public/items'], crons: ['reset-buckets (hourly)'] },
+    { repoId: repo.id, filePath: callers[1]!, endpoints: ['POST /api/public/webhooks'], crons: [] },
+  ]);
+  const blast = toBlastRadius({
+    changedSymbols: [{ name: 'rateLimit', file: 'src/middleware/ratelimit.ts', kind: 'function' }],
+    callers: callers.map((file) => ({ file, symbol: file.split('/').pop()!, viaSymbol: 'rateLimit', line: 2, rank: 0 })),
+    impactedEndpoints: ['GET /api/public/items', 'POST /api/public/webhooks'],
+    factsByFile: { [callers[0]!]: { endpoints: ['GET /api/public/items'], crons: ['reset-buckets (hourly)'] }, [callers[1]!]: { endpoints: ['POST /api/public/webhooks'], crons: [] } },
+  });
+
   const unavailable = (reason: string) => ({ status: 'unavailable' as const, reason });
   const brief = PrBrief.parse({
     summary: 'Cached smoke brief: inspect configuration before merging.',
-    intent: null, blast: null, history: { history: [] },
-    risks: { risks: [{ kind: 'configuration', title: 'Configuration exposure', explanation: 'Check the new configuration value.', severity: 'high', file_refs: ['src/config.ts'] }] },
+    intent, blast, history: { history: [] },
+    risks: { risks: [
+      { kind: 'configuration', title: 'Configuration exposure', explanation: 'Check the new configuration value.', severity: 'high', file_refs: ['src/config.ts'] },
+      { kind: 'behavior', title: 'Rate limiter response behavior', explanation: 'Confirm that rejected requests return the documented status and headers.', severity: 'medium', file_refs: ['src/middleware/ratelimit.ts'] },
+    ] },
     review_focus: [{ file: 'src/config.ts', line: 12, reason: 'Verify the configuration value at this exact line.' }],
-    sources: { intent: unavailable('Intent not derived.'), blast: unavailable('Repository index unavailable.'), issue: unavailable('No linked issue.'), reviewer_context: unavailable('Reviewer context not selected.'), documents: unavailable('No documents selected.') },
+    sources: { intent: { status: 'available', reason: null }, blast: { status: 'available', reason: null }, issue: unavailable('No linked issue.'), reviewer_context: unavailable('Reviewer context not selected.'), documents: unavailable('No documents selected.') },
     provenance: { reviewer_agent_id: null, skill_ids: [], documents: [], pr_linked_spec_path: null, head_sha: pr.headSha, context_fingerprint: 'static-smoke-fixture', generated_at: '2026-10-23T00:00:00Z' },
   });
   await handle.db.insert(t.prBrief).values({ prId: pr.id, json: brief });
