@@ -76,6 +76,21 @@
 
 ## Tool & Library Notes
 
+- **2026-10-22** — `agent-browser scroll`/`scrollintoview` act on the page's
+  default scrolling element, but the PR detail route's scrollable region is
+  an inner `<main>` (the `AppShell` layout), not `window`/`body` — so
+  `agent-browser scroll down <px>` is a silent no-op there (no error,
+  screenshot just doesn't move) and `scrollintoview "text=..."` also did
+  nothing useful. What worked: `agent-browser eval
+  "document.querySelector('main').scrollTop = N"`, or better,
+  `element.scrollIntoView({block:'center'})` done via `eval` in one call (a
+  separate `eval` to compute an element's offset, then a second `eval` to
+  set `scrollTop`, raced against in-flight layout shifts from the page's own
+  data loading and landed on stale coordinates). Evidence: observed verifying
+  `BlastRadiusCard`'s new "Prior PRs touching these files" footer against
+  the real `lanasiderae/dev-digest-ai` PR #5, where `main`'s
+  `scrollHeight` was ~7000px against a ~950px `clientHeight`.
+
 - **2026-10-21** — RTL's `getByDisplayValue` is unreliable for a controlled
   `<textarea>` whose value contains a newline in this setup (it reported
   "unable to find" even though the textarea visibly held the exact text) —

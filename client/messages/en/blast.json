@@ -33,5 +33,11 @@
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "history": {
+    "title": "Prior PRs touching these files",
+    "overlapCount": "{count, plural, one {# shared file} other {# shared files}}",
+    "empty": "No prior PRs overlap these files.",
+    "mergedBy": "{author} · merged {date}"
   }
 }

@@ -28,6 +28,17 @@
 
 ## Codebase Patterns
 
+- **2026-10-22** — `pull_requests` has no dedicated merge-timestamp column —
+  `status` ('open'/'merged'/'closed') IS the GitHub merge state (confirmed
+  by `pulls/status.ts:89`'s `ghStatus === 'merged'` check), and `updated_at`
+  is the closest available timestamp to "when it merged", not an exact one.
+  A feature needing "when was this PR merged" (e.g. the new
+  `history`/`getPriorPrsWithFileOverlap` feature) must fall back through
+  `updatedAt ?? openedAt ?? null` rather than assuming a real merge
+  timestamp exists. Evidence: `server/src/db/schema/pulls.ts:5-34` (no
+  `mergedAt` field), `server/src/modules/history/helpers.ts`
+  (`toPrHistoryItem`'s fallback chain).
+
 - **2026-09-29** — Not every GET route's response is Zod-validated despite
   `server/AGENTS.md`'s "schema-first... one definition drives both request
   validation and response serialization" convention: `/repos/:id/pulls`,

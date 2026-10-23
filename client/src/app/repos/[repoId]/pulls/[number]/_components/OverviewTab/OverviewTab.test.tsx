@@ -20,6 +20,9 @@ function mockFetchByUrl() {
     if (url.includes("/blast")) {
       return new Response(JSON.stringify(BLAST_FIXTURE), { status: 200 });
     }
+    if (url.includes("/history")) {
+      return new Response(JSON.stringify({ history: [] }), { status: 200 });
+    }
     return new Response(JSON.stringify({ intent: null, unavailable_reason: "not_generated" }), { status: 200 });
   });
 }

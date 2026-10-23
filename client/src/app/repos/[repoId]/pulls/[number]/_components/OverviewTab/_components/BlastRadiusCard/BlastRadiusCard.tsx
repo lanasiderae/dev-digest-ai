@@ -20,6 +20,7 @@ import { useBlastRadius } from "@/lib/hooks/blast-radius";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { callerLabel, groupSymbols, symbolKey, totalCounts } from "./helpers";
 import { chevronFor, s } from "./styles";
+import { PriorPrsFooter } from "./_components/PriorPrsFooter";
 
 /** Maps the server's degraded reason enum onto blast.json's `degraded.reason.*`
     keys. Any reason not in this map (future enum members) falls back to the
@@ -56,6 +57,9 @@ export function BlastRadiusCard({
       return next;
     });
   };
+  // Only one row can be hovered by a mouse at a time — a single key avoids a
+  // per-row useState, which the rows-in-a-loop shape can't do anyway.
+  const [hoveredSymbol, setHoveredSymbol] = React.useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -123,9 +127,11 @@ export function BlastRadiusCard({
                       toggleSymbol(key);
                     }
                   }}
-                  style={s.symbolHeader}
+                  onMouseEnter={() => setHoveredSymbol(key)}
+                  onMouseLeave={() => setHoveredSymbol((cur) => (cur === key ? null : cur))}
+                  style={{ ...s.symbolHeader, background: hoveredSymbol === key ? "var(--bg-hover)" : undefined }}
                 >
-                  <Icon.GitBranch size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                  <Icon.Code size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
                   <span style={s.symbolName}>{symbol.name}</span>
                   <span style={s.symbolFile}>{symbol.file}</span>
                   <span style={s.callerCount}>{t("callerCount", { count: downstream?.callers.length ?? 0 })}</span>
@@ -173,6 +179,8 @@ export function BlastRadiusCard({
             );
           })}
         </div>
+
+        <PriorPrsFooter prId={prId} repoFullName={repoFullName} />
       </div>
     </section>
   );

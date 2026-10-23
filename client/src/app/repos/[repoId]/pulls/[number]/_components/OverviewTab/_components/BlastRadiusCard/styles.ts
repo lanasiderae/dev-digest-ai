@@ -48,6 +48,10 @@ export const s = {
     cursor: "pointer",
     userSelect: "none",
     minWidth: 0,
+    borderRadius: 6,
+    padding: "4px 6px",
+    margin: "-4px -6px",
+    transition: "background .1s",
   } satisfies CSSProperties,
   symbolName: { fontWeight: 600, color: "var(--text-primary)", flexShrink: 0 } satisfies CSSProperties,
   // flex:1 + minWidth:0 is what lets a flex child actually shrink below its
