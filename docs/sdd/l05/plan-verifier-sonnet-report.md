@@ -47,7 +47,7 @@ This report was produced by **Claude Sonnet 5** (`claude-sonnet-5`, Anthropic), 
 | BRIEF-AC-11 | 02,08 | `server/test/vendor-contracts-parity.test.ts:32-50` — byte-identical vendored copies, both new contract files present; read directly. | DONE |
 | BRIEF-AC-12 | 03,08,09 | `brief-generate.test.ts:282-305` (head/context race rejection) + `brief-read.test.ts:138+` (reviewer-changed flag). | DONE |
 | BRIEF-AC-13 | 09,12 | URL/query tests exist; exact-line scroll-anchor browser confirmation not separately recorded (task-12-validation.md explicitly: "exact viewport centering... still need demo/manual inspection"). | PARTIAL |
-| BRIEF-AC-14 | 01,14,15 | Cross-model review documented (`plan-review.md`); this Sonnet report is the final required pass — see SDD-AC-07 for its own persistence caveat. | PARTIAL |
+| BRIEF-AC-14 | 01,14,15 | Cross-model review is documented and the final Sonnet report is committed and linked in PR #14. The demo URL remains unlinked, so its video content cannot be checked. | PARTIAL (demo link needed) |
 | BRIEF-AC-15 | 09 | `PrBriefCard.test.tsx:170` unreviewed-state test; `pr-brief-layout.md` describes real `VerdictBanner` reuse. | DONE |
 | BRIEF-AC-16 | 09 | Expand/navigate tests present at `PrBriefCard.test.tsx` (risk section). | DONE |
 | BRIEF-AC-17 | 09 | Downstream "not in diff" label test present per file structure. | DONE |
@@ -119,7 +119,7 @@ I did not rerun suites; I independently opened and read the cited test files (no
 - `architecture-review.md`: no new in-scope boundary violations found by two Codex sessions (Sonnet review request was itself blocked by an approval gate — self-disclosed, not concealed).
 - **Server/reviewer-core/client `.it.test.ts` (DB integration) runs: CANNOT VERIFY** — no document records whether these were executed or honestly skipped, contrary to the plan's own requirement (`plan.md:101`).
 - **Live, successful PR Brief / Onboarding Tour model generation: CANNOT VERIFY as successful** — the one documented live attempt failed OpenRouter structured-output schema validation; the ledger records this as unresolved ("What was hard / missed").
-- **Open PR state, PR description, linked demo video: CANNOT VERIFY** — `gh`/network access was denied in this sandboxed session; no PR URL or video link exists in any committed file.
+- **Open PR state and description: CONFIRMED after follow-up** — PR #14 is open and links this verifier report. The author confirms a separate demo URL exists, but has not provided it or added it to the PR, so the video content remains unverified.
 
 ### Result
 
