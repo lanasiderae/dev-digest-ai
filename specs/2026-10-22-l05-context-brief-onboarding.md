@@ -11,7 +11,18 @@
 
 Before approval, review goals/non-goals, the six clarification categories, source provenance, missing-data semantics, numeric token budgets and their counting method, and every `[NEEDS CLARIFICATION]` marker. Do not pass an unresolved draft to `implementation-planner`.
 
-Required sequence: workflow foundation → approved specification → AC-linked plan → cross-model plan review → commit specification and reviewed plan → Project Context Folder → PR Brief → Onboarding Generator → tests and architecture review → final read-only `plan-verifier` → manually invoked retrospective and delivery evidence. Stage commits must remain traceable. Approval of this specification is not approval of a future plan.
+Required sequence: workflow foundation → approved specification → separately invoked implementation planner → AC-linked plan → cross-model plan review → commit specification and reviewed plan → manually invoked execution-only `run-plan` → Project Context Folder → PR Brief → Onboarding Generator → architecture review, fixes and documentation → final read-only `plan-verifier` → manually invoked retrospective and delivery evidence. An early verifier checkpoint is optional and does not replace final verification. Stage commits must remain traceable. Approval of this specification is not approval of a future plan.
+
+The planner asks once whether execution should use a single agent or multiple agents and resolves technical ambiguities; it does not create or edit the specification. `run-plan` does not invoke specification creation or planning. For this slice, the implementer writes AC-derived tests; a dedicated test-writer phase is skipped, not validation. Architecture reviewer and final verifier use Sonnet in Claude Code. Repository-wide checks are consolidated by the root coordinator rather than repeated independently by each subagent. The user has requested splitting current work where possible; that execution preference does not approve this specification.
+
+## Consolidated decisions
+
+- Keep document selection manual and repository-scoped; project-document previews are view-only in this slice. No document editor or attachment-versioning feature is added.
+- Store attachment paths in metadata. Keep the full actual text sent to the model separately as a run-trace snapshot, not as attachment storage.
+- Skip unavailable selected documents and record each reason. Reuse existing skill `agent_count` for agents-per-skill usage instead of adding another counter.
+- Show document token totals, not “chunks”; count actual selected document text with injection wrappers. The expandable trace label is literally `project context attached specs` and reveals the full snapshot text actually sent.
+- Specification writes are restricted by agent instructions, not a tool hook. The spec creator may use bounded research delegation and read relevant `INSIGHTS.md` files only. Blocking questions come first; nonblocking assumptions or recommendations stay inline.
+- Specification and implementation planning remain separate manual stages. Retrospective is manual-only, defaults to current-context evidence, and may use deep disk-log mode when requested; it reports in chat and appends a short ledger entry.
 
 ## Clarification record
 
@@ -44,7 +55,7 @@ Non-goals: automatic PR-to-document selection, arbitrary host-file uploads, a ne
 
 ## Evidence and provenance
 
-Inspected guidance: root `README.md` and `TESTING.md`; package `AGENTS.md`/README and architecture, review-flow, prompt, engine, and page documentation; `.claude/agents/spec-creator.md`; current `brief.ts` contract and agent registry. `.claude/rules/README.md` states that rules are currently empty.
+Inspected guidance: root `README.md` and `TESTING.md`; package `AGENTS.md`/README and architecture, review-flow, prompt, engine, and page documentation; `.claude/agents/spec-creator.md`; current `brief.ts` contract and agent registry. `.claude/rules/README.md` states that rules are currently empty. Read relevant package insights when needed, without loading unrelated insight collections.
 
 The parent research inventory identifies these integration points; implementation planning must verify exact signatures and current state before changes:
 
@@ -68,16 +79,16 @@ Priorities: P1 = required assignment behavior; P2 = recommended brief evidence/q
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
-| SDD-AC-01 | P1 | WHEN requirements are submitted, `spec-creator` SHALL cover all six clarification categories, produce a feature specification with unique EARS AC IDs, and mark unresolved requirements `[NEEDS CLARIFICATION]` rather than inventing decisions. | Agent configuration, generated spec and approval record. |
-| SDD-AC-02 | P1 | WHEN `spec-creator` uses tools, it SHALL be allowed only read-only DevDigest MCP state tools and writes to the required specification file under `specs/`; writes outside that file and review-triggering tools SHALL be denied by enforced tool policy. | Allowed-read, allowed-write, denied traversal/symlink/write and denied mutation-tool checks in Claude Code; distinguish Codex policy from Claude hook enforcement. |
-| SDD-AC-03 | P1 | WHEN an approved specification is planned, `implementation-planner` SHALL replace `planner`, define how/order rather than clarify requirements, and reference an AC-ID for every task. | Agent registry/config and generated plan. |
+| SDD-AC-01 | P1 | WHEN requirements or supplied designs are submitted, `spec-creator` SHALL cover all six clarification categories, analyze missing elements, edge cases, module interactions and UX recommendations, ask blocking questions first, and produce unique EARS AC IDs with unresolved requirements marked `[NEEDS CLARIFICATION]`. | Agent configuration, design analysis, generated spec and approval record. |
+| SDD-AC-02 | P1 | WHEN `spec-creator` operates, its prompt SHALL restrict product-system access to read-only DevDigest MCP tools and writes to the required specification file; allow bounded read-only research delegation; select package-local versus top-level cross-module specification placement; and prohibit product, plan and unrelated file changes without adding an enforcement hook. | Agent instructions and observed artifact scope; explicitly a prompt restriction, not a permission guarantee. |
+| SDD-AC-03 | P1 | WHEN separately invoked with an approved specification, `implementation-planner` SHALL replace `planner`, ask execution mode once and resolve technical ambiguities, define how/order with an AC-ID for every task, and leave specification files unchanged. | Agent registry/config, mode decision and generated plan. |
 | SDD-AC-04 | P1 | WHEN a plan is ready, a reviewer from a different model family SHALL review it before implementation, and the findings and actual model/provider identity SHALL be saved. | Review note; no claim of cross-model review if unavailable. |
 | SDD-AC-05 | P2 | BEFORE implementation code begins, the generated approved spec and reviewed plan SHALL be committed. | Git history and approval evidence. |
-| SDD-AC-06 | P1 | WHEN an approved plan executes, `run-plan` SHALL preserve task/AC scope, delegate non-trivial tests from the specification, and collect implementation and architectural review evidence. | Stage artifacts, test report and architecture findings. |
-| SDD-AC-07 | P1 | WHEN implementation and reviews finish, the final read-only `plan-verifier` SHALL report AC → task → test → commit coverage and every unresolved/cannot-verify item before merge. | Final verifier report in PR; no writes by verifier. |
+| SDD-AC-06 | P1 | WHEN manually invoked with an approved plan, execution-only `run-plan` SHALL preserve task/AC scope without invoking spec creation or planning, use implementer-authored AC-derived tests for this slice, and collect architectural review evidence with consolidated required validation. | Stage artifacts, test report and architecture findings; no dedicated test-writer phase required. |
+| SDD-AC-07 | P1 | WHEN all implementation, review fixes and documentation finish, the final read-only Sonnet `plan-verifier` SHALL report AC → task → test → commit coverage and every unresolved/cannot-verify item before merge; an optional early checkpoint SHALL not replace this final pass. | Final verifier report in PR; no writes by verifier. |
 | SDD-AC-08 | P1 | BEFORE a long workflow or paid demonstration, the operator SHALL record available budget or its unavailability, choose adequate model cost, and set concurrency/validation limits without disabling all validation. | Run preflight note with actual model identities and limits. |
-| SDD-AC-09 | P1 | WHEN manually invoked after a complete pipeline, `workflow-retro` SHALL inspect parent and nested-agent usage, including disk logs in deep mode, and report tokens, cache reads, tool calls, duration and concurrency with concrete improvements. | Retrospective with source coverage and unknown values explicitly identified. |
-| SDD-AC-10 | P1 | WHEN a retrospective completes, it SHALL append a concise comparable run summary to `docs/retros/ledger.md` without double-counting child usage or inventing unavailable cost. | Ledger entry and calculation/source references. |
+| SDD-AC-09 | P1 | WHEN manually invoked after a pipeline, `workflow-retro` SHALL use current-context evidence by default, optionally inspect disk logs in deep mode, and report parent/nested usage, tokens, cache reads, tool calls, duration and concurrency with concrete improvements in chat. | Retrospective with source coverage and unknown values explicitly identified; no automatic invocation. |
+| SDD-AC-10 | P1 | WHEN a retrospective completes, it SHALL append a concise comparable run summary to `docs/retro/ledger.md` without double-counting child usage or inventing unavailable cost. | Ledger entry and calculation/source references from a manually invoked retrospective. |
 
 ## Feature 1 — Project Context Folder
 
@@ -87,7 +98,7 @@ As a reviewer author, I select repository Markdown rules for an agent or skill, 
 
 ### Contracts and observable outputs
 
-Discovery exposes repository-relative path and document type (`specs`, `docs`, `insights`, or configured-root type), with search and safe text preview. Metadata stores `repoId` and selected paths, not document bodies. Runtime trace exposes `specs_read`, included document list, per-document/total token usage, synced default-branch revision and omission reasons. Token counters label estimated versus actual values.
+Discovery exposes repository-relative path and document type (`specs`, `docs`, `insights`, or configured-root type), with search and view-only safe text preview. Metadata stores `repoId` and selected paths, not document bodies; no new attachment-versioning feature is introduced. Existing skill `agent_count` supplies agents-per-skill usage. Runtime trace exposes `specs_read`, included document list, per-document/total token usage including injection wrappers, synced default-branch revision and omission reasons. The expandable `project context attached specs` section shows the full document snapshot text actually sent, stored separately from attachment metadata. Use token totals rather than chunk counts; label estimated versus actual values.
 
 ### Failure, security and model budget
 
@@ -98,11 +109,11 @@ Proposed C5 caps await approval. Retain deterministic ordering/deduplication and
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
 | CTX-AC-01 | P1 | WHEN documents are discovered, the system SHALL recursively list `.md` files matching configurable roots, defaulting to `**/{specs,docs,insights}/**/*.md`. | Nested/default/custom-root discovery tests. |
-| CTX-AC-02 | P1 | WHEN an agent Context tab is opened, it SHALL show manual selection checkboxes, paths, types, search and preview. | Component tests and real UI check. |
-| CTX-AC-03 | P1 | WHEN a skill is edited, it SHALL offer a matching Project context to use selection section. | Skill interaction and persistence test. |
-| CTX-AC-04 | P1 | WHEN selections are saved and reloaded, metadata SHALL preserve paths rather than document contents, with approved repository scope. | API/storage and reload tests. |
+| CTX-AC-02 | P1 | WHEN an agent Context tab is opened, it SHALL show manual selection checkboxes, paths, types, search and view-only preview without editing repository documents. | Component tests and real UI check. |
+| CTX-AC-03 | P1 | WHEN a skill is edited, it SHALL offer a matching Project context to use section and reuse existing `agent_count` for agents-per-skill usage. | Skill interaction, existing-count and persistence test. |
+| CTX-AC-04 | P1 | WHEN selections are saved and reloaded, metadata SHALL preserve paths rather than document contents, with approved repository scope and without adding attachment versioning. | API/storage and reload tests; trace snapshots verified separately. |
 | CTX-AC-05 | P1 | WHEN a review starts, the server SHALL resolve eligible selected documents from the agent and enabled skills, deduplicate them, and provide guarded untrusted `## Project context` without an extra model call. | Captured prompt, injection/deduplication and model-count tests. |
-| CTX-AC-06 | P1 | WHEN document loading finishes, trace SHALL show `specs_read`, the actual included document list and token usage, and any omitted whole documents with reasons. | Trace contract/persistence/UI tests. |
+| CTX-AC-06 | P1 | WHEN document loading finishes, trace SHALL show `specs_read`, included document list, token totals counting actual text and injection wrappers, omissions with reasons, and an expandable `project context attached specs` section containing the full snapshot text actually sent. | Trace contract/persistence/UI and prompt-snapshot parity tests. |
 | CTX-AC-07 | P1 | IF a path escapes approved roots, targets another repository, or resolves through an unsafe symlink, THEN content SHALL not be read or previewed. | Permission-boundary tests. |
 | CTX-AC-08 | P1 | IF selected documents are unavailable or exceed approved bounds, THEN the review SHALL continue with an explicit partial-context warning and truthful trace. | Missing/oversize/budget boundary tests. |
 | CTX-AC-09 | P1 | WHEN a review receives an attached specification forbidding direct `api/` imports of `db/` and a diff violating that rule, it SHALL identify the violation with the specific attached document reference while retaining grounded diff citations. | Deterministic prompt/output seam test plus recorded real-model demonstration; fixture alone is not proof of model compliance. |
@@ -183,14 +194,18 @@ Proposed C7 budget: 24,000 whole-input tokens including instructions/delimiters,
 
 This draft has **49 acceptance criteria: 36 P1, 7 P2, 6 P3**. A final verifier must reconcile actual approved scope and priority counts before reporting coverage. Optional enhancements are not approval blockers; unresolved required criteria are.
 
-Use specification-derived seam tests: permission guards; discovery and path containment; metadata/prompt/trace; brief source assembly, grounding, cache and navigation; tour ranking, structured call count and fallback. Apply package test/typecheck/lint/audit commands from root guidance. DB-backed tests keep `.it.test.ts`; record skipped Docker tests honestly. Run a real UI check for UI changes and a limited deterministic e2e journey; mocked tests do not establish live model behavior. Do not run tests or paid generation merely to approve this documentation draft.
+Use specification-derived seam tests: prompt-level agent restrictions; document path containment; metadata/prompt/trace parity; brief source assembly, grounding, cache and navigation; tour ranking, structured call count and fallback. The implementer authors these AC-derived tests for this slice. The root coordinator runs affected-package test/typecheck/lint/audit commands from root guidance once after integrating changes, repeating only for new changes or failures. DB-backed tests keep `.it.test.ts`; record skipped Docker tests honestly. Run a real UI check for UI changes and a limited deterministic e2e journey; mocked tests do not establish live model behavior. Do not run tests or paid generation merely to approve this documentation draft.
 
-Required PR evidence: approved agent-generated `spec.md` and `plan.md` committed before product code; actual cross-family review note; stage contributions; tests and audits with pre-existing vulnerabilities distinguished; final read-only verifier report; retrospective/ledger with honest metrics coverage; open PR implementation description; linked 1–3 minute PR Brief video. Video shows generate → summary/risks/focus and available/missing sources → diff navigation → reload without new call → refresh → spec/plan/verifier. Explain that precomputed facts keep source grounding and budgets controlled without sending raw diff hunks or rebuilding index facts. Context rule-violation and unfamiliar-repo tour demonstrations may be separate clips, with actual call/cost evidence.
+Final specification self-check: all six clarification categories are covered; goals/non-goals, contracts and user flows are explicit; relevant module interactions and supplied-design gaps are identified; safety, token budgets and failure NFRs are observable; trace snapshot requirements are testable; every AC has verification evidence. Detailed implementation choices belong in the separate plan. Pasted historical approvals do not approve this draft.
 
-## Open clarifications
+Required PR evidence: approved agent-generated dated English specification (`2026-10-22-l05-context-brief-onboarding.md`) and its separately generated AC-linked implementation plan committed before product code; actual cross-family review note; stage contributions; tests and audits with pre-existing vulnerabilities distinguished; final read-only verifier report; retrospective/ledger with honest metrics coverage; open PR implementation description; linked 1–3 minute PR Brief video. Video shows generate → summary/risks/focus and available/missing sources → diff navigation → reload without new call → refresh → spec/plan/verifier. Explain that precomputed facts keep source grounding and budgets controlled without sending raw diff hunks or rebuilding index facts. Context rule-violation and unfamiliar-repo tour demonstrations may be separate clips, with actual call/cost evidence.
+
+## Outstanding decisions
 
 1. [NEEDS CLARIFICATION: C2 — approve optional explicit reviewer/context selection for brief generation, unioned with a PR-linked specification, to satisfy attached-spec integration? If another source-selection flow is intended, specify it.]
 2. [NEEDS CLARIFICATION: C4 — approve workspace-level configurable discovery roots constrained to the imported repository, using the assignment's recursive default glob?]
 3. [NEEDS CLARIFICATION: C7 — approve proposed limits (C5 document/context policy; brief 8,000 input/1,500 output tokens; tour 24,000 input/8,000 output tokens), with enforced whole-input caps and documented tokenizer/estimate handling?]
+
+The retrospective ledger is `docs/retro/ledger.md`. Add no entry until the retrospective is manually invoked and actual run evidence is available.
 
 No user approval, plan approval, execution budget or cross-model availability has been inferred. Resolve these markers and record user evidence before planning.
