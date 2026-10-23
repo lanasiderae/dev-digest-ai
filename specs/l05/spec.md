@@ -4,37 +4,37 @@
 - Author: `spec-creator` subagent; generated from the assignment and inspected fork evidence.
 - Baseline: `lanasiderae/dev-digest-ai`, `l04/mcp`, commit `da33d6d126e5fd9e23f75f769753c0207115356d`.
 - Target branch: `l05/specs`; `main` is not the baseline.
-- Scope: SDD workflow, Project Context Folder, PR Brief, and the additional Onboarding Generator assignment. Inclusion of onboarding in this delivery remains a clarification below.
+- Scope: SDD workflow, Project Context Folder, PR Brief, and the additional Onboarding Generator assignment.
 - This document defines behavior; it is not an implementation plan or evidence that the features already work.
 
 ## Approval checklist and stage order
 
 Before approval, review goals/non-goals, the six clarification categories, source provenance, missing-data semantics, numeric token budgets and their counting method, and every `[NEEDS CLARIFICATION]` marker. Do not pass an unresolved draft to `implementation-planner`.
 
-Required sequence: workflow foundation → approved specification → AC-linked plan → cross-model plan review → commit specification and reviewed plan → Project Context Folder → PR Brief → Onboarding Generator if included → tests and architecture review → final read-only `plan-verifier` → manually invoked retrospective and delivery evidence. Stage commits must remain traceable. Approval of this specification is not approval of a future plan.
+Required sequence: workflow foundation → approved specification → AC-linked plan → cross-model plan review → commit specification and reviewed plan → Project Context Folder → PR Brief → Onboarding Generator → tests and architecture review → final read-only `plan-verifier` → manually invoked retrospective and delivery evidence. Stage commits must remain traceable. Approval of this specification is not approval of a future plan.
 
 ## Clarification record
 
 | Category | Confirmed requirement / inspected evidence | Unresolved decision |
 |---|---|---|
-| 1. Goals, users, scope | Repository reviewers need selected Markdown rules and a PR overview. Additional assignment requests a five-section tour for an unfamiliar repository. | C1: include onboarding in this delivery or a subsequent L05 delivery? |
-| 2. Behavior and interaction | Selection is manual; agent Context tab and skill section are required. Brief generation/regeneration is user initiated. `/onboarding` already adds repositories. | C2: approve explicit reviewer selection for brief context? C3: approve repository-qualified selections? |
-| 3. Data and provenance | Existing index is reused. Attachments store paths, not contents. Brief JSON must include PR SHA. Existing prompt supports untrusted `specs` chunks. | C3: attachment repository/version policy; C4: scope of configurable roots. |
-| 4. Failure and edge cases | Missing Intent/Blast must not block a brief; degraded data differs from a healthy empty map. Tour needs deterministic fallback for index/model failure. | C5: approve safe document limits and missing-document handling? C6: approve zero-call tour for unavailable/partial index? |
-| 5. Constraints and budget | No extra context-attachment LLM call; one structured brief call and one narrative tour call on eligible generation. Models are selected through feature settings. | C7: approve token caps, counting method, truncation, output allowance and initial workflow resource limits? |
+| 1. Goals, users, scope | Assignment includes all three product features; Project Context Folder comes first. | Whole specification approval is pending. |
+| 2. Behavior and interaction | Manual repository-qualified attachments and a repository-scoped tour preserve the existing add-repository flow. Brief generation is explicit. | C2: decide how reviewer-attached context reaches a brief; a PR-linked specification alone does not satisfy the assignment. |
+| 3. Data and provenance | Proposed `repoId` plus relative path prevents cross-repository ambiguity; the synced default-branch snapshot must remain distinct from PR head. | C4: approve workspace scope for configurable roots. |
+| 4. Failure and edge cases | Whole-document dropping preserves complete rules; zero-call skeletons expose unavailable index data; failed regeneration should preserve a generated cache. | Proposed behavior below awaits specification approval. |
+| 5. Constraints and budget | Proposed limits bound document reads, attachments and model input while allowing a complete five-section tour. | C7: approve numeric budgets, hard whole-input enforcement and tokenizer policy. |
 | 6. Verification and delivery | AC → task → test → commit; real cross-model family review; open PR and demo video. | Cross-model provider availability, paid-call budget, and user approval of draft remain pending; do not fabricate evidence. |
 
-### Proposed decisions awaiting approval
+### Proposed draft decisions
 
-These are reviewable proposals, not accepted requirements:
+These policies await approval as part of this specification; they are design proposals, not claims of existing runtime behavior.
 
-- C1: include all three product features, with Project Context Folder delivered first.
-- C2: choose a reviewer explicitly when generating a brief; use its agent attachments plus enabled skill attachments. Do not silently infer the last reviewer.
-- C3: store each attachment as repository identity plus normalized repository-relative path; resolve only selections for the reviewed repository. Read the current managed clone snapshot, record that revision/content digest in trace, and identify it separately from PR head SHA. No cross-repository content inclusion.
-- C4: configure search roots at workspace scope, defaulting to `**/{specs,docs,insights}/**/*.md`; no arbitrary host paths.
-- C5: bound individual documents at 256 KiB, discovery at 1,000 results, and attached context at 6,000 tokens. Skip unsafe/unreadable/missing documents with visible reasons; truncate eligible documents deterministically, never silently. These limits are proposals, not repository facts.
-- C6: if index facts are absent, disabled, failed, partial, or unavailable because of a large/incomplete clone, generate a deterministic five-section tour with accurate limited status and zero model calls. A complete eligible snapshot uses one model attempt.
-- C7: cap the full assembled brief and tour input messages at 8,000 tokens each, including instructions and delimiters; reserve a separate 2,000-token output allowance. Count with the configured tokenizer and identify its encoding; if an exact model tokenizer is unavailable, label counts as estimates and use a documented conservative preflight limit rather than claiming model-exact tokens. Initial workflow maximum: two concurrent subagents; run focused hermetic tests first, one deterministic end-to-end smoke per product journey at final verification; expand on failures. Check actual available budget before selecting models or running paid demos.
+- C1 (scope resolved): include all three product features, with Project Context Folder first.
+- C2 (decision pending): support an optional safe PR-body Spec reference without introducing a mandatory reviewer picker. The assignment additionally requires reviewer-attached specifications. Proposed integration: an optional explicit reviewer/context selection for generation, unioned with the PR-linked specification when present; no implicit “last reviewer.” Confirm this interaction before planning.
+- C3: store `repoId` plus normalized relative path. Resolve only selections for the reviewed repository, ordered direct-agent first, then enabled safe skills in configured order; first occurrence wins. Read the synced default-branch managed clone, record actual revision/digests separately from PR head, and prevent cross-repository inclusion.
+- C4 (scope pending): configure discovery roots at workspace scope, defaulting to `**/{specs,docs,insights}/**/*.md`; no host paths. Discover nested matching directories as required by the assignment.
+- C5: 256 KiB per document, 2,000 discovered documents and 100 attachments per agent/skill. Attached-block budget is 20% of the selected model context window, clamped to 4,000–32,000 tokens, falling back to 16,000 when unknown. Include headings/delimiters in block counts. Drop whole documents from the end until the block fits; do not truncate documents into misleading rule fragments. Show omission reasons and deterministic order.
+- C6: without an eligible index, return a deterministic five-section skeleton with accurate limited status and zero model calls. Eligible generation makes one attempt, no retry. On model failure, return truthful fallback status while preserving any previously generated cached tour. Concurrent generation for the same resource returns 409 with a useful message.
+- C7: brief full-input cap 8,000 tokens, output allowance 1,500; tour full-input cap 24,000 tokens, output allowance 8,000. The larger tour allowance accommodates five structured sections and reduces JSON truncation risk; it is a cap, not a usage target. Count all assembled messages with the configured tokenizer, identify encoding/estimate status, and fail before the call if mandatory input cannot fit. Initial workflow maximum: two concurrent subagents, focused hermetic checks first, one deterministic e2e smoke per final product journey, expanding on failures; confirm actual available budget before model selection or paid demos.
 
 ## Goals and non-goals
 
@@ -83,17 +83,17 @@ Priorities: P1 = required assignment behavior; P2 = recommended brief evidence/q
 
 ### User story and behavior
 
-As a reviewer author, I select repository Markdown rules for an agent or skill, preview them, and see which documents actually reached a review. Selection is manual. Enabled skill selections and agent selections form a deduplicated context set under the proposed C2/C3 policy.
+As a reviewer author, I select repository Markdown rules for an agent or skill, preview them, and see which documents actually reached a review. Selection is manual. Direct-agent selections come first, followed by enabled safe skills in configured order, with first-occurrence deduplication scoped to the reviewed repository.
 
 ### Contracts and observable outputs
 
-Discovery exposes repository-relative path and document type (`specs`, `docs`, `insights`, or configured-root type), with search and safe text preview. Metadata stores selected paths plus the proposed repository qualifier, not document bodies. Runtime trace exposes `specs_read`, included document list, per-document/total token usage, source revision and omission/truncation reasons. Token counters label estimated versus actual values.
+Discovery exposes repository-relative path and document type (`specs`, `docs`, `insights`, or configured-root type), with search and safe text preview. Metadata stores `repoId` and selected paths, not document bodies. Runtime trace exposes `specs_read`, included document list, per-document/total token usage, synced default-branch revision and omission reasons. Token counters label estimated versus actual values.
 
 ### Failure, security and model budget
 
 Documents are untrusted repository data. Only Markdown under configured repository roots is eligible; reject absolute paths, traversal, unsafe symlink escapes and cross-repository reads. Use existing delimiter escaping and injection guard under `## Project context`; document claims never disable structural safety or grounding. Selection/loading makes no model call. Preserve normal review call strategy; do not promise every review itself uses one call.
 
-Proposed C5 caps require approval. Retain deterministic ordering and deduplication. Warn on stale/missing/unsafe selections without pretending they were read. Reading clone content does not imply it matches PR head; trace records actual provenance.
+Proposed C5 caps await approval. Retain deterministic ordering/deduplication and whole-document dropping; never truncate an attached rule document. Warn on stale/missing/unsafe selections without pretending they were read. Reading the synced default-branch clone does not imply it matches PR head; trace records actual provenance.
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
@@ -102,7 +102,7 @@ Proposed C5 caps require approval. Retain deterministic ordering and deduplicati
 | CTX-AC-03 | P1 | WHEN a skill is edited, it SHALL offer a matching Project context to use selection section. | Skill interaction and persistence test. |
 | CTX-AC-04 | P1 | WHEN selections are saved and reloaded, metadata SHALL preserve paths rather than document contents, with approved repository scope. | API/storage and reload tests. |
 | CTX-AC-05 | P1 | WHEN a review starts, the server SHALL resolve eligible selected documents from the agent and enabled skills, deduplicate them, and provide guarded untrusted `## Project context` without an extra model call. | Captured prompt, injection/deduplication and model-count tests. |
-| CTX-AC-06 | P1 | WHEN document loading finishes, trace SHALL show `specs_read`, the actual included document list and token usage, and any omitted/truncated documents with reasons. | Trace contract/persistence/UI tests. |
+| CTX-AC-06 | P1 | WHEN document loading finishes, trace SHALL show `specs_read`, the actual included document list and token usage, and any omitted whole documents with reasons. | Trace contract/persistence/UI tests. |
 | CTX-AC-07 | P1 | IF a path escapes approved roots, targets another repository, or resolves through an unsafe symlink, THEN content SHALL not be read or previewed. | Permission-boundary tests. |
 | CTX-AC-08 | P1 | IF selected documents are unavailable or exceed approved bounds, THEN the review SHALL continue with an explicit partial-context warning and truthful trace. | Missing/oversize/budget boundary tests. |
 | CTX-AC-09 | P1 | WHEN a review receives an attached specification forbidding direct `api/` imports of `db/` and a diff violating that rule, it SHALL identify the violation with the specific attached document reference while retaining grounded diff citations. | Deterministic prompt/output seam test plus recorded real-model demonstration; fixture alone is not proof of model compliance. |
@@ -111,13 +111,13 @@ Proposed C5 caps require approval. Retain deterministic ordering and deduplicati
 
 ### User story and behavior
 
-As a reviewer, I open Overview, choose the approved reviewer context, generate a brief, examine summary/risks/priorities beside available Intent/Blast, navigate to a relevant diff file, reload a cached result and explicitly regenerate it.
+As a reviewer, I open Overview, generate a brief using available PR-linked specifications and the approved reviewer-context interaction under C2, examine summary/risks/priorities beside available Intent/Blast, navigate to a relevant diff file, reload a cached result and explicitly regenerate it.
 
 ### Contracts and provenance
 
 Extend both `PrBrief` copies with `summary` and `review_focus: Array<{file: string; line: number; reason: string}>`. Preserve existing `Risk` shape (`kind`, `title`, `explanation`, `severity`, `file_refs`) and `history`. Make unavailable Intent/Blast distinguishable from healthy empty data. Add observable source availability/degradation and generation provenance without manufacturing an Intent or Blast result.
 
-`GET /pulls/:id/brief` reads cache only; `POST /pulls/:id/brief` generates. Store PR head SHA inside `pr_brief.json`; include reviewer/context selection fingerprint and actual source revision/digests under proposed C2/C3. A changed head/context identifies stale cache. Never overwrite a valid cache with failed/unvalidated generation or return a result generated for a superseded head as current.
+`GET /pulls/:id/brief` reads cache only; `POST /pulls/:id/brief` generates. Store PR head SHA inside `pr_brief.json`; include approved context identity and actual source revision/digests under C2/C3, including any PR-body Spec reference. A changed head/context identifies stale cache. Never overwrite a valid cache with failed/unvalidated generation or return a result generated for a superseded head as current. Reject concurrent generation for the same PR with an actionable 409 response.
 
 Ground every risk path and focus path against the union of current PR files and available Blast changed-symbol/caller files. Do not infer permitted paths from model text. Focus line numbers must be positive integers; exact line navigation should use existing diff metadata, without feeding hunks to the model. A permitted downstream file absent from the PR diff is not a fabricated path.
 
@@ -125,7 +125,7 @@ Ground every risk path and focus path against the union of current PR files and 
 
 Resolve `resolveFeatureModel(container, workspaceId, 'risk_brief')`; use one `llm.completeStructured({model, schema, schemaName, messages})` attempt producing `{summary, risks: [], review_focus: []}`. No repair model call, retry, Intent generation, document summarization or secondary model call in this operation. Validate the contract and reject invalid references rather than persisting invented paths. Model/provider adapters must not hide additional billable retries.
 
-Proposed C7 cap: 8,000 input tokens, separately 2,000 output tokens. Deterministic priority: source status/head/file allowlist and instructions; compact diff statistics/roles and available Intent/Blast; bounded PR/issue text; selected document excerpts within remaining budget. Report omissions. If mandatory input cannot fit, fail before a model call with an actionable message; do not silently lose grounding facts. Raw diff hunks and source code are never included.
+Proposed C7 cap: 8,000 whole-input tokens, separately 1,500 output tokens. Deterministic priority: source status/head/file allowlist and instructions; compact diff statistics/roles and available Intent/Blast; bounded PR/issue text; whole selected documents within remaining budget. Report omissions. If mandatory input cannot fit, fail before a model call with an actionable message. Raw diff hunks and source code are never included.
 
 Missing Intent/Blast/issue/context is recorded and does not block generation using remaining facts. On model failure, preserve cache and show failure. PR-derived descriptions, issue text, index facts and documents remain delimiter-wrapped untrusted data with the guard preserved. Concurrent regeneration/head-change behavior must not corrupt or mislabel cache.
 
@@ -156,15 +156,15 @@ Missing Intent/Blast/issue/context is recorded and does not block generation usi
 
 ### User story, sections and provenance
 
-As a developer unfamiliar with an imported open-source repository, I generate a guided tour containing exactly five top-level sections: architecture overview; critical execution paths; local setup instructions; recommended file reading order; suggested first tasks. Preserve `/onboarding` add-repository behavior; expose an accessible repository-scoped generation/read flow. Proposed C1 inclusion and C6 failure policy await approval.
+As a developer unfamiliar with an imported open-source repository, I generate a guided tour containing exactly five top-level sections: architecture overview; critical execution paths; local setup instructions; recommended file reading order; suggested first tasks. Preserve `/onboarding` add-repository behavior and expose the repository tour at `/repos/[id]/onboarding`.
 
 Reuse saved `repoIntel.*` facts and ranked files/import graph information; rank reading order using persisted rank/PageRank with available hotness, for example `rank × (1 + hotness)`, with deterministic tie-breaking and truthful indication when hotness is absent. No AST/graph rebuild or fresh ranking model. Setup commands come from available repository documentation/manifests and are suggestions, never executed. Only evidence-backed paths appear; missing setup facts are “unavailable,” not invented commands.
 
 ### Contract, input budget and failures
 
-Store five structured sections plus repository/index revision, status, evidence paths, ordered reading path and call/token/cost metadata in existing onboarding JSON storage. Resolve the `onboarding` feature model setting. For a complete eligible index, make one structured narrative model attempt. Validate section count/shape and paths before caching. On unavailable index, use C6's proposed zero-call deterministic five-section skeleton; on model/validation failure after one attempt, use the skeleton and truthful failure status. Never label fallback as a successful generated narrative.
+Store five structured sections plus repository/index revision, status, evidence paths, ordered reading path and call/token/cost metadata in existing onboarding JSON storage. Resolve the `onboarding` feature model setting. For a complete eligible index, make one structured narrative model attempt. Validate section count/shape and paths before caching. Without an eligible index, use C6's zero-call deterministic five-section skeleton; on model/validation failure after one attempt, provide a skeleton and truthful failure status while preserving any previously generated tour in cache. Never label fallback as a successful generated narrative. Reject concurrent generation for the repository with an actionable 409 response.
 
-Proposed C7 input limit: 8,000 tokens including instructions/delimiters, separate 2,000-token output allowance. Prioritize index status/revision and permitted file references, compact repository map and critical paths, ranked reading files, then bounded setup documentation. Large repositories are bounded using existing ranked index retrieval; no whole-repository prompt or recursive code parsing. Incomplete clone and partial index must remain visible. Record model-reported usage/cost; unknown price remains unknown, not zero. Guard all repo-derived data against injection.
+Proposed C7 budget: 24,000 whole-input tokens including instructions/delimiters, separate 8,000-token output allowance. Prioritize index status/revision and permitted file references, compact repository map and critical paths, ranked reading files, then bounded setup documentation. Enforce the whole-input cap before calling. Large repositories are bounded using existing ranked index retrieval; no whole-repository prompt or recursive code parsing. Incomplete clone and partial index must remain visible. Record model-reported usage/cost; unknown price remains unknown, not zero. Guard all repo-derived data against injection.
 
 | AC-ID | Priority | EARS requirement | Verification evidence |
 |---|---|---|---|
@@ -173,9 +173,9 @@ Proposed C7 input limit: 8,000 tokens including instructions/delimiters, separat
 | ONBOARD-AC-03 | P1 | WHEN reading order is produced, it SHALL use existing graph rank with available hotness and deterministic ordering. | Ranking tests with ties/missing hotness. |
 | ONBOARD-AC-04 | P1 | WHEN complete eligible facts are available, generation SHALL make one structured narrative model attempt using the configured onboarding model and record calls/tokens/cost. | Mock call-count test and live cost evidence. |
 | ONBOARD-AC-05 | P1 | IF the index/clone is unavailable or incomplete, THEN a deterministic five-section skeleton SHALL identify the actual reason without claiming complete repository knowledge, under approved C6 call policy. | Flag-off/failed/partial/large/no-data fixtures. |
-| ONBOARD-AC-06 | P1 | IF the model or output validation fails, THEN the generator SHALL return a truthful deterministic five-section fallback without a second model call. | Failure/invalid-path tests. |
+| ONBOARD-AC-06 | P1 | IF the model or output validation fails, THEN the generator SHALL return a truthful deterministic five-section fallback without a second model call and preserve any previously generated cached tour. | Failure/invalid-path and failed-regeneration cache tests. |
 | ONBOARD-AC-07 | P1 | WHEN a large repository is processed, generation SHALL respect the approved input token cap using bounded persisted facts and disclose omitted evidence. | Large-fact/budget tests. |
-| ONBOARD-AC-08 | P1 | WHEN the tour is exposed, the existing add-repository flow SHALL remain functional and the repository tour SHALL be accessible and reloadable with its status/provenance. | Existing-flow regression and browser check. |
+| ONBOARD-AC-08 | P1 | WHEN the tour is exposed at `/repos/[id]/onboarding`, the existing add-repository flow SHALL remain functional, the tour SHALL be reloadable with status/provenance, and concurrent generation SHALL return an actionable 409. | Existing-flow regression, concurrency and browser checks. |
 | ONBOARD-AC-09 | P1 | WHEN onboarding is delivered, its specification, plan/review, code/tests, architecture review and final AC → task → test → commit report SHALL be separately traceable through stage commits. | Commit history and verifier matrix. |
 | ONBOARD-AC-10 | P1 | WHEN onboarding is demonstrated on an unfamiliar open-source repository, the demonstration SHALL show its five sections and actual model-call count/cost, with unknown cost explicitly labeled. | Demo/log links; no fabricated usage. |
 
@@ -189,12 +189,8 @@ Required PR evidence: approved agent-generated `spec.md` and `plan.md` committed
 
 ## Open clarifications
 
-1. [NEEDS CLARIFICATION: C1 — include Onboarding Generator in this delivery, or specify a subsequent delivery while retaining its draft requirements here?]
-2. [NEEDS CLARIFICATION: C2 — approve explicit reviewer selection for PR Brief and union of that agent's attachments with enabled skill attachments?]
-3. [NEEDS CLARIFICATION: C3 — approve repository-qualified metadata paths, clone-snapshot reads with recorded revision/digests, no cross-repository inclusion, and cache invalidation on reviewer/context identity changes?]
-4. [NEEDS CLARIFICATION: C4 — approve workspace-level configurable roots constrained to the imported repository, with the specified default glob?]
-5. [NEEDS CLARIFICATION: C5 — approve 256 KiB/document, 1,000 discovery entries, 6,000 attached-context tokens and visible deterministic omission/truncation behavior?]
-6. [NEEDS CLARIFICATION: C6 — approve a zero-model-call deterministic five-section tour for any missing/partial/failed/disabled index or incomplete clone, versus allowing one narrative call on partial facts?]
-7. [NEEDS CLARIFICATION: C7 — approve 8,000 input tokens and 2,000 output tokens per brief/tour, the documented tokenizer/estimate policy, priority order and initial concurrency/e2e limits?]
+1. [NEEDS CLARIFICATION: C2 — approve optional explicit reviewer/context selection for brief generation, unioned with a PR-linked specification, to satisfy attached-spec integration? If another source-selection flow is intended, specify it.]
+2. [NEEDS CLARIFICATION: C4 — approve workspace-level configurable discovery roots constrained to the imported repository, using the assignment's recursive default glob?]
+3. [NEEDS CLARIFICATION: C7 — approve proposed limits (C5 document/context policy; brief 8,000 input/1,500 output tokens; tour 24,000 input/8,000 output tokens), with enforced whole-input caps and documented tokenizer/estimate handling?]
 
 No user approval, plan approval, execution budget or cross-model availability has been inferred. Resolve these markers and record user evidence before planning.
