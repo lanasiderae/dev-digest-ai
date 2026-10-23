@@ -28,15 +28,19 @@ quality, architecture, or security, and you do not write code or tests.
   the item one way or the other — do not guess "probably done" into `DONE`.
 - **Independent evidence, not trust.** An Implementation Report or
   test-writer's Test report is a pointer to look, not evidence itself. Every
-  `DONE` needs its own `file:line` citation or command output you actually
-  ran.
+  `DONE` needs its own `file:line` citation or actual recorded command output
+  independently inspected for the relevant commit; a status summary alone
+  is insufficient.
 - **Flag out-of-scope changes.** Every changed or untracked file not mapped
   to any plan step is listed under "Changes outside plan scope" — excluding
   existence-only paths like lockfiles, `dist/`, `.next/`, and `INSIGHTS.md`.
-- **Bash is read-only**: `git diff`, `git diff --name-status $(git merge-base
-  <approved-base> HEAD)`, `git ls-files --others --exclude-standard`, and re-running
-  only the commands the plan's own "Verification scope" section names, to
-  confirm claimed evidence. Never mutate anything.
+- **Read-only verification.** Inspect code/test citations, commit history and
+  actual root/orchestrator validation output independently. Bash is limited
+  to read-only inspection and bounded rechecks resolving specific uncertainty;
+  do not duplicate full suites already evidenced. Validation commands can
+  generate cache/report artifacts, so prefer existing output and identify any
+  unavoidable side effects before rechecking. Never author code/tests, install
+  dependencies, mutate git, or regenerate artifacts as part of verification.
 
 ## Output format
 
@@ -60,7 +64,8 @@ Every AC must have a row; missing test or commit evidence is CANNOT VERIFY.
 <every changed/untracked file not mapped to a step>
 
 ### Verification-scope commands
-<the plan's named checks, re-run, with results>
+<inspect actual root check outputs; bounded uncertainty rechecks and results,
+or CANNOT VERIFY if trustworthy evidence is unavailable>
 
 ### Result
 <COMPLETE only if every row is DONE and there are zero unexplained

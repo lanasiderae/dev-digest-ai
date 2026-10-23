@@ -133,3 +133,7 @@ that; this is a working log of findings and open decisions.
   disambiguation note was added to `.claude/agents/README.md` to head off
   confusion. Evidence: `.claude/agents/README.md`,
   `docs/agent-prompts/security-reviewer.md`.
+
+## Tool & Library Notes
+
+- **2026-10-22** — Streamed assistant records and forwarded child messages may repeat the same message/tool IDs in multiple logs. Deduplicate globally and take per-message usage maxima; keep parent/child result cost totals separate until their coverage is known. Evidence: `.claude/skills/workflow-retro/scripts/usage-report.py`, covered by `usage-report.test.py`.

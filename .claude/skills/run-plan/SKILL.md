@@ -1,35 +1,41 @@
 ---
 name: run-plan
-description: Execute an approved AC-linked specification and implementation plan through independent implementation, tests, reviews and final traceability verification.
+description: Execute an already approved specification and AC-linked plan with focused tests, architecture review, bounded fixes and final traceability verification; does not create specifications or plans.
+disable-model-invocation: true
 ---
 
-Read the approved spec and plan paths supplied by the user (L05 defaults:
-`specs/l05/spec.md`, `specs/l05/plan.md`). Before implementation:
+Execute only on manual invocation. Consume approved spec and plan paths; never
+invoke spec-creator or implementation-planner from this skill. Supplemental
+prompts or designs may explain approved scope, never expand it. Return scope
+changes to the caller instead of silently redesigning requirements.
 
-- Confirm approval evidence, no unresolved clarification markers, unique AC IDs,
-  and every task linked to an AC. Return requirements gaps to spec-creator.
-- Require a saved cross-model plan review from a different model family. Record
-  actual reviewer identity and findings; if unavailable, report the missing gate
-  instead of labeling a same-family review cross-model.
-- Commit spec and plan before product implementation; record the commit SHA.
-  Preserve the user's fork and requested base branch, not an assumed main.
-- Check actual available budget/dashboard or ask if unavailable. Do not invent
-  quota or prices. Default to one worker at a time and a capable less expensive
-  model (Sonnet for these Claude agents); reserve expensive overrides for a
-  demonstrated need. Load only skills routed to current tasks.
+Confirm actual approval, unique AC IDs, no unresolved blockers, AC-linked tasks,
+a saved different-family cross-model review, and spec/plan commit before product
+code. Record actual reviewer/model identity and findings; unavailable evidence
+stays unavailable. Preserve the user's fork and base branch.
 
-Execute bounded tasks with implementer. Have test-writer independently derive
-non-trivial cases from ACs and the plan; do not have implementer author its own
-permission/business-flow coverage. Save implementation and test reports with
-AC/task/file/command evidence. Run package-required tests, typecheck, lint and
-audit; initially keep e2e to affected journeys and record what was omitted.
-Never disable all validation or auto-apply migrations.
+Check available budget/dashboard; if inaccessible report unknown and keep work
+bounded rather than inventing quota/prices. Respect the session's single-agent
+or multi-agent decision; ask once only if unanswered. Start conservatively with
+one worker and capable lower-cost models. Declared Claude roles use Sonnet for
+implementation, architecture review and verification; expensive overrides need
+a concrete reason. Load only relevant skills on demand.
 
-Run architecture-reviewer and applicable security review, address findings,
-then doc-writer. Run read-only plan-verifier **last**, supplying spec, plan,
-base/head, commit history, tests and reviews. Save its AC → task → test → commit
-report; do not claim complete with unresolved rows. Include reports in the PR.
+Run implementation → focused AC-derived tests → architecture review → bounded
+fix iterations (default maximum three) → final validation → plan-verifier last.
+Implementer may write tests; separate test-writer is skipped for the current run
+and remains optional. Capture AC/task/file/check evidence. An early read-only
+verifier checkpoint is useful for complex stages but cannot replace final
+verification after all fixes. Stop and report remaining findings after the fix
+limit; do not claim completion or loop indefinitely.
 
-After a completed pipeline, remind the user to manually invoke workflow-retro.
-Do not fabricate execution, cost, approval, or demo evidence. Recording a demo
-or publishing a PR requires the relevant authorization and real artifacts.
+Workers run focused relevant checks. After code stabilizes, root/orchestrator
+runs each touched package's required tests/typecheck/lint/audit once, plus
+bounded affected e2e/manual UI checks. Avoid duplicate whole-package runs; rerun
+only when fixes invalidate their evidence. Never disable all validation or
+apply migrations automatically. Run applicable security review and doc updates
+before the final read-only plan-verifier. Save AC → task → test → commit evidence
+and unresolved requirements; include the final report in the PR.
+
+Workflow-retro is manual only and is not executed by this pipeline. Do not
+fabricate execution, approval, cost or demo evidence.

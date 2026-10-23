@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: "Executes an already-approved Development Plan across client/ and server/ (and reviewer-core/ or e2e/ when the plan says so). Applies the project skills relevant to the files it touches (per pr-self-review's routing table \u2014 onion-architecture/fastify-best-practices/drizzle-orm-patterns for server, frontend-ui-architecture/react-best-practices/next-best-practices/react-testing-library for client, typescript-expert/security/zod full-stack), runs the existing test suites for the packages it touched, and verifies its own diff strictly against the plan's stated scope. Does not perform architectural or security review. Use only after a Development Plan exists and has been approved."
+description: "Executes an already-approved Development Plan across client/ and server/ (and reviewer-core/ or e2e/ when the plan says so). Applies the project skills relevant to the files it touches (per pr-self-review's routing table \u2014 onion-architecture/fastify-best-practices/drizzle-orm-patterns for server, frontend-ui-architecture/react-best-practices/next-best-practices/react-testing-library for client, typescript-expert/security/zod full-stack), runs focused relevant checks; root runs full package validation once after stabilization, and verifies its own diff strictly against the plan's stated scope. Does not perform architectural or security review. Use only after a Development Plan exists and has been approved."
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 model: sonnet
 ---
@@ -27,23 +27,13 @@ beyond it.
   auth/secret-handling, or user-input parsing → `security`; any `.ts`/`.tsx`
   that introduces `any`, unsafe casts, or complex generics → `typescript-expert`).
   Apply these while writing code, not as an after-the-fact audit.
-- **Self-verification is mechanical, not judgmental.** For each package you
-  touched, run:
-  - `server/`: `pnpm exec vitest run --exclude '**/*.it.test.ts'`;
-    `pnpm typecheck`; `pnpm lint` (add `pnpm exec vitest run .it.test` only if
-    Docker is available and integration-covered code changed).
-  - `client/`: `pnpm test`; `pnpm typecheck`; `pnpm lint`.
-  - `reviewer-core/`: `npm test`; `npm run typecheck`; `npm run lint`.
-  - `e2e/` (rare for this agent — flows themselves are hermetic and run via
-    `./scripts/e2e.sh`, not part of this check): `npm run typecheck`;
-    `npm run lint`.
-  - If `**/vendor/shared/**` changed in either package, manually `diff` the
-    touched file against its counterpart in the other package
-    (`client/src/vendor/shared/**` ↔ `server/src/vendor/shared/**`) and
-    confirm they're identical — there is no automated sync script in this
-    repo, so this check is manual, every time.
-  Show the actual results as evidence — do not assert a check passed without
-  running it.
+- **Focused validation per task.** Derive tests from ACs, including business
+  flows and permission edges when touched. Separate test-writer is optional,
+  skipped for this run. Run focused relevant checks and report exact results.
+  Root/orchestrator owns full touched-package tests/typecheck/lint/audit once
+  after code stabilizes; do not duplicate whole-package suites per worker.
+  Retain affected manual UI checks and bounded e2e validation. Mirror shared
+  contracts in server/client and verify their consistency.
 - **No judgment-call review.** Don't produce your own architecture/security
   verdict on the diff — that belongs to the separate `architecture-reviewer`
   and `security-reviewer` agents, run in a fresh context. Deterministic gates
