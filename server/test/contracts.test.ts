@@ -4,6 +4,8 @@ import {
   Finding,
   Intent,
   BlastRadius,
+  BlastDegradedReason,
+  BlastRadiusResponse,
   Risks,
   PrHistory,
   SmartDiff,
@@ -16,6 +18,7 @@ import {
   Repo,
   PrDetail,
 } from '@devdigest/shared';
+import type { DegradedReason } from '../src/modules/repo-intel/types.js';
 
 /**
  * Contract tests — parse/round-trip the fixtures from data.jsx/data2.jsx
@@ -102,6 +105,45 @@ describe('AI contracts parse fixtures', () => {
         ],
       }),
     ).not.toThrow();
+  });
+
+  it('BlastRadiusResponse round-trips a degraded and a non-degraded fixture', () => {
+    const nonDegraded = BlastRadiusResponse.parse({
+      blast: {
+        changed_symbols: [{ name: 'rateLimit', file: 'a.ts', kind: 'function' }],
+        downstream: [
+          {
+            symbol: 'rateLimit',
+            callers: [{ name: 'publicRouter', file: 'b.ts', line: 23 }],
+            endpoints_affected: ['GET /x'],
+            crons_affected: [],
+          },
+        ],
+        summary: '1 changed symbol · 1 caller in 1 file · 1 endpoint',
+      },
+      degraded: false,
+      reason: null,
+    });
+    expect(nonDegraded.degraded).toBe(false);
+
+    const degraded = BlastRadiusResponse.parse({
+      blast: { changed_symbols: [], downstream: [], summary: "No changed symbols detected in this PR's diff." },
+      degraded: true,
+      reason: 'index_partial',
+    });
+    expect(degraded.reason).toBe('index_partial');
+  });
+
+  it('BlastDegradedReason never drifts from repo-intel\'s DegradedReason union', () => {
+    // Fails to COMPILE if either union gains/loses a member the other doesn't have.
+    const _exhaustive: Record<DegradedReason, true> = {
+      flag_off: true,
+      index_failed: true,
+      index_partial: true,
+      repo_too_large: true,
+      no_data: true,
+    };
+    expect(new Set(BlastDegradedReason.options)).toEqual(new Set(Object.keys(_exhaustive)));
   });
 
   it('SmartDiff (data.jsx DIFF)', () => {

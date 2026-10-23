@@ -1,7 +1,7 @@
 ## Overview
 
 Course-starter for an agentic PR-reviewer (import a PR → AI agent review →
-grounded findings). Four standalone packages, no workspace, all TypeScript:
+grounded findings). Five standalone packages, no workspace, all TypeScript:
 
 - `server/` (`@devdigest/api`) — Fastify 5 API + Drizzle ORM
   (Postgres/pgvector), `:3001`.
@@ -13,6 +13,9 @@ grounded findings). Four standalone packages, no workspace, all TypeScript:
 - `e2e/` (`@devdigest/e2e`) — deterministic browser flows, driven by the
   `agent-browser` CDP CLI (a separate global tool, not an npm dependency —
   see `e2e/AGENTS.md`).
+- `mcp-server/` (`@devdigest/mcp-server`) — a local stdio MCP server, a thin
+  HTTP client of `server/`'s API exposing 5 tools to an MCP-capable agent
+  (see `mcp-server/AGENTS.md`).
 
 Sharing is via tsconfig path aliases, not publishing. Only Postgres
 (pgvector) runs in Docker.
@@ -36,16 +39,25 @@ Other top-level folders (not packages — no `package.json`, nothing to
   pnpm db:migrate && pnpm db:seed && pnpm dev` → `cd client && pnpm install
   && pnpm dev`.
 - Validation (phase 4 below) — the exact command per package. Note the
-  package-manager split: `server`/`client` use **pnpm**, `reviewer-core`/`e2e`
-  use **npm**.
+  package-manager split: `server`/`client` use **pnpm**,
+  `reviewer-core`/`e2e`/`mcp-server` use **npm**. Every package also has an
+  `audit` script (`pnpm audit`/`npm audit`) — run it as part of validation.
+  It's CI-enforced (fails the build) for `e2e` and `mcp-server`, which are
+  currently clean; `server`, `client`, and `reviewer-core` still carry
+  pre-existing vulnerabilities that need dependency bumps (some breaking) to
+  clear, so their CI step is report-only (`continue-on-error`) until that's
+  done — don't read a clean exit there as "no known vulnerabilities."
   - `cd server && pnpm exec vitest run --exclude '**/*.it.test.ts' && pnpm
-    typecheck && pnpm lint` — unit lane, hermetic (no Docker). Integration is
-    the separate `pnpm exec vitest run .it.test` and needs Docker; plain
-    `pnpm test` runs both and will fail without it.
-  - `cd client && pnpm test && pnpm typecheck && pnpm lint`
-  - `cd reviewer-core && npm test && npm run typecheck && npm run lint`
-  - `cd e2e && npm run typecheck && npm run lint` — flows are
+    typecheck && pnpm lint && pnpm audit` — unit lane, hermetic (no Docker).
+    Integration is the separate `pnpm exec vitest run .it.test` and needs
+    Docker; plain `pnpm test` runs both and will fail without it.
+  - `cd client && pnpm test && pnpm typecheck && pnpm lint && pnpm audit`
+  - `cd reviewer-core && npm test && npm run typecheck && npm run lint &&
+    npm audit`
+  - `cd e2e && npm run typecheck && npm run lint && npm audit` — flows are
     `./scripts/e2e.sh` (hermetic), not part of typecheck.
+  - `cd mcp-server && npm test && npm run typecheck && npm run lint && npm
+    audit`
 - Anything beyond the above is in each package's own
   `AGENTS.md`/`README.md` — don't assume a script name without checking
   there first.
@@ -137,10 +149,11 @@ Non-trivial changes in this repo follow five phases:
   a repo-wide pattern (client/reviewer-core's CI does just run their plain
   `test` script).
 - Lock files (`client/pnpm-lock.yaml`, `server/pnpm-lock.yaml`,
-  `reviewer-core/package-lock.json`, `e2e/package-lock.json`, root
-  `skills-lock.json`) — generated artifacts; don't hand-edit them. Let the
-  package manager (`pnpm install`/`npm install`) regenerate the 4 per-package
-  ones. `skills-lock.json` tracks externally-sourced skills (GitHub) listed
+  `reviewer-core/package-lock.json`, `e2e/package-lock.json`,
+  `mcp-server/package-lock.json`, root `skills-lock.json`) — generated
+  artifacts; don't hand-edit them. Let the package manager
+  (`pnpm install`/`npm install`) regenerate the 5 per-package ones.
+  `skills-lock.json` tracks externally-sourced skills (GitHub) listed
   in `.claude/skills/README.md`'s catalog — no in-repo regeneration command
   is known; don't hand-edit its hashes.
 - Never run `docker compose down -v` against the dev stack — `-v` deletes the
@@ -149,9 +162,9 @@ Non-trivial changes in this repo follow five phases:
 ## Gotchas
 
 - Empty-looking UI sections, unused DB tables, and unimplemented routes
-  (Skills, Memory, Eval pipeline, Blast Radius, multi-agent review, CI
-  export, …) are intentional scaffolding for future course lessons (L01–L08)
-  — not bugs to fix or dead code to remove.
+  (Skills, Memory, Eval pipeline, multi-agent review, CI export, …) are
+  intentional scaffolding for future course lessons (L01–L08) — not bugs to
+  fix or dead code to remove.
 - Only Postgres is Dockerized — if the API/web won't start, check `pnpm dev`
   output in `server/`/`client/`, not `docker compose logs`.
 - Port `5432` already in use → another Postgres is running; stop it or
@@ -167,8 +180,8 @@ Non-trivial changes in this repo follow five phases:
 - `docs/agent-prompts/README.md` — read before creating or editing an agent
   system prompt.
 - `server/AGENTS.md`, `client/AGENTS.md`, `reviewer-core/AGENTS.md`,
-  `e2e/AGENTS.md` (+ each package's own `README.md`) — read before working
-  inside that package.
+  `e2e/AGENTS.md`, `mcp-server/AGENTS.md` (+ each package's own `README.md`)
+  — read before working inside that package.
 - `e2e/specs/*.flow.json` — read before adding or changing an e2e flow.
 - `.claude/rules/` — always-applied project rules (distinct from
   `.claude/skills/`, which loads on-demand); currently empty. Read it before

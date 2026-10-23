@@ -28,6 +28,17 @@
 
 ## Codebase Patterns
 
+- **2026-10-22** — `pull_requests` has no dedicated merge-timestamp column —
+  `status` ('open'/'merged'/'closed') IS the GitHub merge state (confirmed
+  by `pulls/status.ts:89`'s `ghStatus === 'merged'` check), and `updated_at`
+  is the closest available timestamp to "when it merged", not an exact one.
+  A feature needing "when was this PR merged" (e.g. the new
+  `history`/`getPriorPrsWithFileOverlap` feature) must fall back through
+  `updatedAt ?? openedAt ?? null` rather than assuming a real merge
+  timestamp exists. Evidence: `server/src/db/schema/pulls.ts:5-34` (no
+  `mergedAt` field), `server/src/modules/history/helpers.ts`
+  (`toPrHistoryItem`'s fallback chain).
+
 - **2026-09-29** — Not every GET route's response is Zod-validated despite
   `server/AGENTS.md`'s "schema-first... one definition drives both request
   validation and response serialization" convention: `/repos/:id/pulls`,
@@ -141,6 +152,17 @@
   `groundFindings`. Evidence: `server/src/modules/pulls/routes.ts`
   (the smart-diff handler's `eq(t.findings.kind, 'finding')` filter).
 
+- **2026-10-22** — Blast Radius's caller-dedup must be scoped PER changed-symbol
+  group (`viaSymbol`), not globally across `result.callers`: the same
+  `file|symbol|line` caller location can legitimately appear under two
+  different changed symbols when one function calls both of them (e.g. a
+  caller invoking both `symA` and `symB` from the same line of its own body).
+  A dedup key of just `file|symbol|line` silently drops that caller from the
+  second group; the key must include `viaSymbol` as its first segment.
+  Evidence: `server/src/modules/blast/helpers.ts:44` (the four-part key),
+  `server/test/blast-grouping.test.ts` ("a caller row reaching two different
+  changed symbols from the same file/symbol/line survives in both groups").
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
@@ -217,3 +239,19 @@
   `server/test/pulls-smart-diff.it.test.ts` (each file's `openrouter:`
   override line), `server/test/helpers/runs.ts` (`waitForPrRuns`'s 10s
   default `timeoutMs`).
+- **2026-10-22** — `waitForPrRuns` only polled `agent_runs.status`, but
+  `ReviewRunExecutor` persists a terminal `status` and the run's
+  `run_traces` document as two sequential, non-transactional awaits
+  (status first — `specs/review-flow.md` documents this as steps 3 then 4
+  deliberately, so don't "fix" it by reordering production code). A caller
+  can observe the terminal status before the trace row exists; the window
+  is normally sub-millisecond so it rarely loses, but widened enough on a
+  CI runner to fail `review-run-skills.it.test.ts` with "Cannot read
+  properties of undefined (reading 'skills')" on `trace.prompt_assembly`,
+  right after the identical server code passed on the prior CI run.
+  `reviews.it.test.ts` has the same `waitForPrRuns` → `GET /runs/:id/trace`
+  pattern and carries the same latent risk. Fixed by making
+  `waitForPrRuns` also poll `run_traces` for each terminal run id before
+  returning. Evidence: `server/src/modules/reviews/run-executor.ts:300-345`
+  (`completeAgentRun` before `saveRunTrace`, same order in the `failAll`
+  and catch branches), `server/test/helpers/runs.ts` (`tracesExist`).

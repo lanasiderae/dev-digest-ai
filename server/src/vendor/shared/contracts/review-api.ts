@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Finding, Verdict } from './findings.js';
-import { Intent, SmartDiff } from './brief.js';
+import { BlastRadius, Intent, SmartDiff } from './brief.js';
 
 /**
  * A2 — Review-Core API surface contracts. These extend the core
@@ -85,3 +85,33 @@ export type PrIntentResponse = z.infer<typeof PrIntentResponse>;
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;
 export type SmartDiffResponse = z.infer<typeof SmartDiffResponse>;
+
+/**
+ * Why the blast radius for a PR is incomplete. Mirrors the repo-intel layer's
+ * own degraded vocabulary so the UI can explain *which* kind of gap it hit
+ * (flag off vs. never indexed vs. partial index) instead of showing an empty
+ * card that is indistinguishable from "nothing downstream".
+ */
+export const BlastDegradedReason = z.enum([
+  'flag_off',
+  'index_failed',
+  'index_partial',
+  'repo_too_large',
+  'no_data',
+]);
+export type BlastDegradedReason = z.infer<typeof BlastDegradedReason>;
+
+/**
+ * Response of `GET /pulls/:id/blast`. The `blast` payload is ALWAYS present —
+ * a blast radius with no downstream callers is a real answer, not an absence,
+ * so it is never null (unlike `PrIntentResponse.intent`, where "not generated
+ * yet" genuinely has no payload). `degraded` answers the orthogonal question
+ * "could the index fully answer this?", and is a required boolean (never
+ * `undefined`) so no consumer has to distinguish absent-from-false.
+ */
+export const BlastRadiusResponse = z.object({
+  blast: BlastRadius,
+  degraded: z.boolean(),
+  reason: BlastDegradedReason.nullable(),
+});
+export type BlastRadiusResponse = z.infer<typeof BlastRadiusResponse>;

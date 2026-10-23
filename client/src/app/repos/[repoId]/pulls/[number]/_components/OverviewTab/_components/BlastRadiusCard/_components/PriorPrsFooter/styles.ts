@@ -1,0 +1,47 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  root: {
+    borderTop: "1px solid var(--border)",
+    paddingTop: 12,
+    marginTop: 2,
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  } satisfies CSSProperties,
+  trigger: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    cursor: "pointer",
+    userSelect: "none",
+    borderRadius: 6,
+    padding: "4px 6px",
+    margin: "-4px -6px",
+    transition: "background .1s",
+  } satisfies CSSProperties,
+  triggerStatic: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    color: "var(--text-muted)",
+    padding: "4px 6px",
+    margin: "-4px -6px",
+  } satisfies CSSProperties,
+  title: { color: "var(--text-secondary)", flex: 1, minWidth: 0 } satisfies CSSProperties,
+  count: { fontSize: 12, color: "var(--text-muted)", flexShrink: 0, whiteSpace: "nowrap" } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 10 } satisfies CSSProperties,
+  item: {
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: 10,
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  } satisfies CSSProperties,
+  itemHeader: { display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 } satisfies CSSProperties,
+  itemTitle: { fontWeight: 600, color: "var(--text-primary)" } satisfies CSSProperties,
+  itemMeta: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+} as const;

@@ -39,6 +39,15 @@ export class ReviewRepository {
     return pullRepo.getPrFiles(this.db, prId);
   }
 
+  /** Prior merged PRs in the same repo that touched any of `filePaths`. */
+  getPriorPrsWithFileOverlap(
+    repoId: string,
+    excludePrId: string,
+    filePaths: string[],
+  ): Promise<pullRepo.PriorPrOverlap[]> {
+    return pullRepo.getPriorPrsWithFileOverlap(this.db, repoId, excludePrId, filePaths);
+  }
+
   // ---- reviews + findings -------------------------------------------------
 
   insertReview(values: {
