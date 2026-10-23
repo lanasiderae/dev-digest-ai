@@ -13,6 +13,16 @@
   (`initial?: { name?, description?, type?, body?, source?, evidenceFiles? }`),
   used blank from `SkillsListView.tsx` and prefilled from
   `client/src/app/repos/[repoId]/conventions/_components/ConventionsView/ConventionsView.tsx`.
+- **2026-10-23** — `RunTraceDrawer`'s existing `PromptBlock` sub-component
+  already defaults `open` to `false` and renders `{text || "—"}` verbatim
+  inside a `<pre>` — i.e. it already is a "collapsed-by-default, reveal-exact-
+  text-on-expand" component, not something specific to the Prompt assembly
+  section. Passing it a new `label`/`color` reused it as-is for L05's literal
+  `project context attached specs` expandable section, satisfying that AC's
+  "collapsed by default" and "verbatim, no re-wrapping" requirements for free
+  (plus copy/fullscreen for free). Prefer reusing it over writing a bespoke
+  collapsible whenever a new trace sub-section needs the same shape. Evidence:
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/ProjectContextSection/ProjectContextSection.tsx`.
 
 ## What Doesn't Work
 
@@ -150,6 +160,21 @@
   which is what lets a test actually assert which element got scrolled into
   view. Evidence: `client/src/test/setup.ts`,
   `client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/RoleGroup/RoleGroup.test.tsx`.
+- **2026-10-23** — RTL's `getByText`/`queryByText` apply a default normalizer
+  that collapses whitespace (including newlines) on the RENDERED text before
+  comparing, but do not normalize a multiline string passed in as the
+  matcher — so asserting a `<pre>` block renders a multiline string
+  byte-for-byte (e.g. "reveal this trace snapshot verbatim, no re-wrapping")
+  can never pass via `getByText(multilineString)`: the matcher still has
+  literal `\n`, the normalized rendered text has those collapsed to spaces.
+  Use `container.querySelector("pre")?.textContent` and `toBe(exactString)`
+  instead, bypassing the normalizer entirely. Distinct from the existing
+  `getByDisplayValue`-on-multiline-textarea entry above — this is the same
+  family of gotcha but a different RTL query (`getByText`) and a different
+  element (`<pre>`, not `<textarea>`). Evidence:
+  `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/ProjectContextSection/ProjectContextSection.test.tsx`
+  ("collapses the attached-specs section by default and reveals the exact
+  text, unmodified, on expand").
 
 ## Recurring Errors & Fixes
 
