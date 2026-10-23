@@ -16,6 +16,7 @@
     { "cmd": ["wait", "--text", "static-smoke-fixture"] },
     { "cmd": ["find", "role", "button", "click", "--name", "Open run trace & logs", "--exact"] },
     { "cmd": ["wait", "--text", "project context attached specs"] },
+    { "cmd": ["scrollintoview", "button[aria-label='project context attached specs']"] },
     { "cmd": ["find", "role", "button", "click", "--name", "project context attached specs", "--exact"] },
     { "cmd": ["wait", "--text", "The api/ module must not import db/ directly."] }
   ]

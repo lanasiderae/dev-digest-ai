@@ -52,6 +52,7 @@ export function PromptBlock({
             nested button instead of toggling open). */}
         <button
           type="button"
+          aria-label={label}
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
           style={s.promptToggleButton}
