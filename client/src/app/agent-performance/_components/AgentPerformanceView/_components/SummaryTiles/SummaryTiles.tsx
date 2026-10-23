@@ -30,7 +30,7 @@ export function SummaryTiles({
         value={
           <>
             {formatPercent(summary.avg_accept_rate)}
-            <span style={s.decisionsNote}> · {t("summary.decisionsMatched", { count: decisions })}</span>
+            <span style={s.decisionsNote}>· {t("summary.decisionsMatched", { count: decisions })}</span>
           </>
         }
       />
