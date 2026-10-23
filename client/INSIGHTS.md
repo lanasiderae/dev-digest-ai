@@ -335,3 +335,7 @@
   `app/agents/[id]/page.tsx` independently filters the query through `VALID_TABS`.
   Include new tab keys there or deep links and clicks silently render Config;
   the L05 context browser flow caught this missing route-level wiring.
+- **2026-10-23** — Running hermetic and dev Next servers from one checkout
+  with different public API URLs must use separate `distDir` values; shared
+  `.next` assets made the dev browser call the stopped test API on port 3101.
+  `next.config.mjs` now selects `.next-e2e` for `E2E_FIXTURES=1`; the user confirmed recovery and all 10 concurrent-stack smoke flows passed.
