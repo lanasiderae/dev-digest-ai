@@ -110,3 +110,33 @@ Required before this plan can be treated as approved/committed:
 Minor items D1–D3 should be addressed but do not block plan approval on their own.
 
 This review does not approve or implement anything on the user's behalf; it is input for the user's own manual plan-approval decision.
+
+---
+
+## Disposition record (applied 2026-10-22, by `implementation-planner`, coordinator-persisted)
+
+The plan was revised in response to this review. The revised plan is `docs/sdd/l05/plan.md` (not yet re-reviewed or approved). This record is the "finding dispositions" evidence required before further plan approval.
+
+- **B1 (blocking — model-family identity): APPLIED.** Added an explicit "Plan-author / reviewer identity" paragraph to the plan's Scope section recording plan author = Codex implementation-planner (GPT family, exact variant not exposed) and reviewer = Anthropic `claude-sonnet-5` (confirmed via this review's own `plan-review-receipt.json` `modelUsage` field, not self-description). States the families differ and this satisfies SDD-AC-04, and explicitly flags the receipt's auxiliary `claude-haiku-4-5-20251001` entry as CLI-side auxiliary usage, not a second reviewer.
+
+- **A1 (major — traceability drift): APPLIED, with one finding explicitly REJECTED.** Ran a full mechanical cross-check of all 49 AC-IDs' inline task brackets against their Traceability table rows. Fixed three table rows (added Task 03 to CTX-AC-04; Task 05 to CTX-AC-08; Task 08 to BRIEF-AC-03) and five task brackets (TASK-01 dropped SDD-AC-09/10 and BRIEF-AC-20; TASK-07 dropped BRIEF-AC-09; TASK-12 dropped CTX-AC-09; TASK-15 added BRIEF-AC-08 and ONBOARD-AC-10). Added an explicit "Traceability convention" paragraph to the plan distinguishing "bracket = touches/depends-on" from "table row = primary evidence" so broad-range foundational/review tasks (02, 12, 13) legitimately appearing in more brackets than rows is not re-flagged as drift. **Rejected:** this review's own claim (coordinator note above) that the ONBOARD-AC-09 row `01,13–15` omits Task 14 — the range `13–15` already includes 13, 14 and 15. No plan change was made for that specific allegation; it is recorded here as a reviewer error, not applied.
+
+- **C1 (major — unjustified serialization): APPLIED.** Verified actual file sets against the live repo. No file-level collision exists between TASK-07 (`repo-intel/*` only) and Context's files — relaxed TASK-07's dependency from "02; Context backend must stabilize first" to "02" only. No file-level collision exists between TASK-09 (`OverviewTab`/`PrBriefCard`/brief hooks/messages) and TASK-05 (`AgentEditor`/`ProjectContextSelector`/settings messages) — relaxed TASK-09's dependency from "02/08; Context UI complete first" to "02/08" only. TASK-10 does have a real but narrow shared artifact (`server/src/modules/index.ts`, edited by TASK-03/08/10 as one import + one entry each) — kept TASK-10's functional dependency on 04/07/08 but replaced the vague "stable conventions" clause with this named-file, single-line-edit sequencing note instead of full-task-completion gating. Updated the plan's Verification-scope dependency-order prose to match all three relaxations.
+
+- **D1 (minor — cached vs. live reviewer identity): APPLIED.** Added explicit AC-derived test requirements to TASK-08 (API/response-shape test keeping cached-provenance and live-selector fields distinct) and TASK-09 (UI test asserting the two render as visibly distinct elements even when they currently show the same name).
+
+- **D2 (minor — unverified signatures): APPLIED, with one correction to the claim verified.** Read the actual baseline code and confirmed `server/src/adapters/tokenizer/index.ts` (`Tokenizer.count` is the only member; `cl100k_base`; sticky fallback to `approxTokens` on load/encode failure — matches the plan's prior assertion exactly). Confirmed `server/src/modules/repo-intel/service.ts`'s `getFileRank` → `Promise<FileRankRow[]>` (`{path, percentile}`) and `getTopFilesByRank` → `Promise<string[]>` (paths only) — also independently re-verified by the coordinator directly against the source, not just taken from the subagent's report. Additionally discovered (not previously stated in the plan) that the indexer's underlying `IndexerFileRankRow` does store raw `rank`/`hotness`, and that `hotness` is currently hardcoded to `0` for every row across all three pipeline paths (`rank.ts`, `full.ts`, `incremental.ts`) — this was independently confirmed via `grep` and added as a citation to the plan's Architectural constraints and referenced inline in TASK-04/TASK-07.
+
+- **D3 (minor, informational — preliminary vs. final verifier): APPLIED.** Tightened TASK-14's wording to require the "preliminary" label appear visibly in the video/PR text itself, not just in planning notes, and tightened TASK-15's wording to state explicitly that its report is the only output citable as "final" for delivery-evidence purposes.
+
+No product code was touched while producing this revision.
+
+## User plan approval (2026-10-22)
+
+The user approved this revised plan with the instruction: "forget about codex. we dont have token to run it now. approved." Recorded disposition:
+
+- **Codex re-engagement:** dropped. The user has no budget to run Codex again right now. This revision's B1–D3 fixes were produced by a Claude-family `implementation-planner` subagent, not Codex — see the plan's Scope section, "This revision's own authorship" note.
+- **Cross-family re-review of this revision:** explicitly waived by the user, not performed. The revision is therefore same-family with its own fixer (Claude reviewing/revising Claude-produced changes); it does not carry a second genuine cross-family pass. Only the *original* draft's cross-family review (Codex-authored, Claude-reviewed) stands as the SDD-AC-04 evidence.
+- **Plan approval:** granted. This satisfies the manual reviewed-plan-approval gate required before `run-plan` execution for this revision; no further approval loop is needed to proceed.
+
+Both artifacts (`plan.md`, this file) are to be committed as the next stage commit before any product code, per the workflow's commit-before-implementation rule.
