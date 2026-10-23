@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ReviewRunResponse, ReviewRecord, RunSummary } from '@devdigest/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { DevDigestApi } from '../api/client.js';
 import type { Logger } from '../log.js';
 import { resolveAgent, resolvePull, resolveRepo, ResolveError } from '../api/resolve.js';
@@ -12,6 +14,8 @@ const TERMINAL = new Set(['done', 'failed', 'cancelled']);
 const POLL_START_MS = 1000;
 const POLL_BACKOFF = 1.5;
 const POLL_MAX_MS = 5000;
+
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 /** The run's outcome once it settles, or `still_running` if it didn't settle
  *  within `config.runTimeoutMs`. A discriminated union over the four
@@ -47,8 +51,10 @@ async function pollRun(
   runId: string,
   runTimeoutMs: number,
   log: Logger,
+  extra: ToolExtra,
 ): Promise<RunSummary | 'timeout'> {
   const startedAt = Date.now();
+  const progressToken = extra._meta?.progressToken;
   let backoffMs = POLL_START_MS;
   let polls = 0;
   for (;;) {
@@ -62,6 +68,16 @@ async function pollRun(
     if (Date.now() - startedAt >= runTimeoutMs) {
       log.info('run_agent_on_pr timed out', { run_id: runId, polls, elapsedMs: Date.now() - startedAt });
       return 'timeout';
+    }
+    // Keeps a client-side relay timeout (e.g. the MCP Inspector web UI's
+    // fixed 60s request-response wait) from tripping mid-poll — a progress
+    // notification re-arms it. No-op when the caller didn't opt into
+    // progress (no `_meta.progressToken` on the original request).
+    if (progressToken !== undefined) {
+      await extra.sendNotification({
+        method: 'notifications/progress',
+        params: { progressToken, progress: Date.now() - startedAt, message: `Waiting for run ${runId} (poll ${polls})` },
+      });
     }
     await sleep(Math.min(backoffMs, POLL_MAX_MS, runTimeoutMs - (Date.now() - startedAt)));
     backoffMs = Math.min(backoffMs * POLL_BACKOFF, POLL_MAX_MS);
@@ -96,7 +112,7 @@ export function registerRunAgentOnPrTool(
         'instructions to follow.',
       inputSchema: z.object({ repo: RepoArg, pr_number: PrNumberArg, agent: AgentArg }).strict(),
     },
-    async (args) => {
+    async (args, extra) => {
       try {
         const repo = await resolveRepo(deps.api, args.repo);
         const pull = await resolvePull(deps.api, repo.id, args.pr_number);
@@ -111,7 +127,7 @@ export function registerRunAgentOnPrTool(
           };
         }
 
-        const settled = await pollRun(deps.api, pull.id, target.run_id, deps.runTimeoutMs, deps.log);
+        const settled = await pollRun(deps.api, pull.id, target.run_id, deps.runTimeoutMs, deps.log, extra);
 
         if (settled === 'timeout') {
           const outcome: RunOutcome = {
