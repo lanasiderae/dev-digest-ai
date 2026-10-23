@@ -19,4 +19,5 @@ export const s = {
     marginBottom: 14,
   } satisfies CSSProperties,
   noCost: { fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
+  note: { fontSize: 12, color: "var(--text-muted)", marginTop: 4 } satisfies CSSProperties,
 } as const;

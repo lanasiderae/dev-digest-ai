@@ -55,6 +55,7 @@ export function StatsTab({ agent }: { agent: Agent }) {
             <MetricCard label={t("stats.metrics.avgCost")} value={formatCost(data.avg_cost_usd)} />
             <MetricCard label={t("stats.metrics.avgLatency")} value={formatDuration(data.avg_latency_ms)} />
           </div>
+          <p style={s.note}>{t("stats.costEstimateNote")}</p>
 
           <div style={s.section}>
             <div style={s.sectionLabel}>{t("stats.severity")}</div>

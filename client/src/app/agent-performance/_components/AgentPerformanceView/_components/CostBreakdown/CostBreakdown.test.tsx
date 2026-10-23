@@ -29,4 +29,18 @@ describe("CostBreakdown", () => {
     renderBreakdown([], []);
     expect(screen.getAllByText("No cost recorded yet.")).toHaveLength(2);
   });
+
+  it("labels cost as a DevDigest estimate, not reconciled billing, when any breakdown has data", () => {
+    renderBreakdown([{ label: "Security Reviewer", value: 1.2 }], []);
+    expect(
+      screen.getByText("Cost is a DevDigest estimate (via PriceBook, from recorded token usage) — not reconciled provider billing."),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the estimate note when there is no cost to show at all", () => {
+    renderBreakdown([], []);
+    expect(
+      screen.queryByText("Cost is a DevDigest estimate (via PriceBook, from recorded token usage) — not reconciled provider billing."),
+    ).not.toBeInTheDocument();
+  });
 });

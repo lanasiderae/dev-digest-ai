@@ -23,23 +23,26 @@ export function CostBreakdown({
 }) {
   const t = useTranslations("agentPerformance");
   return (
-    <div style={s.row}>
-      <div style={s.panel}>
-        <div style={s.panelLabel}>{t("costByAgent")}</div>
-        {costByAgent.length === 0 ? (
-          <div style={s.noCost}>{t("noCost")}</div>
-        ) : (
-          <Donut segments={toDonutSegments(costByAgent)} />
-        )}
+    <div>
+      <div style={s.row}>
+        <div style={s.panel}>
+          <div style={s.panelLabel}>{t("costByAgent")}</div>
+          {costByAgent.length === 0 ? (
+            <div style={s.noCost}>{t("noCost")}</div>
+          ) : (
+            <Donut segments={toDonutSegments(costByAgent)} />
+          )}
+        </div>
+        <div style={s.panel}>
+          <div style={s.panelLabel}>{t("costByModel")}</div>
+          {costByModel.length === 0 ? (
+            <div style={s.noCost}>{t("noCost")}</div>
+          ) : (
+            <Donut segments={toDonutSegments(costByModel)} />
+          )}
+        </div>
       </div>
-      <div style={s.panel}>
-        <div style={s.panelLabel}>{t("costByModel")}</div>
-        {costByModel.length === 0 ? (
-          <div style={s.noCost}>{t("noCost")}</div>
-        ) : (
-          <Donut segments={toDonutSegments(costByModel)} />
-        )}
-      </div>
+      {(costByAgent.length > 0 || costByModel.length > 0) && <p style={s.note}>{t("costEstimateNote")}</p>}
     </div>
   );
 }

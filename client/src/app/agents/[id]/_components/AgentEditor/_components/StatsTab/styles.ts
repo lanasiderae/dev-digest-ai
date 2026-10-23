@@ -15,4 +15,5 @@ export const s = {
     textTransform: "uppercase",
   } satisfies CSSProperties,
   severityRow: { display: "flex", gap: 10, flexWrap: "wrap" } satisfies CSSProperties,
+  note: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
 } as const;

@@ -219,16 +219,34 @@ export function toAgentPerf(rawByAgent: AgentStatsRawGroup[], estimate: Estimate
   const totalDecisions = totalAccepted + totalDismissed;
   const avg_accept_rate = totalDecisions > 0 ? round4(totalAccepted / totalDecisions) : null;
 
-  const costRows = rows.filter((r): r is AgentPerfRow & { total_cost_usd: number } => r.total_cost_usd != null);
-  const total_cost_usd = costRows.length > 0 ? round2(sum(costRows.map((r) => r.total_cost_usd))) : null;
-
   const most_active_agent = pickMostActive(rows);
 
-  const cost_by_agent: PerfCostSegment[] = costRows
-    .map((r) => ({ label: r.agent_name, value: r.total_cost_usd }))
-    .sort((a, b) => b.value - a.value);
+  // `total_cost_usd` is the single source of truth: round the flat raw sum
+  // ONCE. `cost_by_agent`/`cost_by_model` must each independently round a
+  // per-group subtotal to display it (that's what a "breakdown" is) — but
+  // rounding every subtotal on its own, same-direction, can land the
+  // segment sum a whole cent or more away from that total (two agents each
+  // summing to a raw $0.015 round to $0.02 apiece = $0.04, while the same
+  // $0.03 raw grand total rounds once to $0.03). That's not floating-point
+  // noise, it's "sum of independently-rounded parts != round of the sum" —
+  // unavoidable with plain per-segment rounding, so both breakdowns use
+  // largest-remainder apportionment (`allocateCents`) instead: round every
+  // segment down to the cent, then hand the few leftover pennies to the
+  // segments with the largest fractional remainder, until the segments sum
+  // EXACTLY to `total_cost_usd` (AC-04), not just approximately.
+  const rawCostByAgent = buildRawCostByAgent(rawByAgent, estimate);
+  const totalRaw = sum([...rawCostByAgent.values()].map((a) => a.raw));
+  const total_cost_usd = rawCostByAgent.size > 0 ? round2(totalRaw) : null;
 
-  const cost_by_model = buildCostByModel(rawByAgent, estimate);
+  const cost_by_agent: PerfCostSegment[] =
+    total_cost_usd != null
+      ? allocateCents(
+          [...rawCostByAgent.values()].map((a) => ({ label: a.name, raw: a.raw })),
+          total_cost_usd,
+        ).sort((a, b) => b.value - a.value)
+      : [];
+
+  const cost_by_model = buildCostByModel(rawByAgent, estimate, total_cost_usd);
 
   return {
     summary: { runs, total_cost_usd, avg_accept_rate, most_active_agent },
@@ -263,11 +281,16 @@ function pickMostActive(rows: AgentPerfRow[]): string | null {
 /**
  * Cost grouped by the model each run actually used (`agent_runs.model`, not
  * the agent's current config, which may have changed since) — built from
- * the SAME per-run costs as `cost_by_agent`/`summary.total_cost_usd`, so
- * reconciliation (AC-04) is structural rather than a second computation
- * that could drift.
+ * the SAME per-run costs as `cost_by_agent`/`summary.total_cost_usd`, with
+ * the same `allocateCents` apportionment so its segments sum EXACTLY to
+ * `totalCostUsd` (AC-04), not just approximately.
  */
-function buildCostByModel(rawByAgent: AgentStatsRawGroup[], estimate: Estimate): PerfCostSegment[] {
+function buildCostByModel(
+  rawByAgent: AgentStatsRawGroup[],
+  estimate: Estimate,
+  totalCostUsd: number | null,
+): PerfCostSegment[] {
+  if (totalCostUsd == null) return [];
   const byModel = new Map<string, number>();
   for (const g of rawByAgent) {
     for (const r of g.runs) {
@@ -277,7 +300,60 @@ function buildCostByModel(rawByAgent: AgentStatsRawGroup[], estimate: Estimate):
       byModel.set(key, (byModel.get(key) ?? 0) + cost);
     }
   }
-  return [...byModel.entries()]
-    .map(([label, value]) => ({ label, value: round2(value) }))
-    .sort((a, b) => b.value - a.value);
+  const entries = [...byModel.entries()].map(([label, raw]) => ({ label, raw }));
+  return allocateCents(entries, totalCostUsd).sort((a, b) => b.value - a.value);
+}
+
+/**
+ * Largest-remainder apportionment: splits `totalUsd` (already `round2`'d)
+ * across `entries` by their raw (unrounded) share, so the returned
+ * segments sum to EXACTLY `totalUsd` rather than each segment rounding
+ * independently and landing the sum a cent or more off. Standard method
+ * for "parts that must sum to a rounded whole" (the same approach used to
+ * apportion seats/percentages): round every entry down to the cent, then
+ * hand the few leftover pennies (`totalCents - sum of floors`) to the
+ * entries with the largest fractional remainder, one cent each.
+ */
+function allocateCents(entries: { label: string; raw: number }[], totalUsd: number): PerfCostSegment[] {
+  const totalCents = Math.round(totalUsd * 100);
+  const withRemainders = entries.map((e) => {
+    const exactCents = e.raw * 100;
+    const floorCents = Math.floor(exactCents);
+    return { label: e.label, floorCents, remainder: exactCents - floorCents };
+  });
+  const flooredTotal = sum(withRemainders.map((e) => e.floorCents));
+  let leftoverCents = totalCents - flooredTotal;
+
+  const byRemainderDesc = [...withRemainders].sort((a, b) => b.remainder - a.remainder);
+  return byRemainderDesc.map((e) => {
+    const bonus = leftoverCents > 0 ? 1 : 0;
+    if (leftoverCents > 0) leftoverCents--;
+    return { label: e.label, value: round2((e.floorCents + bonus) / 100) };
+  });
+}
+
+/**
+ * Per-agent raw (unrounded) cost sums — the single source `cost_by_agent`
+ * and `summary.total_cost_usd` both round from, mirroring `buildCostByModel`'s
+ * own single-rounding-from-raw shape so neither grouping double-rounds.
+ * Same implicit `computeRunCost` → `null` filter for non-`done`/uncosted
+ * runs as `buildCostByModel` and `aggregate()`.
+ */
+function buildRawCostByAgent(
+  rawByAgent: AgentStatsRawGroup[],
+  estimate: Estimate,
+): Map<string, { name: string; raw: number }> {
+  const byAgent = new Map<string, { name: string; raw: number }>();
+  for (const g of rawByAgent) {
+    let raw = 0;
+    let hasCost = false;
+    for (const r of g.runs) {
+      const cost = computeRunCost(estimate, r);
+      if (cost == null) continue;
+      raw += cost;
+      hasCost = true;
+    }
+    if (hasCost) byAgent.set(g.agentId, { name: g.agentName, raw });
+  }
+  return byAgent;
 }

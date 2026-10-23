@@ -106,6 +106,14 @@ describe("StatsTab", () => {
     expect(screen.getByText(/4 runs matched/)).toBeInTheDocument();
   });
 
+  it("labels cost as a DevDigest estimate, not reconciled billing", () => {
+    mockState = { data: STATS, isLoading: false, isError: false };
+    renderTab();
+    expect(
+      screen.getByText("Cost is a DevDigest estimate (via PriceBook), not reconciled provider billing."),
+    ).toBeInTheDocument();
+  });
+
   it("never calls any review-run or LLM endpoint on mount — only the stats hook (AC-03)", () => {
     mockState = { data: STATS, isLoading: false, isError: false };
     renderTab();

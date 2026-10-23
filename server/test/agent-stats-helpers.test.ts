@@ -253,4 +253,44 @@ describe('toAgentPerf', () => {
     ];
     expect(toAgentPerf(raw, estimate).summary.most_active_agent).toBe('Newer');
   });
+
+  it('reconciles exactly even when per-agent subtotals straddle a rounding boundary', () => {
+    // Regression for a real double-rounding bug: summing already-rounded
+    // per-agent totals (then rounding again) drifted from cost_by_model's
+    // single rounding by a whole cent on ordinary, non-contrived costs.
+    // $0.0075/run * 2 runs = $0.015 raw per agent, which round2() alone
+    // pushes to $0.02 — summing two of those "$0.04"s is the bug; summing
+    // the $0.03 raw total once is correct.
+    const subCentEstimate = (): number => 0.0075;
+    const raw: AgentStatsRawGroup[] = [
+      {
+        agentId: 'agent-1',
+        agentName: 'Agent A',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        runs: [
+          run({ id: 'r1', agentId: 'agent-1', ranAt: new Date('2026-01-01T00:00:00.000Z') }),
+          run({ id: 'r2', agentId: 'agent-1', ranAt: new Date('2026-01-01T01:00:00.000Z') }),
+        ],
+        findings: [],
+      },
+      {
+        agentId: 'agent-2',
+        agentName: 'Agent B',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        runs: [
+          run({ id: 'r3', agentId: 'agent-2', ranAt: new Date('2026-01-01T02:00:00.000Z') }),
+          run({ id: 'r4', agentId: 'agent-2', ranAt: new Date('2026-01-01T03:00:00.000Z') }),
+        ],
+        findings: [],
+      },
+    ];
+
+    const perf = toAgentPerf(raw, subCentEstimate);
+    expect(perf.summary.total_cost_usd).toBe(0.03);
+    const sumSegments = (segs: { value: number }[]) => segs.reduce((s, x) => s + x.value, 0);
+    expect(sumSegments(perf.cost_by_agent)).toBe(0.03);
+    expect(sumSegments(perf.cost_by_model)).toBe(0.03);
+  });
 });

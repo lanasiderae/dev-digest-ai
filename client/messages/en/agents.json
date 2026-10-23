@@ -114,7 +114,8 @@
     },
     "severity": "Findings by severity",
     "trend": "Findings per run (oldest → newest)",
-    "lowSampleNote": "Fewer than {min} decisions — accept rate may not be reliable yet."
+    "lowSampleNote": "Fewer than {min} decisions — accept rate may not be reliable yet.",
+    "costEstimateNote": "Cost is a DevDigest estimate (via PriceBook), not reconciled provider billing."
   },
   "skills": {
     "title": "Skills",

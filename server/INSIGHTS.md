@@ -694,3 +694,25 @@
   per-attempt `try/catch`), `server/test/llm-disable-retry.test.ts` ("preserves
   real accumulated usage on failure when an earlier attempt DID respond",
   "labels failure usage 'unknown' when no response was ever received").
+- **2026-10-23** — Agent Performance Dashboard's `cost_by_model` (and, via
+  the old `total_cost_usd` derivation, `cost_by_agent` too) could drift from
+  `summary.total_cost_usd` by whole cents on ordinary data — not
+  floating-point noise but "sum of independently-rounded subtotals != round
+  of the raw sum" (two agents each raw-summing to $0.015 round to $0.02
+  apiece = $0.04, while the true $0.03 raw total rounds once to $0.03).
+  `PriceBook.estimate()` returns arbitrary-precision floats with no
+  rounding, so sub-cent per-run costs are the normal case — the original
+  integration test masked this by hand-picking a $0.60-exactly-per-run
+  token count "so reconciliation assertions need no fuzzy rounding
+  tolerance" (`server/test/agent-stats.it.test.ts:24-28`), so it never
+  exercised the bug. Fixed with largest-remainder apportionment: round
+  every segment down to the cent, then hand the leftover pennies to the
+  segments with the largest fractional remainder, so a breakdown's
+  segments sum EXACTLY to the displayed total rather than approximately.
+  General rule: any "breakdown that must sum to a displayed rounded
+  total" needs this apportionment pattern, not independent per-segment
+  `round2` — plain rounding only coincidentally reconciles on round-number
+  test fixtures. Evidence: `server/src/modules/agent-stats/helpers.ts`
+  (`allocateCents`, `buildRawCostByAgent`), regression test in
+  `server/test/agent-stats-helpers.test.ts` ("reconciles exactly even when
+  per-agent subtotals straddle a rounding boundary").
