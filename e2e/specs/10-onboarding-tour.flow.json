@@ -1,0 +1,21 @@
+{
+  "name": "Cached five-section tour and distinct incomplete-index skeleton",
+  "description": "ONBOARD-AC-01/05/08: cached tour and five sections survive reload, a separate unindexed repository shows its cached deterministic skeleton, and the original add-repository screen remains available. No model generation.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/repos/{REPO_ID}/onboarding"] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: architecture overview."] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: critical paths."] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: local setup."] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: reading order."] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: first tasks."] },
+    { "cmd": ["reload"] },
+    { "cmd": ["wait", "--text", "Cached smoke tour: architecture overview."] },
+    { "cmd": ["open", "{BASE}/repos/{FALLBACK_REPO_ID}/onboarding"] },
+    { "cmd": ["wait", "--text", "Repository index unavailable — static smoke fixture."] },
+    { "cmd": ["wait", "--text", "No model call was made for this generation."] },
+    { "cmd": ["wait", "--text", "Skeleton — deterministic fallback"] },
+    { "cmd": ["open", "{BASE}/onboarding"] },
+    { "cmd": ["wait", "--text", "Add a repository"] },
+    { "cmd": ["wait", "--text", "Repository URL"] }
+  ]
+}

@@ -64,7 +64,16 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  const container = new Container(config, db, opts.overrides);
+  // `handle` is only set when WE created the db connection (no `opts.db`
+  // override) — supply its raw postgres-js client for the advisory-lock
+  // seam (see `ContainerOverrides.rawSql`'s doc comment). A test that passes
+  // its own `db` must opt in to `rawSql` explicitly via its own overrides if
+  // it needs real locking (e.g. `brief.it.test.ts` passes testcontainers'
+  // `pg.handle.sql`).
+  const container = new Container(config, db, {
+    ...opts.overrides,
+    rawSql: opts.overrides?.rawSql ?? handle?.sql,
+  });
   app.decorate('container', container);
 
   // Reap runs left 'running' by a previous (now-dead) process — otherwise they

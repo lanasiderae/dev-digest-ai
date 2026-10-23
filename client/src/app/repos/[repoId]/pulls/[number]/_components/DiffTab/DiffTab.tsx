@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi, type DiffFindingApi } from "@/components/diff-viewer";
@@ -25,6 +26,7 @@ interface DiffTabProps {
 
 export function DiffTab({ prId, filesCount, files, canComment, repoFullName, headSha }: DiffTabProps) {
   const t = useTranslations("prReview");
+  const searchParams = useSearchParams();
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   const { data: smartDiff } = useSmartDiff(prId);
@@ -81,6 +83,25 @@ export function DiffTab({ prId, filesCount, files, canComment, repoFullName, hea
   const split = smartDiff?.split_suggestion;
   const stats = React.useMemo(() => sumDiffStats(files), [files]);
 
+  // `?file=<path>&line=<n>` navigation target (PR Brief's review focus/risk
+  // links — BRIEF-AC-05/13/16). `line` is the new (RIGHT) side's line number;
+  // `lineKey`'s "SIDE:line" format must match `components/diff-viewer/comments.ts`'s
+  // `lineKey()`. `nonce` is a pure function of the target itself (not a clock
+  // read, which React's purity rule rejects in render) — it only needs to
+  // differ when the target's path/line does, which a new memoized object
+  // already signals via identity to FileCard's scroll effect.
+  const focusFile = searchParams.get("file");
+  const focusLineRaw = searchParams.get("line");
+  const focusTarget = React.useMemo(() => {
+    if (!focusFile) return null;
+    const line = focusLineRaw != null ? Number(focusLineRaw) : null;
+    return {
+      path: focusFile,
+      lineKey: line != null && Number.isFinite(line) ? `RIGHT:${line}` : undefined,
+      nonce: focusFile.length * 1_000_000 + (line ?? 0),
+    };
+  }, [focusFile, focusLineRaw]);
+
   return (
     <section>
       <SectionLabel
@@ -134,11 +155,11 @@ export function DiffTab({ prId, filesCount, files, canComment, repoFullName, hea
       {groups && order === "smart" ? (
         <div style={s.groups}>
           {groups.map((g) => (
-            <RoleGroup key={g.role} group={g} commenting={commenting} findings={findings} />
+            <RoleGroup key={g.role} group={g} commenting={commenting} findings={findings} focusTarget={focusTarget} />
           ))}
         </div>
       ) : (
-        <DiffViewer files={files} commenting={commenting} findings={findings} />
+        <DiffViewer files={files} commenting={commenting} findings={findings} scrollTarget={focusTarget} />
       )}
     </section>
   );

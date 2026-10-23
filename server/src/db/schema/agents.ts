@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey } from 'drizzle-orm/pg-core';
-import { now } from './_shared';
+import { now, type ProjectContextSelectionRow } from './_shared';
 import { workspaces, users } from './core';
 import { skills } from './skills';
 
@@ -29,6 +30,16 @@ export const agents = pgTable('agents', {
   // + file-rank note) injected into the prompt. Default on; the global
   // REPO_INTEL_ENABLED flag is the second gate (facade degrades when off).
   repoIntel: boolean('repo_intel').notNull().default(true),
+  // Project Context Folder (L05): ordered per-repository selected document
+  // paths (never bodies), capped at 100 attachments total — enforced by the
+  // ProjectContextSelectionList Zod refinement, not a DB constraint. Default
+  // empty is the healthy-empty case (no selections), not "unavailable".
+  // Participates in the EXISTING `version`/`agentVersions.configJson`
+  // snapshot semantics below — no second versioning mechanism is added.
+  projectContext: jsonb('project_context')
+    .$type<ProjectContextSelectionRow>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   enabled: boolean('enabled').notNull().default(true),
   version: integer('version').notNull().default(1),
   createdBy: uuid('created_by').references(() => users.id),

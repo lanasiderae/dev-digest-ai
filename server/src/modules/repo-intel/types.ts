@@ -121,6 +121,36 @@ export interface FileRankRow {
   percentile: number;
 }
 
+// ---------------------------------------------------------------------------
+// Raw rank/hotness facade (L05 onboarding reading-path). Distinct from
+// `FileRankRow` (percentile-only, used by smart-diff/run-executor) — this
+// exposes the stored `rank`/`hotness` columns directly, plus the combined
+// `rank × (1 + hotness)` score callers (onboarding/brief) sort by.
+// ---------------------------------------------------------------------------
+
+export interface RankedFileRow {
+  path: string;
+  rank: number;
+  hotness: number;
+  /** `rank * (1 + hotness)` — the sort key; ties break by lexicographic path. */
+  score: number;
+}
+
+export interface RankedFilesResult {
+  files: RankedFileRow[];
+  /**
+   * Whether the persisted `hotness` column reflects real git-churn data for
+   * this repo's last index run, vs. the "Option B" placeholder (`hotness`
+   * hardcoded to 0 for every row) — true/false, never inferred from the rows
+   * themselves. Disclosed so a caller doesn't read a flat `hotness=0` across
+   * every row as "this repo has no hot files" when it's actually "hotness
+   * was never computed for this index."
+   */
+  hotnessAvailable: boolean;
+  degraded?: boolean;
+  reason?: DegradedReason;
+}
+
 export interface RepoMapResult {
   text: string;
   tokens: number;
@@ -169,4 +199,14 @@ export interface RepoIntel {
     opts?: { exclude?: string[] },
   ): Promise<string[]>;
   getCriticalPaths(repoId: string): Promise<string[][]>;
+  /**
+   * Top-N files by `rank * (1 + hotness)` (persisted-index-only; never
+   * triggers a reindex/refresh), with the raw rank/hotness columns and an
+   * explicit `hotnessAvailable` disclosure. See `RankedFilesResult`.
+   */
+  getRankedFilesWithHotness(
+    repoId: string,
+    n: number,
+    opts?: { exclude?: string[] },
+  ): Promise<RankedFilesResult>;
 }

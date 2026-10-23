@@ -14,6 +14,7 @@ import { TraceSection } from "../TraceSection";
 import { ToolCallRow } from "../ToolCallRow";
 import { PromptBlock } from "../PromptBlock";
 import { FindingsSection } from "../FindingsSection";
+import { ProjectContextSection } from "../ProjectContextSection";
 import { Row, Stat } from "../atoms";
 
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
@@ -95,6 +96,8 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
         )}
         <PromptBlock label={t("trace.prompt.user")} text={trace.prompt_assembly.user} color={PROMPT_COLORS.user} />
       </TraceSection>
+
+      <ProjectContextSection snapshot={trace.project_context} />
 
       <TraceSection
         icon="Wrench"

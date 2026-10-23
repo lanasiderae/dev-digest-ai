@@ -63,3 +63,17 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}
   }
   throw lastErr;
 }
+
+/**
+ * `withRetry`, except when `disabled` is true: runs `fn` through `withRetry`
+ * called with `{ retries: 0 }` — ONE underlying attempt, no 429/5xx backoff —
+ * instead of the normal default retry count. Used by the LLM adapters'
+ * `complete`/`completeStructured` for `CompletionRequest`/`StructuredRequest`'s
+ * `disableTransportRetry` flag (L05 one-attempt brief/tour generation); every
+ * other caller of `withRetry` (review calls, `listModels`, embeddings) is
+ * unaffected — they keep calling `withRetry` directly with no options, same
+ * as before this flag existed.
+ */
+export function withRetryUnless<T>(disabled: boolean | undefined, fn: () => Promise<T>): Promise<T> {
+  return withRetry(fn, disabled ? { retries: 0 } : undefined);
+}

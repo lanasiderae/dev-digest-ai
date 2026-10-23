@@ -17,6 +17,7 @@ function skill(id: string, name: string, enabled = true): Skill {
     version: 1,
     evidence_files: null,
     injection_detected: false,
+    project_context: [],
   };
 }
 
@@ -71,6 +72,7 @@ const AGENT: Agent = {
   repo_intel: true,
   enabled: true,
   version: 1,
+  project_context: [],
 };
 
 function renderWithIntl() {

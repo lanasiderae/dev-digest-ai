@@ -1,4 +1,11 @@
-import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  Agent,
+  AgentVersion,
+  CiFailOn,
+  Provider,
+  ProjectContextSelectionList,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
 import type { AgentRow, AgentVersionRow } from './repository.js';
 
@@ -23,6 +30,7 @@ export function toAgentDto(row: AgentRow): Agent {
     strategy: row.strategy as ReviewStrategy,
     ci_fail_on: row.ciFailOn as CiFailOn,
     repo_intel: row.repoIntel,
+    project_context: row.projectContext,
   };
 }
 
@@ -52,6 +60,24 @@ export interface ConfigChangePatch {
   strategy?: ReviewStrategy;
   ciFailOn?: CiFailOn;
   repoIntel?: boolean;
+  projectContext?: ProjectContextSelectionList;
+}
+
+/**
+ * True when two `project_context` selection lists are equivalent (same
+ * repo/path entries in the same order) — a plain JSON.stringify comparison is
+ * sufficient since every entry is built from the same literal `{repo_id,
+ * paths}` shape in a canonical, caller-preserved order (see C3's "ordered"
+ * requirement), so there's no key-ordering ambiguity for stringify to get
+ * wrong. Exported so `isConfigChange` doesn't bump the agent's version (and
+ * snapshot a no-op `agent_versions` row) just because the client resent an
+ * unchanged `project_context` array object on an unrelated field edit.
+ */
+export function projectContextEqual(
+  a: ProjectContextSelectionList | undefined,
+  b: ProjectContextSelectionList | undefined,
+): boolean {
+  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
 }
 
 /**
@@ -69,6 +95,7 @@ export function isConfigChange(
     | 'strategy'
     | 'ciFailOn'
     | 'repoIntel'
+    | 'projectContext'
   >,
   patch: ConfigChangePatch,
 ): boolean {
@@ -81,6 +108,8 @@ export function isConfigChange(
     (patch.strategy !== undefined && patch.strategy !== existing.strategy) ||
     (patch.ciFailOn !== undefined && patch.ciFailOn !== existing.ciFailOn) ||
     (patch.repoIntel !== undefined && patch.repoIntel !== existing.repoIntel) ||
+    (patch.projectContext !== undefined &&
+      !projectContextEqual(patch.projectContext, existing.projectContext)) ||
     patch.outputSchema !== undefined
   );
 }

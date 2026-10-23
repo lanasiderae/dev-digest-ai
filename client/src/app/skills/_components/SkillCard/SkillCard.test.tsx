@@ -19,6 +19,7 @@ const SKILL: Skill = {
   version: 1,
   evidence_files: null,
   injection_detected: false,
+  project_context: [],
 };
 
 function renderWithIntl(ui: React.ReactElement) {

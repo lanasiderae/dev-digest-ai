@@ -8,7 +8,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
   {
-    ignores: [".next/**", "node_modules/**", "src/vendor/**", "next-env.d.ts"],
+    ignores: [".next/**", ".next-e2e/**", "node_modules/**", "src/vendor/**", "next-env.d.ts"],
   },
   ...tseslint.configs.recommended,
   {

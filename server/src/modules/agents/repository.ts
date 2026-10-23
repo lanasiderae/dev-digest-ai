@@ -1,7 +1,12 @@
 import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  CiFailOn,
+  Provider,
+  ProjectContextSelectionList,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
 import { isConfigChange } from './helpers.js';
 
@@ -25,6 +30,7 @@ export interface InsertAgent {
   strategy?: ReviewStrategy;
   ciFailOn?: CiFailOn;
   repoIntel?: boolean;
+  projectContext?: ProjectContextSelectionList;
   enabled?: boolean;
   createdBy?: string | null;
 }
@@ -39,6 +45,7 @@ export interface UpdateAgent {
   strategy?: ReviewStrategy;
   ciFailOn?: CiFailOn;
   repoIntel?: boolean;
+  projectContext?: ProjectContextSelectionList;
   enabled?: boolean;
 }
 
@@ -70,6 +77,18 @@ export class AgentsRepository {
     return row;
   }
 
+  /**
+   * Same read as `getById`, without the workspace filter — for internal
+   * callers (e.g. `AgentsService.resolveProjectContext`) that already
+   * resolved/validated the agent in their own workspace-scoped flow and only
+   * need the row by id, the same "no tenancy scope, caller already trusted
+   * it" shape `RepoRepository.workspaceIdFor` uses.
+   */
+  async getByIdUnscoped(id: string): Promise<AgentRow | undefined> {
+    const [row] = await this.db.select().from(t.agents).where(eq(t.agents.id, id));
+    return row;
+  }
+
   /** Delete an agent (scoped to workspace). Versions/skill-links cascade;
    *  agent_runs keep their history with agent_id set null. Returns false if
    *  no such agent existed in the workspace. */
@@ -96,6 +115,7 @@ export class AgentsRepository {
         ...(values.strategy !== undefined ? { strategy: values.strategy } : {}),
         ...(values.ciFailOn !== undefined ? { ciFailOn: values.ciFailOn } : {}),
         ...(values.repoIntel !== undefined ? { repoIntel: values.repoIntel } : {}),
+        ...(values.projectContext !== undefined ? { projectContext: values.projectContext } : {}),
         enabled: values.enabled ?? true,
         version: INITIAL_AGENT_VERSION,
         createdBy: values.createdBy ?? null,
@@ -135,6 +155,7 @@ export class AgentsRepository {
         ...(patch.strategy !== undefined ? { strategy: patch.strategy } : {}),
         ...(patch.ciFailOn !== undefined ? { ciFailOn: patch.ciFailOn } : {}),
         ...(patch.repoIntel !== undefined ? { repoIntel: patch.repoIntel } : {}),
+        ...(patch.projectContext !== undefined ? { projectContext: patch.projectContext } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
         ...(configChanged ? { version: nextVersion } : {}),
       })
@@ -160,6 +181,7 @@ export class AgentsRepository {
           strategy: row.strategy,
           ci_fail_on: row.ciFailOn,
           repo_intel: row.repoIntel,
+          project_context: row.projectContext,
           skills,
         },
       })

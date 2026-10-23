@@ -143,9 +143,12 @@
     "tabConfig": "Config",
     "tabPreview": "Preview",
     "tabVersions": "Versions",
+    "tabContext": "Context",
     "runOnEvals": "Run on evals",
     "runOnEvalsDisabledHint": "Eval pipeline isn't built yet in this course.",
-    "configTitle": "Configuration"
+    "configTitle": "Configuration",
+    "contextTitle": "Project context to use",
+    "contextHint": "Select Markdown documents under the repository's configured context roots (specs/docs/insights) for this skill to carry into an agent's review context. Selection only — documents are never edited here."
   },
   "versions": {
     "title": "Version history",

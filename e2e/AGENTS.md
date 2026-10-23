@@ -24,8 +24,10 @@ TypeScript, deterministic browser flows for the web app, driven by Vercel
 - Locators are deterministic only (`--url`, `--text`, `find role|text|label`)
   — never use the AI `chat` command, that breaks the no-LLM/no-key/
   determinism guarantee.
-- Flows target read-only seeded data only (`acme/payments-api`, PR #482,
-  the seeded agents) — nothing here should trigger a model call.
+- Flows target isolated seeded data only (`acme/payments-api`, PRs #482/483,
+  the seeded agents and a fallback-tour repository). The L05 context flow
+  saves attachment paths on the seeded agent; nothing triggers a model call.
+  Use the hermetic runner to provision the required temporary fixtures.
 
 ## Do not touch
 

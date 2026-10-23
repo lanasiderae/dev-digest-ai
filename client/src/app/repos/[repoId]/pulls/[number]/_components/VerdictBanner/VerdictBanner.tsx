@@ -16,18 +16,20 @@ export function VerdictBanner({
   score,
   severityCounts,
   agentName,
+  embedded = false,
 }: {
   verdict: Verdict;
   summary: string | null;
   score: number | null;
   severityCounts: Record<Severity, number>;
   agentName?: string | null;
+  embedded?: boolean;
 }) {
   const t = useTranslations("prReview");
   const m = VERDICT_META[verdict] ?? VERDICT_META.comment;
   const VIcon = Icon[m.icon];
   return (
-    <div style={s.wrap}>
+    <div style={embedded ? { ...s.wrap, border: 0, padding: 0, background: "transparent" } : s.wrap}>
       <div style={s.iconBox(m.bg, m.c)}>
         <VIcon size={22} />
       </div>

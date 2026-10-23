@@ -39,6 +39,9 @@ const RESULTS_DIR = join(HERE, "test-results");
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const BIN = process.env.AGENT_BROWSER_BIN ?? "agent-browser";
 const STEP_TIMEOUT = Number(process.env.E2E_STEP_TIMEOUT ?? 60_000);
+const fixtureVariables: Record<string, string> = process.env.E2E_FIXTURE_ROOT
+  ? JSON.parse(readFileSync(join(process.env.E2E_FIXTURE_ROOT, 'variables.json'), 'utf8'))
+  : {};
 
 /** Run one agent-browser command; resolve with its stdout, reject on non-zero exit. */
 async function ab(args: string[]): Promise<string> {
@@ -66,7 +69,11 @@ async function runFlow(file: string, flow: Flow): Promise<FlowResult> {
   const steps: StepResult[] = [];
 
   for (const step of flow.steps) {
-    const args = resolveArgs(step.cmd, BASE);
+    const args = resolveArgs(step.cmd, BASE).map((arg) => arg.replace(/\{([A-Z_]+)\}/g, (_, key: string) => {
+      const value = fixtureVariables[key];
+      if (typeof value !== 'string') throw new Error(`Missing fixture ${key}; use ./scripts/e2e.sh`);
+      return value;
+    }));
     const label = step.label ?? args.join(" ");
     try {
       const stdout = await ab(args);
@@ -94,6 +101,7 @@ async function runFlow(file: string, flow: Flow): Promise<FlowResult> {
 
 async function main(): Promise<void> {
   console.log(`DevDigest e2e — base=${BASE} bin=${BIN}`);
+  mkdirSync(RESULTS_DIR, { recursive: true });
   const flows = loadFlows();
   if (flows.length === 0) {
     console.error(`No specs found in ${SPECS_DIR}`);

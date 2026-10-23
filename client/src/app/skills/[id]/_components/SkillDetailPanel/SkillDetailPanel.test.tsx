@@ -1,9 +1,49 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Skill } from "@devdigest/shared";
+import type { ProjectContextDiscoveredDocument, Repo, Skill } from "@devdigest/shared";
 import messages from "../../../../../../messages/en/skills.json";
+import projectContextMessages from "../../../../../../messages/en/project-context.json";
+
+// The "Context" tab mounts the shared ProjectContextSelector only once the
+// user switches to it — none of this file's other tests render it, but its
+// data hooks still need a mocked boundary for the two tests below that do.
+const REPOS: Repo[] = [
+  {
+    id: "r1",
+    workspace_id: "ws1",
+    owner: "acme",
+    name: "widgets",
+    full_name: "acme/widgets",
+    default_branch: "main",
+    clone_path: "/clones/r1",
+    last_polled_at: null,
+    created_by: null,
+  },
+];
+const DOCS: ProjectContextDiscoveredDocument[] = [
+  { repo_id: "r1", path: "specs/alpha.md", type: "specs", size_bytes: 100, tokens_estimate: 10, updated_at: null, oversized: false },
+];
+
+vi.mock("../../../../../lib/hooks", () => ({
+  useRepos: () => ({ data: REPOS, isLoading: false }),
+  useSettings: () => ({ data: { project_context: { roots: ["**/{specs,docs,insights}/**/*.md"] } } }),
+}));
+
+vi.mock("../../../../../lib/hooks/project-context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../../lib/hooks/project-context")>();
+  return {
+    ...actual,
+    useProjectContextDiscovery: () => ({
+      data: { repo_id: "r1", revision: "abc123", documents: DOCS, truncated: false },
+      isLoading: false,
+      isError: false,
+    }),
+    useProjectContextDocument: () => ({ data: undefined, isLoading: false, isError: false }),
+  };
+});
+
 import { SkillDetailPanel } from "./SkillDetailPanel";
 
 afterEach(cleanup);
@@ -19,13 +59,14 @@ const SKILL: Skill = {
   version: 1,
   evidence_files: null,
   injection_detected: false,
+  project_context: [],
 };
 
 function renderWithProviders(skill: Skill = SKILL) {
   const qc = new QueryClient();
   return render(
     <QueryClientProvider client={qc}>
-      <NextIntlClientProvider locale="en" messages={{ skills: messages }}>
+      <NextIntlClientProvider locale="en" messages={{ skills: messages, "project-context": projectContextMessages }}>
         <SkillDetailPanel skill={skill} />
       </NextIntlClientProvider>
     </QueryClientProvider>,
@@ -177,5 +218,43 @@ describe("SkillDetailPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Versions" }));
     await screen.findByText("Current");
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+  });
+
+  it("reuses the existing agent_count for agents-per-skill usage (CTX-AC-03) instead of a second counter", () => {
+    renderWithProviders({ ...SKILL, agent_count: 3 });
+    expect(screen.getByText("3 agents")).toBeInTheDocument();
+  });
+
+  it("falls back to 0 agents when agent_count is absent, same as the list view's own fallback", () => {
+    renderWithProviders();
+    expect(screen.getByText("0 agents")).toBeInTheDocument();
+  });
+
+  it("offers a matching 'Project context to use' section on the Context tab, seeded from the skill's saved selection", () => {
+    renderWithProviders({ ...SKILL, project_context: [{ repo_id: "r1", paths: ["specs/alpha.md"] }] });
+    fireEvent.click(screen.getByRole("button", { name: "Context" }));
+
+    expect(screen.getByText("Project context to use")).toBeInTheDocument();
+    const row = screen.getByText("specs/alpha.md").closest("div")!;
+    expect(within(row).getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("saving the Context tab persists the selection via the existing skill update hook", async () => {
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(new Response(JSON.stringify(SKILL), { status: 200 }));
+    renderWithProviders();
+    fireEvent.click(screen.getByRole("button", { name: "Context" }));
+
+    const row = screen.getByText("specs/alpha.md").closest("div")!;
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`/skills/${SKILL.id}`),
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
+    const body = JSON.parse((fetchSpy.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body).toEqual({ project_context: [{ repo_id: "r1", paths: ["specs/alpha.md"] }] });
   });
 });

@@ -8,7 +8,7 @@ import type {
   StructuredResult,
   ChatMessage,
 } from '@devdigest/shared';
-import { withRetry, withTimeout } from '../../platform/resilience.js';
+import { withRetry, withRetryUnless, withTimeout } from '../../platform/resilience.js';
 import { toJsonSchema, parseWithRepair } from '../../platform/structured.js';
 import { estimateCost } from './pricing.js';
 import { ExternalServiceError } from '../../platform/errors.js';
@@ -59,7 +59,9 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
-    return withRetry(() => withTimeout(this.doComplete(req), req.timeoutMs ?? DEFAULT_TIMEOUT));
+    return withRetryUnless(req.disableTransportRetry, () =>
+      withTimeout(this.doComplete(req), req.timeoutMs ?? DEFAULT_TIMEOUT),
+    );
   }
 
   private async doComplete(req: CompletionRequest): Promise<CompletionResult> {
@@ -89,36 +91,52 @@ export class AnthropicProvider implements LLMProvider {
   async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     const jsonSchema = toJsonSchema(req.schema, req.schemaName);
     const toolName = req.schemaName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const maxRetries = req.maxRetries ?? 2;
+    // disableTransportRetry forces exactly one attempt total — it overrides
+    // maxRetries' own reprompt-on-error loop, not just the transport retry
+    // below (see StructuredRequest.disableTransportRetry's doc comment).
+    const maxRetries = req.disableTransportRetry ? 0 : (req.maxRetries ?? 2);
     const { system, rest } = splitSystem(req.messages);
     const messages: Anthropic.MessageParam[] = [...rest];
     let tokensIn = 0;
     let tokensOut = 0;
+    // True once at least one attempt actually received a response — see
+    // OpenAIProvider.completeStructured's identical comment.
+    let usageKnown = false;
     let lastRaw = '';
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-      const res = await withRetry(() =>
-        withTimeout(
-          this.client.messages.create({
-            model: req.model,
-            system: system || undefined,
-            messages,
-            max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
-            temperature: req.temperature ?? 0,
-            tools: [
-              {
-                name: toolName,
-                description: `Return the result as ${req.schemaName}.`,
-                input_schema: jsonSchema.schema as Anthropic.Tool.InputSchema,
-              },
-            ],
-            tool_choice: { type: 'tool', name: toolName },
-          }),
-          req.timeoutMs ?? DEFAULT_TIMEOUT,
-        ),
-      );
+      let res;
+      try {
+        res = await withRetryUnless(req.disableTransportRetry, () =>
+          withTimeout(
+            this.client.messages.create({
+              model: req.model,
+              system: system || undefined,
+              messages,
+              max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
+              temperature: req.temperature ?? 0,
+              tools: [
+                {
+                  name: toolName,
+                  description: `Return the result as ${req.schemaName}.`,
+                  input_schema: jsonSchema.schema as Anthropic.Tool.InputSchema,
+                },
+              ],
+              tool_choice: { type: 'tool', name: toolName },
+            }),
+            req.timeoutMs ?? DEFAULT_TIMEOUT,
+          ),
+        );
+      } catch (err) {
+        throw new ExternalServiceError('Anthropic structured output request failed', {
+          raw: lastRaw,
+          usage: usageKnown ? { tokensIn, tokensOut } : 'unknown',
+          cause: err instanceof Error ? err.message : String(err),
+        });
+      }
       tokensIn += res.usage.input_tokens;
       tokensOut += res.usage.output_tokens;
+      usageKnown = true;
 
       const toolUse = res.content.find(
         (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
@@ -146,6 +164,7 @@ export class AnthropicProvider implements LLMProvider {
 
     throw new ExternalServiceError('Anthropic structured output failed schema validation', {
       raw: lastRaw,
+      usage: usageKnown ? { tokensIn, tokensOut } : 'unknown',
     });
   }
 

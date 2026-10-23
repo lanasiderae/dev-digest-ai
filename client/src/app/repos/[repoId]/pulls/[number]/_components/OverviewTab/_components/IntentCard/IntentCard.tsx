@@ -10,15 +10,17 @@ import { Button, Icon, SectionLabel, Skeleton } from "@devdigest/ui";
 import { usePrIntent, useRegenerateIntent } from "@/lib/hooks/intent";
 import { s } from "./styles";
 
-export function IntentCard({ prId }: { prId: string | null | undefined }) {
+export function IntentCard({ prId, embedded = false }: { prId: string | null | undefined; embedded?: boolean }) {
   const t = useTranslations("intent");
+  const cardStyle = embedded ? { ...s.card, border: 0, padding: 0, background: "transparent" } : s.card;
+  const labelStyle = embedded ? { ...s.labelRow, minHeight: 26 } : s.labelRow;
   const { data, isLoading, isError } = usePrIntent(prId);
   const regenerate = useRegenerateIntent(prId);
 
   if (isLoading) {
     return (
       <section style={s.root}>
-        <div style={s.labelRow}>
+        <div style={labelStyle}>
           <SectionLabel icon="Target">{t("title")}</SectionLabel>
         </div>
         <Skeleton height={110} />
@@ -36,7 +38,7 @@ export function IntentCard({ prId }: { prId: string | null | undefined }) {
     if (unavailable_reason === "provider_not_configured") {
       return (
         <section style={s.root}>
-          <div style={s.labelRow}>
+          <div style={labelStyle}>
             <SectionLabel icon="Target">{t("title")}</SectionLabel>
           </div>
           <div style={s.inlineNote}>
@@ -49,7 +51,7 @@ export function IntentCard({ prId }: { prId: string | null | undefined }) {
     if (unavailable_reason === "generation_failed" || unavailable_reason === "timeout") {
       return (
         <section style={s.root}>
-          <div style={s.labelRow}>
+          <div style={labelStyle}>
             <SectionLabel icon="Target">{t("title")}</SectionLabel>
           </div>
           <div style={s.inlineNote}>
@@ -72,10 +74,10 @@ export function IntentCard({ prId }: { prId: string | null | undefined }) {
     // hasn't pressed the button either.
     return (
       <section style={s.root}>
-        <div style={s.labelRow}>
+        <div style={labelStyle}>
           <SectionLabel icon="Target">{t("title")}</SectionLabel>
         </div>
-        <div style={s.card}>
+        <div style={cardStyle}>
           <p style={s.statement}>{t("notGenerated.title")}</p>
           <div style={s.muted}>{t("notGenerated.body")}</div>
           <div>
@@ -96,10 +98,10 @@ export function IntentCard({ prId }: { prId: string | null | undefined }) {
 
   return (
     <section style={s.root}>
-      <div style={s.labelRow}>
+      <div style={labelStyle}>
         <SectionLabel icon="Target">{t("title")}</SectionLabel>
       </div>
-      <div style={s.card}>
+      <div style={cardStyle}>
         <p style={s.statement}>{record.intent}</p>
 
         <div style={s.columns}>

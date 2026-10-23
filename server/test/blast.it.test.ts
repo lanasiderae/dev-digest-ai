@@ -10,6 +10,7 @@ import type {
   FileRankRow,
   IndexResult,
   IndexState,
+  RankedFilesResult,
   RefRow,
   RepoIntel,
   RepoMapResult,
@@ -82,6 +83,9 @@ class StubRepoIntel implements RepoIntel {
   }
   async getCriticalPaths(): Promise<string[][]> {
     return [];
+  }
+  async getRankedFilesWithHotness(): Promise<RankedFilesResult> {
+    return { files: [], hotnessAvailable: false, degraded: true, reason: 'no_data' };
   }
 }
 

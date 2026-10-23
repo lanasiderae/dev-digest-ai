@@ -29,6 +29,23 @@
     "suggestedFix": "Suggested fix:",
     "collapse": "collapse",
     "expand": "expand",
+    "projectContext": {
+      "title": "Project context",
+      "notAvailable": "Project context is not available for this run.",
+      "none": "No project-context documents were included in this run.",
+      "docTokens": "{count, plural, one {# token} other {# tokens}}",
+      "totalTokens": "{count, plural, one {# token} other {# tokens}} total",
+      "omissions": "Omissions",
+      "attachedSpecsLabel": "project context attached specs",
+      "reason": {
+        "missing": "missing",
+        "oversized": "oversized",
+        "unsafe_path": "unsafe path",
+        "cross_repo": "cross-repository",
+        "budget": "dropped for budget",
+        "duplicate": "duplicate"
+      }
+    },
     "config": {
       "model": "Model",
       "provider": "Provider",

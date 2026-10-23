@@ -44,23 +44,33 @@ export function PromptBlock({
   };
   return (
     <div style={s.promptRow}>
-      <div onClick={() => setOpen((o) => !o)} style={s.promptHead}>
-        <span style={s.promptDot(color)} />
-        <span style={s.promptLabel}>{label}</span>
-        {tokens != null && (
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            {t("trace.prompt.tokens", { count: tokens })}
-          </span>
-        )}
+      <div style={s.promptHead}>
+        {/* A real <button>, sibling to the mini copy/fullscreen <button>s
+            below — not a <div role="button"> wrapping them. Nesting
+            interactive elements inside a button is invalid markup, and made
+            the toggle's click target unreliable (clicks could land on a
+            nested button instead of toggling open). */}
+        <button
+          type="button"
+          aria-label={label}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          style={s.promptToggleButton}
+        >
+          <span style={s.promptDot(color)} />
+          <span style={s.promptLabel}>{label}</span>
+          {tokens != null && (
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              {t("trace.prompt.tokens", { count: tokens })}
+            </span>
+          )}
+        </button>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"
             title={t("trace.prompt.copy")}
             aria-label={t("trace.prompt.copy")}
-            onClick={(e) => {
-              e.stopPropagation();
-              copy();
-            }}
+            onClick={copy}
             style={miniBtnStyle}
           >
             {copied ? <Icon.Check size={12} /> : <Icon.Copy size={12} />}
@@ -69,10 +79,7 @@ export function PromptBlock({
             type="button"
             title={t("trace.prompt.fullscreen")}
             aria-label={t("trace.prompt.fullscreen")}
-            onClick={(e) => {
-              e.stopPropagation();
-              setFull(true);
-            }}
+            onClick={() => setFull(true)}
             style={miniBtnStyle}
           >
             <Icon.ExternalLink size={12} />

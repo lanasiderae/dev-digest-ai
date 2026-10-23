@@ -38,6 +38,16 @@ export interface CompletionRequest {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  /**
+   * One-attempt mode (L05 brief/tour generation — BRIEF-AC-09/ONBOARD-AC-04):
+   * when true, disables the transport-level `withRetry` wrapping the
+   * underlying provider call (429/5xx exponential backoff), so a failure
+   * surfaces immediately instead of silently retrying. Distinct from
+   * `StructuredRequest.maxRetries`, which only controls schema-validation
+   * REPROMPT attempts and has no effect on transport retries by itself.
+   * Unset (default/false) preserves today's review-call retry behavior.
+   */
+  disableTransportRetry?: boolean;
 }
 
 export interface CompletionResult {
@@ -61,6 +71,17 @@ export interface StructuredRequest<T> {
   maxTokens?: number;
   timeoutMs?: number;
   maxRetries?: number;
+  /**
+   * One-attempt mode (L05 brief/tour generation — BRIEF-AC-09/ONBOARD-AC-04):
+   * when true, disables BOTH the transport-level `withRetry` wrapping the
+   * underlying provider call AND forces `maxRetries` to 0 (no schema-reprompt),
+   * so the call makes exactly one underlying attempt and fails cleanly rather
+   * than retrying. Distinct from `maxRetries` above, which alone only
+   * controls schema-validation reprompts, not transport retries. Unset
+   * (default/false) preserves today's review-call retry behavior on both
+   * axes.
+   */
+  disableTransportRetry?: boolean;
   /**
    * OpenRouter session id — groups related generations (e.g. all map-reduce
    * chunks of one review) into a session in the OpenRouter dashboard. Sent as

@@ -19,6 +19,7 @@ export function toSkillDto(row: SkillRow): Skill {
     enabled: row.enabled,
     version: row.version,
     evidence_files: row.evidenceFiles ?? null,
+    project_context: row.projectContext,
     injection_detected: detectInjectionPatterns(row.body).length > 0,
   };
 }

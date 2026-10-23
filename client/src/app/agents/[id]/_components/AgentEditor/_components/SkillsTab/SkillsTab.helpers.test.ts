@@ -14,6 +14,7 @@ function skill(id: string, name: string): Skill {
     version: 1,
     evidence_files: null,
     injection_detected: false,
+    project_context: [],
   };
 }
 
