@@ -147,3 +147,25 @@ export const OnboardingTour = z.object({
   generated_at: z.string(),
 });
 export type OnboardingTour = z.infer<typeof OnboardingTour>;
+
+// ---- Route contracts (TASK-10) ----
+
+/** `GET /repos/:id/onboarding` — cache-only read, no generation. */
+export const OnboardingReadResponse = z.object({
+  tour: OnboardingTour.nullable(),
+});
+export type OnboardingReadResponse = z.infer<typeof OnboardingReadResponse>;
+
+/**
+ * `POST /repos/:id/onboarding` — generate/regenerate. `cached_tour_preserved`
+ * is true iff the DB cache was left untouched by this call (a prior cached
+ * tour existed and this generation did not overwrite it — the zero-call
+ * skeleton path and the model/validation-failure fallback path both leave
+ * any existing cache alone); false when there was nothing to preserve, or
+ * when this call just wrote a fresh successful generation.
+ */
+export const OnboardingGenerateResponse = z.object({
+  tour: OnboardingTour,
+  cached_tour_preserved: z.boolean(),
+});
+export type OnboardingGenerateResponse = z.infer<typeof OnboardingGenerateResponse>;

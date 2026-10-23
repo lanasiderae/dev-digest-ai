@@ -149,15 +149,6 @@ export const OnboardingTour = z.object({
 export type OnboardingTour = z.infer<typeof OnboardingTour>;
 
 // ---- Route contracts (TASK-10) ----
-//
-// SERVER-ONLY for now, same documented gap as TASK-08's brief.ts route
-// contracts (see server/INSIGHTS.md's 2026-10-23 entry) — this task ran
-// under the same explicit "backend-only, never touch client/**" constraint
-// (a concurrent frontend worker owns client/** in this checkout). Needs a
-// follow-up hand-edit mirroring these two exports into
-// client/src/vendor/shared/contracts/onboarding.ts before
-// `vendor-contracts-parity.test.ts` (if it covers this file) is green and
-// before any client hook can read them with a type-checked contract.
 
 /** `GET /repos/:id/onboarding` — cache-only read, no generation. */
 export const OnboardingReadResponse = z.object({
