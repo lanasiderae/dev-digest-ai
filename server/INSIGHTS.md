@@ -313,6 +313,71 @@
   symlink to `/etc/hosts` AFTER `listTree()`, then shows `readBlob` still
   returns the original committed content).
 
+- **2026-10-23** — L05/TASK-06 needed `run-executor.ts` (reviews module) to resolve
+  project-context documents, which required BOTH `AgentsService`-shaped union
+  logic AND `ProjectContextService`'s git-object read path — a genuine
+  cross-module (`project-context/service.ts`) call from `reviews/`. No
+  container getter exists for either service (only repositories —
+  `agentsRepo`/`reposRepo`/`skillsRepo`/`reviewRepo` — are container-exposed
+  singletons); the only existing precedent for "construct a service inline
+  inside another module's orchestration code" is `run-executor.ts`'s own
+  `new IntentService(this.container, this.repo)` call, which is INTRA-module
+  (`reviews/pipeline/intent.ts`). TASK-06 extended that same inline-construction
+  pattern across a module boundary (`new ProjectContextService(this.container)`
+  inside `reviews/run-executor.ts`) rather than adding a container getter
+  (container/module registration is TASK-02's sole-owner territory per the
+  plan) — and avoided needing `AgentsService` at all by inlining the pure
+  `resolveProjectContextPaths` helper directly against `agent.projectContext`
+  (already on the `AgentRow` the executor already has) and the SAME
+  `agents.linkedSkills()` call `resolveAgentSkills` already makes (added a
+  `projectContext: ProjectContextSelectionList[]` field to `ResolvedSkills`
+  rather than querying twice). Flagged for the architecture reviewer: this is
+  the first cross-module `service.ts`-class construction in this codebase: a
+  container-getter shouldn't be added for it without touching the
+  TASK-02-owned container file, but it's worth that reviewer explicitly
+  deciding whether it crosses onion-architecture's "other services via the
+  container" guidance enough to need one. Evidence:
+  `server/src/modules/reviews/run-executor.ts` (`buildProjectContext`,
+  `resolveAgentSkills`), `server/src/modules/project-context/service.ts`
+  (`resolveDocuments`).
+- **2026-10-23** — The approved spec's C5 budget rule ("Attached-block budget
+  is 20% of the selected model context window, clamped to 4,000–32,000
+  tokens, falling back to 16,000 when unknown") is ambiguous about WHICH
+  number the 16,000 fallback actually produces: naively composing it as
+  `clamp(0.2 * resolveContextWindowTokens(modelInfo), 4000, 32000)` — i.e.
+  piping the tokenizer adapter's own existing 16,000 "unknown window"
+  fallback through the SAME 20%/clamp formula used for a known window — gives
+  `0.2 * 16000 = 3200`, which the 4,000 floor then clamps UP to **4,000**,
+  never actually producing the literal 16,000 the spec names. Implemented
+  instead as: apply the 20%/clamp formula only when `modelInfo.contextLength`
+  is a real known positive number; when it is not, use
+  `resolveContextWindowTokens`'s 16,000 fallback directly AS the budget,
+  bypassing the clamp formula entirely. Any other caller composing
+  `resolveContextWindowTokens` with a budget-sizing clamp should check this
+  same trap before assuming "pipe the window through the usual formula" is
+  correct. Evidence: `server/src/modules/reviews/pipeline/project-context.ts`
+  (`resolveProjectContextBudgetTokens`'s doc comment),
+  `server/test/review-project-context-budget.test.ts` ("falls back to 16,000
+  (not 4,000) when the model/window is entirely unknown").
+- **2026-10-23** — `ReviewRunExecutor` (`reviews/run-executor.ts`) had NO
+  hermetic (non-`.it.test.ts`) test coverage before this session — confirmed
+  by `grep -rln "ReviewRunExecutor" server/test server/src` returning only
+  `.it.test.ts` files and the production code itself — because its
+  constructor takes a real `ReviewRepository`/`Container['agentsRepo']`
+  previously assumed to need a live Postgres. A private orchestration method
+  that only touches `container.{db,git,gitTreeReader,tokenizer}` and
+  `agents.linkedSkills()` (not the full `executeRuns`/`runOneAgent` DB-write
+  path) CAN be unit-tested without Docker: construct the executor with a
+  plain object implementing just `{linkedSkills}` cast to
+  `Container['agentsRepo']`, a minimal chainable `{select: () => ({from: () =>
+  ({where: async () => [row]})})}` stub standing in for the ONE Drizzle query
+  `ProjectContextRepository.getOwnedRepo` runs through `container.db`, and
+  `MockGitClient`/`MockGitTreeReader` from `adapters/mocks.ts` — then call the
+  private method via `executor as unknown as {theMethod: ...}`, the same
+  private-method-cast convention `project-context-service.test.ts` already
+  uses for `.repo`/`.getRoots` overrides. Evidence:
+  `server/test/review-executor-project-context.test.ts` (`makeExecutor`).
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({

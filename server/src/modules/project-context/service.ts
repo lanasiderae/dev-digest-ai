@@ -3,6 +3,8 @@ import type {
   ProjectContextDiscoveryQuery,
   ProjectContextDiscoveryResponse,
   ProjectContextDocumentQuery,
+  ProjectContextDocumentType,
+  ProjectContextOmission,
   ProjectContextPreview,
 } from '@devdigest/shared';
 import { MAX_PROJECT_CONTEXT_DISCOVERED_DOCUMENTS, MAX_PROJECT_CONTEXT_DOCUMENT_BYTES } from '@devdigest/shared';
@@ -12,6 +14,26 @@ import { getProjectContextRoots } from '../settings/feature-models.js';
 import { ProjectContextRepository } from './repository.js';
 import { UNAVAILABLE_REVISION } from './constants.js';
 import { classifyDocumentType, estimateTokensFromBytes, isEligibleMarkdownPath, normalizeRequestedPath } from './helpers.js';
+
+/**
+ * One project-context document actually resolved and read for a review
+ * (TASK-06 — CTX-AC-05/06). Distinct from `ProjectContextPreview` (the
+ * single-document view-only API response): this is the server-internal
+ * shape `resolveDocuments` returns in bulk, before any token-budget
+ * decisions are applied.
+ */
+export interface ResolvedProjectContextDocument {
+  repo_id: string;
+  path: string;
+  type: ProjectContextDocumentType;
+  revision: string;
+  content: string;
+}
+
+export interface ResolveDocumentsResult {
+  documents: ResolvedProjectContextDocument[];
+  omissions: ProjectContextOmission[];
+}
 
 /**
  * project-context service — orchestration for discovery/preview. No SQL (see
@@ -162,5 +184,109 @@ export class ProjectContextService {
       content,
       tokens_estimate: estimateTokensFromBytes(Buffer.byteLength(content, 'utf8')),
     };
+  }
+
+  /**
+   * TASK-06 (CTX-AC-05/06/08) — bulk read path for a review's resolved
+   * project-context paths. Unlike `preview()` (one document, one HTTP
+   * request), this fetches the repo lookup / configured roots / pinned
+   * `listTree()` ONCE for the whole batch, then resolves each path against
+   * that single snapshot — reusing exactly the same safety primitives
+   * (`getOwnedRepo`, `getRoots`, `gitTreeReader.listTree`/`readBlob`,
+   * `isEligibleMarkdownPath`) `preview()` uses, without a per-document git
+   * round trip. Never throws for a per-document problem (missing/oversized/
+   * unsafe path) — those become `ProjectContextOmission`s so one bad
+   * selection never fails the whole review (CTX-AC-08). Only a repo-level
+   * problem (not owned / no clone / unreadable tree) omits every requested
+   * path with reason `missing`.
+   */
+  async resolveDocuments(
+    workspaceId: string,
+    repoId: string,
+    paths: readonly string[],
+  ): Promise<ResolveDocumentsResult> {
+    if (paths.length === 0) return { documents: [], omissions: [] };
+
+    const omitAll = (detail: string): ResolveDocumentsResult => ({
+      documents: [],
+      omissions: paths.map((path) => ({ repo_id: repoId, path, reason: 'missing', detail })),
+    });
+
+    const repoRow = await this.repo.getOwnedRepo(workspaceId, repoId);
+    if (!repoRow) return omitAll('Repository not found in this workspace');
+    if (!repoRow.clonePath) return omitAll('Repository clone is not ready yet');
+
+    const repoRef = { owner: repoRow.owner, name: repoRow.name };
+    const roots = await this.getRoots(workspaceId);
+
+    let revision: string;
+    let entries: Awaited<ReturnType<Container['gitTreeReader']['listTree']>>;
+    try {
+      revision = await this.container.git.currentHead(repoRef);
+      entries = await this.container.gitTreeReader.listTree(repoRef, revision);
+    } catch {
+      return omitAll('Repository clone is not ready yet');
+    }
+
+    const byPath = new Map(entries.map((e) => [e.path, e]));
+    const documents: ResolvedProjectContextDocument[] = [];
+    const omissions: ProjectContextOmission[] = [];
+
+    for (const path of paths) {
+      // Defensive re-check against the CURRENTLY configured roots — a
+      // selection stored earlier may no longer match if workspace roots
+      // changed since it was saved (CTX-AC-07's boundary applies at read
+      // time, not just at selection time).
+      if (!isEligibleMarkdownPath(path, roots)) {
+        omissions.push({
+          repo_id: repoId,
+          path,
+          reason: 'unsafe_path',
+          detail: 'Outside the configured project-context roots',
+        });
+        continue;
+      }
+      const entry = byPath.get(path);
+      if (!entry || entry.kind !== 'blob' || !entry.oid) {
+        // Covers missing-at-this-revision AND the symlink/submodule cases —
+        // same "falls through to not-found" shape as preview() (CTX-AC-07).
+        omissions.push({
+          repo_id: repoId,
+          path,
+          reason: 'missing',
+          detail: 'Document not found at the pinned revision',
+        });
+        continue;
+      }
+      if ((entry.sizeBytes ?? 0) > MAX_PROJECT_CONTEXT_DOCUMENT_BYTES) {
+        omissions.push({
+          repo_id: repoId,
+          path,
+          reason: 'oversized',
+          detail: 'Exceeds the 256 KiB per-document cap',
+        });
+        continue;
+      }
+      try {
+        const { content } = await this.container.gitTreeReader.readBlob(
+          repoRef,
+          entry.oid,
+          MAX_PROJECT_CONTEXT_DOCUMENT_BYTES,
+        );
+        documents.push({ repo_id: repoId, path, type: classifyDocumentType(path), revision, content });
+      } catch {
+        // readBlob's own cap check (BlobTooLargeError) — ls-tree's reported
+        // size and the actual blob size should agree, but never crash the
+        // review over a read-time mismatch.
+        omissions.push({
+          repo_id: repoId,
+          path,
+          reason: 'oversized',
+          detail: 'Exceeds the 256 KiB per-document cap',
+        });
+      }
+    }
+
+    return { documents, omissions };
   }
 }

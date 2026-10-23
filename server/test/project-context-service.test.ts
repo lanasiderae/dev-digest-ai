@@ -219,3 +219,83 @@ describe('ProjectContextService.preview', () => {
     });
   });
 });
+
+/**
+ * L05/TASK-06 (CTX-AC-05/06/08) — the bulk review-time read path. Unlike
+ * `preview()`, never throws for a per-document problem: every failure mode
+ * becomes an omission so one bad selection never fails the whole review.
+ */
+describe('ProjectContextService.resolveDocuments', () => {
+  it('reads every eligible document in one batch, fetching the tree only once', async () => {
+    const service = makeService({
+      basics: REPO_BASICS,
+      entries: [blobEntry('specs/a.md', 'oid-a', 5), blobEntry('specs/b.md', 'oid-b', 5)],
+      blobsByOid: { 'oid-a': 'alpha', 'oid-b': 'beta' },
+    });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/a.md', 'specs/b.md']);
+    expect(result.omissions).toEqual([]);
+    expect(result.documents).toEqual([
+      { repo_id: 'repo-1', path: 'specs/a.md', type: 'specs', revision: 'sha-1', content: 'alpha' },
+      { repo_id: 'repo-1', path: 'specs/b.md', type: 'specs', revision: 'sha-1', content: 'beta' },
+    ]);
+  });
+
+  it('omits a path missing at the pinned revision without failing the batch', async () => {
+    const service = makeService({
+      basics: REPO_BASICS,
+      entries: [blobEntry('specs/a.md', 'oid-a', 5)],
+      blobsByOid: { 'oid-a': 'alpha' },
+    });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/a.md', 'specs/missing.md']);
+    expect(result.documents.map((d) => d.path)).toEqual(['specs/a.md']);
+    expect(result.omissions).toEqual([
+      { repo_id: 'repo-1', path: 'specs/missing.md', reason: 'missing', detail: 'Document not found at the pinned revision' },
+    ]);
+  });
+
+  it('omits an oversized document without reading its content', async () => {
+    const service = makeService({
+      basics: REPO_BASICS,
+      entries: [blobEntry('specs/huge.md', 'oid-huge', MAX_PROJECT_CONTEXT_DOCUMENT_BYTES + 1)],
+    });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/huge.md']);
+    expect(result.documents).toEqual([]);
+    expect(result.omissions).toEqual([
+      { repo_id: 'repo-1', path: 'specs/huge.md', reason: 'oversized', detail: 'Exceeds the 256 KiB per-document cap' },
+    ]);
+  });
+
+  it('omits a symlink entry rather than reading its target (CTX-AC-07)', async () => {
+    const service = makeService({ basics: REPO_BASICS, entries: [symlinkEntry('specs/escape.md')] });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/escape.md']);
+    expect(result.documents).toEqual([]);
+    expect(result.omissions[0]).toMatchObject({ path: 'specs/escape.md', reason: 'missing' });
+  });
+
+  it('omits a path outside the currently configured roots as unsafe_path', async () => {
+    const service = makeService({
+      basics: REPO_BASICS,
+      roots: ['policies/**/*.md'],
+      entries: [blobEntry('specs/a.md', 'oid-a', 5)],
+      blobsByOid: { 'oid-a': 'alpha' },
+    });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/a.md']);
+    expect(result.documents).toEqual([]);
+    expect(result.omissions[0]).toMatchObject({ path: 'specs/a.md', reason: 'unsafe_path' });
+  });
+
+  it('omits every requested path when the repo has no clone yet', async () => {
+    const service = makeService({ basics: { ...REPO_BASICS, clonePath: null } });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', ['specs/a.md']);
+    expect(result.documents).toEqual([]);
+    expect(result.omissions).toEqual([
+      { repo_id: 'repo-1', path: 'specs/a.md', reason: 'missing', detail: 'Repository clone is not ready yet' },
+    ]);
+  });
+
+  it('returns empty immediately for an empty path list, without any lookup', async () => {
+    const service = makeService({ basics: null });
+    const result = await service.resolveDocuments('ws-1', 'repo-1', []);
+    expect(result).toEqual({ documents: [], omissions: [] });
+  });
+});
