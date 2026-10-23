@@ -46,6 +46,18 @@ export const NAV: NavGroup[] = [
       },
     ],
   },
+  {
+    section: "GLOBAL",
+    items: [
+      {
+        key: "agent-performance",
+        label: "Agent Performance",
+        icon: "Activity",
+        href: "/agent-performance",
+        gKey: "f",
+      },
+    ],
+  },
 ];
 
 export const SETTINGS_ITEM: NavItemDef = {
@@ -76,6 +88,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { keys: "g a", label: "Go to Agents", group: "Navigation" },
   { keys: "g s", label: "Go to Skills", group: "Navigation" },
   { keys: "g c", label: "Go to Conventions", group: "Navigation" },
+  { keys: "g f", label: "Go to Agent Performance", group: "Navigation" },
   { keys: "j / k", label: "Next / previous finding", group: "Findings" },
   { keys: "a", label: "Accept finding", group: "Findings" },
   { keys: "d", label: "Dismiss finding", group: "Findings" },

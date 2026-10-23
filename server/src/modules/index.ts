@@ -14,6 +14,7 @@ import history from './history/routes.js';
 import projectContext from './project-context/routes.js';
 import brief from './brief/routes.js';
 import onboardingTour from './onboarding-tour/routes.js';
+import agentStats from './agent-stats/routes.js';
 
 /**
  * Module registry. Each feature module is a Fastify plugin in
@@ -44,4 +45,5 @@ export const modules: Record<string, FastifyPluginAsync> = {
   projectContext,
   brief,
   onboardingTour,
+  agentStats,
 };

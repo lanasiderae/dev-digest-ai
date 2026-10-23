@@ -93,6 +93,29 @@
     "hint": "Select Markdown documents under the repository's configured context roots (specs/docs/insights) for this agent to read as grounding context during a review. Selection only — documents are never edited here.",
     "save": "Save context"
   },
+  "stats": {
+    "title": "Performance",
+    "loadError": "Could not load this agent's stats.",
+    "empty": {
+      "title": "No runs in this range",
+      "body": "Run a review with this agent (manually, or on a PR) to populate its stats."
+    },
+    "range": {
+      "oneDay": "1 day",
+      "thirtyDays": "30 days",
+      "custom": "Custom",
+      "matched": "{count, plural, one {# run} other {# runs}} matched"
+    },
+    "metrics": {
+      "runs": "Runs",
+      "acceptRate": "Accept rate",
+      "avgCost": "Avg cost / run",
+      "avgLatency": "Avg latency"
+    },
+    "severity": "Findings by severity",
+    "trend": "Findings per run (oldest → newest)",
+    "lowSampleNote": "Fewer than {min} decisions — accept rate may not be reliable yet."
+  },
   "skills": {
     "title": "Skills",
     "enabledCount": "{linked} of {total} linked skills are enabled",

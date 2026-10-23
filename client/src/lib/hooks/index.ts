@@ -13,3 +13,4 @@ export * from "./blast-radius";
 export * from "./project-context";
 export * from "./brief";
 export * from "./onboarding-tour";
+export * from "./agent-stats";

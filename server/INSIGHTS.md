@@ -505,6 +505,24 @@
   `server/test/onboarding-tour-generate.test.ts` ("partial index: zero model
   calls" and "downgrades local_setup... and the top status to 'partial'").
 
+- **2026-10-23** — `LocalNoAuthProvider.currentWorkspace()`
+  (`adapters/auth/local.ts`) always resolves the ONE seeded default
+  workspace for every request — it ignores its `req` argument entirely, so
+  there is no per-request workspace override via the HTTP API. A route that
+  aggregates "everything in the caller's workspace" with no `:id` scoping
+  (e.g. L08's `GET /agents/performance`) therefore sees every OTHER
+  `.it.test.ts`'s seeded rows sharing the same Postgres fixture/workspace;
+  `history.it.test.ts`'s `seedRepo({ otherWorkspace: true })` isolation trick
+  doesn't help here, since it only isolates rows inserted directly via the
+  DB, not rows created through a route that resolves workspace via this
+  provider. Fix used: scope the test's OWN query window tightly to just its
+  own freshly-seeded timestamps (capture `const windowStart = new Date()`
+  right before seeding, then query `from=windowStart&to=windowStart+10s`)
+  instead of relying on a wide preset like `range=30d`. Evidence:
+  `server/src/adapters/auth/local.ts:28-37`,
+  `server/test/agent-stats.it.test.ts` ("GET /agents/performance reconciles
+  cost_by_agent/cost_by_model with summary.total_cost_usd").
+
 ## Tool & Library Notes
 
 - **2026-10-21** — Fastify's instance-level `bodyLimit` (set in `Fastify({
@@ -582,6 +600,19 @@
   `pnpm typecheck`, per this file's existing `tsconfig.json include` gotcha).
   Evidence: `server/src/adapters/tokenizer/index.ts` (`TokenizerWithEstimate`,
   `estimateWithEncoding`), `server/test/tokenizer-estimate.test.ts`.
+
+- **2026-10-23** — `agent_runs.findings_count` is already persisted per run
+  by the existing `completeAgentRun` write path
+  (`reviews/repository/run.repo.ts`), so a per-run trend/sparkline (L08's
+  `AgentStats.trend`/`AgentPerfRow.trend`) needs no join through
+  `reviews`/`findings` at all — only the accept/dismiss/severity breakdown
+  needs that join (keyed via `reviews.run_id`, since `findings` has no
+  direct `run_id` or `workspace_id` column, only `review_id`). Evidence:
+  `server/src/modules/agent-stats/helpers.ts` (`buildTrend`/
+  `buildNumericTrend` read `r.findingsCount` directly off the `agent_runs`
+  row), `server/src/modules/reviews/repository/stats.repo.ts` (two separate
+  queries, not one 3-way join, specifically to avoid fanning out run-level
+  columns once per finding on that run).
 
 ## Recurring Errors & Fixes
 

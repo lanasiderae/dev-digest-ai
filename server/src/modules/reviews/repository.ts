@@ -21,6 +21,8 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
+import * as statsRepo from './repository/stats.repo.js';
+export type { AgentStatsRawGroup } from './repository/stats.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -196,5 +198,16 @@ export class ReviewRepository {
 
   getRunTrace(runId: string): Promise<RunTrace | undefined> {
     return runRepo.getRunTrace(this.db, runId);
+  }
+
+  // ---- L08: Agent Performance Dashboard (agent-stats module) -------------
+
+  /** Raw per-agent run/finding rows for the agent-stats module (L08, Part 5),
+   *  scoped to the workspace + `[from, to]` and optionally one `agentId`. */
+  getAgentStatsRaw(
+    workspaceId: string,
+    opts: { agentId?: string; from: Date; to: Date },
+  ): Promise<statsRepo.AgentStatsRawGroup[]> {
+    return statsRepo.getAgentStatsRaw(this.db, workspaceId, opts);
   }
 }

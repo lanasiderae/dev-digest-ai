@@ -211,6 +211,16 @@
   `useTranslations("onboarding-tour")`), not a camelCase guess like
   `"onboardingTour"`.
 
+- **2026-10-23** — `vendor/ui/charts/LineChart.tsx` defaults its Y-axis
+  domain to `yMin=0.6/yMax=1.0` — tuned for an accept-rate-shaped (0..1)
+  series, not a sensible default for any other data shape. A caller
+  charting a different-shaped series (e.g. per-run findings count) must
+  pass explicit `yMin`/`yMax` (e.g. `yMin={0} yMax={Math.max(1, ...values)}`)
+  or the series renders clipped/invisible against the wrong domain.
+  Evidence: `client/src/vendor/ui/charts/LineChart.tsx` (`yMin = 0.6, yMax =
+  1.0` defaults), `client/src/app/agents/[id]/_components/AgentEditor/
+  _components/StatsTab/StatsTab.tsx` (explicit override).
+
 ## Tool & Library Notes
 
 - **2026-10-22** — `agent-browser scroll`/`scrollintoview` act on the page's
@@ -302,6 +312,18 @@
   (`isOpen = open || belongsHere`),
   `client/src/app/repos/[repoId]/pulls/[number]/_components/OverviewTab/_components/PrBriefCard/PrBriefCard.tsx`
   (`seededForPrId` render-time guard replacing a `useEffect`).
+- **2026-10-23** — Addendum to the `react-hooks/purity` entry directly above:
+  when the impure value genuinely IS wall-clock time itself (not derivable
+  as a pure function of props/state — e.g. a range-picker resolving "1d/30d"
+  against "now"), capture `Date.now()` inside an EVENT HANDLER (e.g. a
+  wrapped `setPreset` that also calls `setNow(Date.now())`) into a plain
+  `useState`, then feed that captured number as an ordinary dependency into
+  `useMemo` — never read `Date.now()`/`new Date()` directly inside the
+  `useMemo` callback body itself, only via a value that was captured outside
+  render. A `useState(() => ...)` lazy initializer is the other safe escape
+  (runs once, exempted) for a value only needed once at mount. Evidence:
+  `client/src/components/agent-stats/StatsRangePicker/useStatsRange.ts`
+  (`now`/`setNow`, `resolvedFrom`/`resolvedTo`'s `useMemo`).
 
 ## Recurring Errors & Fixes
 
