@@ -20,7 +20,6 @@ import {
 import type { Skill, SkillType } from "@devdigest/shared";
 import { useUpdateSkill } from "../../../../../lib/hooks/skills";
 import { detectInjectionPatterns } from "../../../../../lib/injection-scan";
-import { readProjectContext, type WithProjectContext } from "../../../../../lib/hooks/project-context";
 import { ProjectContextSelector } from "../../../../../components/project-context/ProjectContextSelector";
 import { SkillVersionsTab } from "./_components/SkillVersionsTab";
 import { TYPE_OPTIONS } from "./constants";
@@ -28,7 +27,7 @@ import { s } from "./styles";
 
 type TabKey = "config" | "preview" | "versions" | "context";
 
-export function SkillDetailPanel({ skill }: { skill: WithProjectContext<Skill> }) {
+export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
   const update = useUpdateSkill();
 
@@ -38,7 +37,7 @@ export function SkillDetailPanel({ skill }: { skill: WithProjectContext<Skill> }
   const [type, setType] = React.useState<SkillType>(skill.type);
   const [body, setBody] = React.useState(skill.body);
   const [enabled, setEnabled] = React.useState(skill.enabled);
-  const [contextDraft, setContextDraft] = React.useState(readProjectContext(skill));
+  const [contextDraft, setContextDraft] = React.useState(skill.project_context);
 
   const typeOptions = TYPE_OPTIONS.map((v) => ({ value: v, label: t(`listItem.type.${v}`) }));
   const untrusted = skill.source !== "manual" && !enabled;
@@ -76,7 +75,7 @@ export function SkillDetailPanel({ skill }: { skill: WithProjectContext<Skill> }
     setType(skill.type);
     setBody(skill.body);
     setEnabled(skill.enabled);
-    setContextDraft(readProjectContext(skill));
+    setContextDraft(skill.project_context);
   };
 
   return (

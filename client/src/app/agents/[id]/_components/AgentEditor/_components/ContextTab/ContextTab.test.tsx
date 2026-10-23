@@ -5,7 +5,6 @@ import type { Agent, ProjectContextDiscoveredDocument, Repo } from "@devdigest/s
 import agentsMessages from "../../../../../../../../messages/en/agents.json";
 import projectContextMessages from "../../../../../../../../messages/en/project-context.json";
 import { ToastProvider } from "../../../../../../../lib/toast";
-import type { WithProjectContext } from "../../../../../../../lib/hooks/project-context";
 
 const REPOS: Repo[] = [
   {
@@ -71,9 +70,10 @@ const AGENT: Agent = {
   repo_intel: true,
   enabled: true,
   version: 1,
+  project_context: [],
 };
 
-function renderWithIntl(agent: WithProjectContext<Agent>) {
+function renderWithIntl(agent: Agent) {
   return render(
     <NextIntlClientProvider
       locale="en"

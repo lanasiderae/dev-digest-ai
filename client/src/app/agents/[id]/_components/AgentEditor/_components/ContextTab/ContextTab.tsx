@@ -11,16 +11,15 @@ import { useTranslations } from "next-intl";
 import { Button } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
 import { useUpdateAgent } from "../../../../../../../lib/hooks/agents";
-import { readProjectContext, type WithProjectContext } from "../../../../../../../lib/hooks/project-context";
 import { useToast } from "../../../../../../../lib/toast";
 import { ProjectContextSelector } from "../../../../../../../components/project-context/ProjectContextSelector";
 import { s } from "./styles";
 
-export function ContextTab({ agent }: { agent: WithProjectContext<Agent> }) {
+export function ContextTab({ agent }: { agent: Agent }) {
   const t = useTranslations("agents");
   const toast = useToast();
   const update = useUpdateAgent();
-  const [draft, setDraft] = React.useState(readProjectContext(agent));
+  const [draft, setDraft] = React.useState(agent.project_context);
 
   // Reuses the EXISTING agent save/update hook (same PUT /agents/:id call
   // ConfigTab already uses) rather than a parallel save path for this one

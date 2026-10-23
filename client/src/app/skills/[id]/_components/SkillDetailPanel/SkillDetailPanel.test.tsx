@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ProjectContextDiscoveredDocument, Repo, Skill } from "@devdigest/shared";
 import messages from "../../../../../../messages/en/skills.json";
 import projectContextMessages from "../../../../../../messages/en/project-context.json";
-import type { WithProjectContext } from "../../../../../lib/hooks/project-context";
 
 // The "Context" tab mounts the shared ProjectContextSelector only once the
 // user switches to it — none of this file's other tests render it, but its
@@ -60,9 +59,10 @@ const SKILL: Skill = {
   version: 1,
   evidence_files: null,
   injection_detected: false,
+  project_context: [],
 };
 
-function renderWithProviders(skill: WithProjectContext<Skill> = SKILL) {
+function renderWithProviders(skill: Skill = SKILL) {
   const qc = new QueryClient();
   return render(
     <QueryClientProvider client={qc}>
