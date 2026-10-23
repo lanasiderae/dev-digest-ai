@@ -44,6 +44,12 @@ jobs:
 
       - run: npm ci
 
+      # Report-only for now: reviewer-core carries pre-existing vulnerabilities
+      # that need dependency bumps (some breaking) to clear, tracked separately.
+      # continue-on-error keeps this visible without failing every PR.
+      - run: npm audit
+        continue-on-error: true
+
       - run: npm run typecheck
 
       - run: npm test

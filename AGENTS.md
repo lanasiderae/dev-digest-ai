@@ -40,16 +40,24 @@ Other top-level folders (not packages — no `package.json`, nothing to
   && pnpm dev`.
 - Validation (phase 4 below) — the exact command per package. Note the
   package-manager split: `server`/`client` use **pnpm**,
-  `reviewer-core`/`e2e`/`mcp-server` use **npm**.
+  `reviewer-core`/`e2e`/`mcp-server` use **npm**. Every package also has an
+  `audit` script (`pnpm audit`/`npm audit`) — run it as part of validation.
+  It's CI-enforced (fails the build) for `e2e` and `mcp-server`, which are
+  currently clean; `server`, `client`, and `reviewer-core` still carry
+  pre-existing vulnerabilities that need dependency bumps (some breaking) to
+  clear, so their CI step is report-only (`continue-on-error`) until that's
+  done — don't read a clean exit there as "no known vulnerabilities."
   - `cd server && pnpm exec vitest run --exclude '**/*.it.test.ts' && pnpm
-    typecheck && pnpm lint` — unit lane, hermetic (no Docker). Integration is
-    the separate `pnpm exec vitest run .it.test` and needs Docker; plain
-    `pnpm test` runs both and will fail without it.
-  - `cd client && pnpm test && pnpm typecheck && pnpm lint`
-  - `cd reviewer-core && npm test && npm run typecheck && npm run lint`
-  - `cd e2e && npm run typecheck && npm run lint` — flows are
+    typecheck && pnpm lint && pnpm audit` — unit lane, hermetic (no Docker).
+    Integration is the separate `pnpm exec vitest run .it.test` and needs
+    Docker; plain `pnpm test` runs both and will fail without it.
+  - `cd client && pnpm test && pnpm typecheck && pnpm lint && pnpm audit`
+  - `cd reviewer-core && npm test && npm run typecheck && npm run lint &&
+    npm audit`
+  - `cd e2e && npm run typecheck && npm run lint && npm audit` — flows are
     `./scripts/e2e.sh` (hermetic), not part of typecheck.
-  - `cd mcp-server && npm test && npm run typecheck && npm run lint`
+  - `cd mcp-server && npm test && npm run typecheck && npm run lint && npm
+    audit`
 - Anything beyond the above is in each package's own
   `AGENTS.md`/`README.md` — don't assume a script name without checking
   there first.

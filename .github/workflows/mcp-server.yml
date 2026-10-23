@@ -55,6 +55,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm audit
+
       - name: Install server deps (zod, for the @devdigest/shared alias)
         working-directory: server
         run: pnpm install --frozen-lockfile
