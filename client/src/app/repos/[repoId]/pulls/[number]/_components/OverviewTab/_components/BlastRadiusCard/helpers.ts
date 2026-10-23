@@ -23,6 +23,12 @@ export function callerLabel(file: string, line: number): string {
   return `${file}:${line}`;
 }
 
+/** Stable identity for a changed symbol — used as both the React list key and
+    the collapse-state map key, so the two stay in sync by construction. */
+export function symbolKey(symbol: ChangedSymbol): string {
+  return `${symbol.name}:${symbol.file}`;
+}
+
 export interface BlastCounts {
   symbols: number;
   callers: number;

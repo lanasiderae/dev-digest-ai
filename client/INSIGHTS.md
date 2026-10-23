@@ -97,6 +97,18 @@
 
 ## Recurring Errors & Fixes
 
+- **2026-10-22** — A flex row with a long unbounded-width text child (e.g. a
+  file path) silently pushes trailing siblings (a count label, a chevron)
+  off the visible edge of the page instead of wrapping or ellipsizing, even
+  with `overflow: hidden` + `textOverflow: "ellipsis"` + `whiteSpace: "nowrap"`
+  set on that child — a flex item's default `min-width: auto` means it won't
+  shrink below its content's intrinsic width, so the ellipsis CSS never
+  engages. Fix: also set `minWidth: 0` (plus `flex: 1`) on that child. RTL/
+  jsdom tests never catch this — jsdom doesn't do layout, so `getByText`
+  still finds the pushed-off-screen content; it only showed up testing in a
+  real browser against a PR with long paths (`agent-browser`, 97-symbol PR).
+  Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/OverviewTab/_components/BlastRadiusCard/styles.ts`
+  (`symbolFile`).
 - **2026-10-21** — A component test fails with `Error: invariant expected
   app router to be mounted` the moment the component under test (or a child
   it renders) calls `next/navigation`'s `useRouter()` — add

@@ -13,8 +13,9 @@ export const s = {
     gap: 14,
   } satisfies CSSProperties,
   summaryLine: {
-    fontSize: 12.5,
-    color: "var(--text-muted)",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
   } satisfies CSSProperties,
   // Degraded state: a separate warning banner, visually distinct from the
   // per-symbol no-callers note below (different element, border, background).
@@ -41,12 +42,32 @@ export const s = {
   } satisfies CSSProperties,
   symbolHeader: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: 8,
     fontSize: 13,
+    cursor: "pointer",
+    userSelect: "none",
+    minWidth: 0,
   } satisfies CSSProperties,
-  symbolName: { fontWeight: 600, color: "var(--text-primary)" } satisfies CSSProperties,
-  symbolFile: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  symbolName: { fontWeight: 600, color: "var(--text-primary)", flexShrink: 0 } satisfies CSSProperties,
+  // flex:1 + minWidth:0 is what lets a flex child actually shrink below its
+  // content width — without minWidth:0 a long path ignores the ellipsis and
+  // overflows the row instead, pushing the caller count/chevron off-screen.
+  symbolFile: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    flex: 1,
+    minWidth: 0,
+  } satisfies CSSProperties,
+  callerCount: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
   callerList: { display: "flex", flexDirection: "column", gap: 4 } satisfies CSSProperties,
   callerRow: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
   chipsRow: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 } satisfies CSSProperties,
@@ -57,3 +78,14 @@ export const s = {
     color: "var(--text-muted)",
   } satisfies CSSProperties,
 } as const;
+
+/** Chevron rotates 90deg when the symbol row is expanded — matches
+    DiffTab/RoleGroup's identical disclosure affordance. */
+export function chevronFor(open: boolean): CSSProperties {
+  return {
+    color: "var(--text-muted)",
+    flexShrink: 0,
+    transform: open ? "rotate(90deg)" : "none",
+    transition: "transform .12s",
+  };
+}
