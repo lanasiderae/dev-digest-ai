@@ -22,7 +22,7 @@ import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
 import * as statsRepo from './repository/stats.repo.js';
-export type { AgentStatsRawGroup } from './repository/stats.repo.js';
+export type { AgentStatsRawGroup, SkillStatsRaw, BulkPullFrequencyRaw } from './repository/stats.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -209,5 +209,24 @@ export class ReviewRepository {
     opts: { agentId?: string; from: Date; to: Date },
   ): Promise<statsRepo.AgentStatsRawGroup[]> {
     return statsRepo.getAgentStatsRaw(this.db, workspaceId, opts);
+  }
+
+  /** Raw run/matched-finding rows for the skill-stats module, scoped to the
+   *  workspace + `[from, to]` + the given agent ids (the skill's linked
+   *  agents) + skill name (matched against `findings.matched_skill`). */
+  getSkillStatsRaw(
+    workspaceId: string,
+    opts: { agentIds: string[]; skillName: string; from: Date; to: Date },
+  ): Promise<statsRepo.SkillStatsRaw> {
+    return statsRepo.getSkillStatsRaw(this.db, workspaceId, opts);
+  }
+
+  /** Raw run/matched-finding rows for the Skills list's bulk pull-frequency
+   *  column (one query pass for every skill card, not one per skill). */
+  getBulkPullFrequencyRaw(
+    workspaceId: string,
+    opts: { agentIds: string[]; skillNames: string[]; from: Date; to: Date },
+  ): Promise<statsRepo.BulkPullFrequencyRaw> {
+    return statsRepo.getBulkPullFrequencyRaw(this.db, workspaceId, opts);
   }
 }

@@ -81,3 +81,96 @@ export async function getAgentStatsRaw(
   }
   return [...groups.values()];
 }
+
+/** One finding paired with the run it came from — unlike `AgentStatsRawGroup`,
+ *  the skill-stats module needs to know WHICH run each matched finding
+ *  belongs to (to resolve that run's PR for the pull-frequency denominator). */
+export interface SkillStatsRaw {
+  runs: AgentRunRow[];
+  matchedFindings: { finding: FindingRow; runId: string }[];
+}
+
+/**
+ * Raw rows for the skill-stats module (`GET /skills/:id/stats`): every run
+ * (in range) by any agent that links the skill, plus only the findings on
+ * those runs whose `matched_skill` names this skill — the proxy this repo
+ * already has for "the model applied this skill" (no per-run prompt-
+ * inclusion tracking exists; see `findings.matched_skill`'s other use in
+ * `FindingCard`'s "via <skill>" tag).
+ */
+export async function getSkillStatsRaw(
+  db: Db,
+  workspaceId: string,
+  opts: { agentIds: string[]; skillName: string; from: Date; to: Date },
+): Promise<SkillStatsRaw> {
+  if (opts.agentIds.length === 0) return { runs: [], matchedFindings: [] };
+
+  const runs = await db
+    .select()
+    .from(t.agentRuns)
+    .where(
+      and(
+        eq(t.agentRuns.workspaceId, workspaceId),
+        inArray(t.agentRuns.agentId, opts.agentIds),
+        gte(t.agentRuns.ranAt, opts.from),
+        lte(t.agentRuns.ranAt, opts.to),
+      ),
+    );
+  if (runs.length === 0) return { runs: [], matchedFindings: [] };
+
+  const runIds = runs.map((r) => r.id);
+  const findingRows = await db
+    .select({ finding: t.findings, runId: t.reviews.runId })
+    .from(t.findings)
+    .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+    .where(and(inArray(t.reviews.runId, runIds), eq(t.findings.matchedSkill, opts.skillName)));
+
+  const matchedFindings = findingRows.filter(
+    (f): f is { finding: FindingRow; runId: string } => f.runId != null,
+  );
+  return { runs, matchedFindings };
+}
+
+/** Raw rows for the Skills LIST view's bulk pull-frequency computation
+ *  (`SkillsService.list` → `skill-stats/helpers.ts`'s `toBulkPullFrequency`):
+ *  every run (in range) by any agent that links ANY of the given skills, plus
+ *  only the (matched_skill, runId) pairs whose matched_skill names one of the
+ *  given skills — ONE pass over the whole list, not one `getSkillStatsRaw`
+ *  call per skill/card. */
+export interface BulkPullFrequencyRaw {
+  runs: { id: string; agentId: string | null; prId: string | null }[];
+  matchedFindings: { matchedSkill: string; runId: string }[];
+}
+
+export async function getBulkPullFrequencyRaw(
+  db: Db,
+  workspaceId: string,
+  opts: { agentIds: string[]; skillNames: string[]; from: Date; to: Date },
+): Promise<BulkPullFrequencyRaw> {
+  if (opts.agentIds.length === 0 || opts.skillNames.length === 0) return { runs: [], matchedFindings: [] };
+
+  const runs = await db
+    .select({ id: t.agentRuns.id, agentId: t.agentRuns.agentId, prId: t.agentRuns.prId })
+    .from(t.agentRuns)
+    .where(
+      and(
+        eq(t.agentRuns.workspaceId, workspaceId),
+        inArray(t.agentRuns.agentId, opts.agentIds),
+        gte(t.agentRuns.ranAt, opts.from),
+        lte(t.agentRuns.ranAt, opts.to),
+      ),
+    );
+  if (runs.length === 0) return { runs: [], matchedFindings: [] };
+
+  const runIds = runs.map((r) => r.id);
+  const findingRows = await db
+    .select({ matchedSkill: t.findings.matchedSkill, runId: t.reviews.runId })
+    .from(t.findings)
+    .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+    .where(and(inArray(t.reviews.runId, runIds), inArray(t.findings.matchedSkill, opts.skillNames)));
+
+  const matchedFindings = findingRows.filter(
+    (f): f is { matchedSkill: string; runId: string } => f.matchedSkill != null && f.runId != null,
+  );
+  return { runs, matchedFindings };
+}

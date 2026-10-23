@@ -64,6 +64,16 @@ describe("SkillCard (smoke)", () => {
     expect(screen.getByText("0 agents")).toBeInTheDocument();
   });
 
+  it("shows the real pull frequency when present", () => {
+    renderWithIntl(<SkillCard skill={{ ...SKILL, pull_frequency: 1 }} />);
+    expect(screen.getByText("100% pull freq")).toBeInTheDocument();
+  });
+
+  it("shows '–' (not a fabricated 0%) when pull_frequency is null or absent", () => {
+    renderWithIntl(<SkillCard skill={{ ...SKILL, pull_frequency: null }} />);
+    expect(screen.getByText("– pull freq")).toBeInTheDocument();
+  });
+
   it("shows a 'needs vetting' badge for a disabled, non-manual skill", () => {
     renderWithIntl(<SkillCard skill={{ ...SKILL, source: "imported_url", enabled: false }} />);
     expect(screen.getByText("needs vetting")).toBeInTheDocument();

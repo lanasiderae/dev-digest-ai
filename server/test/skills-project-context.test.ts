@@ -93,6 +93,10 @@ function makeService(opts: { ownedRepoIds?: string[] } = {}) {
     agentsRepo: {
       skillAgentCounts: async (_ws: string, skillIds: string[]) =>
         Object.fromEntries(skillIds.map((id) => [id, 0])),
+      agentIdsForSkills: async (_ws: string, _skillIds: string[]) => ({}),
+    },
+    reviewRepo: {
+      getBulkPullFrequencyRaw: async () => ({ runs: [], matchedFindings: [] }),
     },
   } as unknown as Container;
 

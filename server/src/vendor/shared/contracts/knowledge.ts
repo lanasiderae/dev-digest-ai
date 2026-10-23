@@ -139,6 +139,13 @@ export const Skill = z.object({
   // SkillsService via container.agentsRepo, not stored on the skills table.
   // Optional: absent on hand-built fixtures (tests, local component state).
   agent_count: z.number().int().optional(),
+  // Share of PRs (reviewed by this skill's linked agents, last 30 days) with
+  // a finding citing this skill (`findings.matched_skill`) — the same metric
+  // as the detail Stats tab's live `pull_frequency`, computed cheaply in bulk
+  // for the whole list instead of one `GET /skills/:id/stats` call per card.
+  // Null = no PR reviewed by a linked agent in that window. Optional: absent
+  // on hand-built fixtures (tests, local component state).
+  pull_frequency: z.number().nullable().optional(),
   // Computed from `body` on every read (injection-scan.ts), not a stored
   // column — a flagged skill is also always `enabled: false` (service-level
   // gate), but the client needs this to explain WHY and to re-check an

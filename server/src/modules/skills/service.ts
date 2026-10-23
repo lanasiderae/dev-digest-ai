@@ -12,6 +12,9 @@ import { toSkillDto, toSkillVersionDto } from './helpers.js';
 import { extractSkillArchive, type ArchiveImportResult } from './import/archive.js';
 import type { UrlImportResult } from './import/url.js';
 import { detectInjectionPatterns } from './injection-scan.js';
+import { resolveRange } from '../agent-stats/helpers.js';
+import { toBulkPullFrequency } from '../skill-stats/helpers.js';
+import type { SkillRow } from '../../db/rows.js';
 
 /**
  * Skills service. Business logic for skill CRUD + import ingestion.
@@ -54,14 +57,55 @@ export class SkillsService {
       workspaceId,
       rows.map((r) => r.id),
     );
-    return rows.map((r) => ({ ...toSkillDto(r), agent_count: counts[r.id] ?? 0 }));
+    const pullFreq = await this.bulkPullFrequency(workspaceId, rows);
+    return rows.map((r) => ({
+      ...toSkillDto(r),
+      agent_count: counts[r.id] ?? 0,
+      pull_frequency: pullFreq[r.id] ?? null,
+    }));
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
     const row = await this.repo.getById(workspaceId, id);
     if (!row) return undefined;
     const counts = await this.container.agentsRepo.skillAgentCounts(workspaceId, [row.id]);
-    return { ...toSkillDto(row), agent_count: counts[row.id] ?? 0 };
+    const pullFreq = await this.bulkPullFrequency(workspaceId, [row]);
+    return {
+      ...toSkillDto(row),
+      agent_count: counts[row.id] ?? 0,
+      pull_frequency: pullFreq[row.id] ?? null,
+    };
+  }
+
+  /**
+   * List-view "pull freq" badge: the same metric as the detail Stats tab's
+   * live `GET /skills/:id/stats`, computed cheaply for ALL given skills in
+   * one query pass (`getBulkPullFrequencyRaw` + `toBulkPullFrequency`)
+   * instead of one stats call per skill/card — see those for the metric's
+   * definition. Fixed last-30-days window (no range picker in the list).
+   */
+  private async bulkPullFrequency(
+    workspaceId: string,
+    rows: Pick<SkillRow, 'id' | 'name'>[],
+  ): Promise<Record<string, number | null>> {
+    if (rows.length === 0) return {};
+    const agentIdsBySkill = await this.container.agentsRepo.agentIdsForSkills(
+      workspaceId,
+      rows.map((r) => r.id),
+    );
+    const allAgentIds = [...new Set(Object.values(agentIdsBySkill).flat())];
+    const { from, to } = resolveRange({});
+    const raw = await this.container.reviewRepo.getBulkPullFrequencyRaw(workspaceId, {
+      agentIds: allAgentIds,
+      skillNames: rows.map((r) => r.name),
+      from,
+      to,
+    });
+    return toBulkPullFrequency(
+      rows.map((r) => ({ skillId: r.id, skillName: r.name, agentIds: agentIdsBySkill[r.id] ?? [] })),
+      raw.runs,
+      raw.matchedFindings,
+    );
   }
 
   async delete(workspaceId: string, id: string): Promise<boolean> {

@@ -286,4 +286,36 @@ export class AgentsRepository {
       .groupBy(t.agentSkills.skillId);
     return Object.fromEntries(rows.map((r) => [r.skillId, Number(r.n)]));
   }
+
+  /**
+   * Agent ids linked to each of the given skills, grouped by skill id — ONE
+   * query for the whole Skills list (not one per skill/card), read through
+   * by `SkillsService.list` to feed the bulk pull-frequency computation
+   * (`skill-stats/helpers.ts`'s `toBulkPullFrequency`). Skill ids with no
+   * linked agents are simply absent from the returned map.
+   */
+  async agentIdsForSkills(workspaceId: string, skillIds: string[]): Promise<Record<string, string[]>> {
+    if (skillIds.length === 0) return {};
+    const rows = await this.db
+      .select({ skillId: t.agentSkills.skillId, agentId: t.agentSkills.agentId })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
+      .where(and(eq(t.agents.workspaceId, workspaceId), inArray(t.agentSkills.skillId, skillIds)));
+    const out: Record<string, string[]> = {};
+    for (const r of rows) {
+      (out[r.skillId] ??= []).push(r.agentId);
+    }
+    return out;
+  }
+
+  /** Agents (id+name) in this workspace that link the given skill — read
+   *  through by `SkillStatsService` for the "agents using this skill" list,
+   *  same cross-module repository-read pattern as `skillAgentCounts` above. */
+  async agentsForSkill(workspaceId: string, skillId: string): Promise<{ id: string; name: string }[]> {
+    return this.db
+      .select({ id: t.agents.id, name: t.agents.name })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agentSkills.skillId, skillId)));
+  }
 }

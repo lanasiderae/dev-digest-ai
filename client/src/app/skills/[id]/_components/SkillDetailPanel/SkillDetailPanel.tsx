@@ -22,10 +22,11 @@ import { useUpdateSkill } from "../../../../../lib/hooks/skills";
 import { detectInjectionPatterns } from "../../../../../lib/injection-scan";
 import { ProjectContextSelector } from "../../../../../components/project-context/ProjectContextSelector";
 import { SkillVersionsTab } from "./_components/SkillVersionsTab";
+import { StatsTab } from "./_components/StatsTab";
 import { TYPE_OPTIONS } from "./constants";
 import { s } from "./styles";
 
-type TabKey = "config" | "preview" | "versions" | "context";
+type TabKey = "config" | "preview" | "stats" | "versions" | "context";
 
 export function SkillDetailPanel({ skill }: { skill: Skill }) {
   const t = useTranslations("skills");
@@ -121,6 +122,7 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
         tabs={[
           { key: "config", label: t("preview.tabConfig"), icon: "Settings" },
           { key: "preview", label: t("preview.tabPreview"), icon: "Eye" },
+          { key: "stats", label: t("preview.tabStats"), icon: "Activity" },
           { key: "versions", label: t("preview.tabVersions"), icon: "History" },
           { key: "context", label: t("preview.tabContext"), icon: "Folder" },
         ]}
@@ -140,6 +142,8 @@ export function SkillDetailPanel({ skill }: { skill: Skill }) {
             </div>
           </>
         )}
+
+        {tab === "stats" && <StatsTab skill={skill} />}
 
         {tab === "versions" && <SkillVersionsTab skill={skill} />}
 
