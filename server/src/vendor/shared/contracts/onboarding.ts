@@ -147,3 +147,34 @@ export const OnboardingTour = z.object({
   generated_at: z.string(),
 });
 export type OnboardingTour = z.infer<typeof OnboardingTour>;
+
+// ---- Route contracts (TASK-10) ----
+//
+// SERVER-ONLY for now, same documented gap as TASK-08's brief.ts route
+// contracts (see server/INSIGHTS.md's 2026-10-23 entry) — this task ran
+// under the same explicit "backend-only, never touch client/**" constraint
+// (a concurrent frontend worker owns client/** in this checkout). Needs a
+// follow-up hand-edit mirroring these two exports into
+// client/src/vendor/shared/contracts/onboarding.ts before
+// `vendor-contracts-parity.test.ts` (if it covers this file) is green and
+// before any client hook can read them with a type-checked contract.
+
+/** `GET /repos/:id/onboarding` — cache-only read, no generation. */
+export const OnboardingReadResponse = z.object({
+  tour: OnboardingTour.nullable(),
+});
+export type OnboardingReadResponse = z.infer<typeof OnboardingReadResponse>;
+
+/**
+ * `POST /repos/:id/onboarding` — generate/regenerate. `cached_tour_preserved`
+ * is true iff the DB cache was left untouched by this call (a prior cached
+ * tour existed and this generation did not overwrite it — the zero-call
+ * skeleton path and the model/validation-failure fallback path both leave
+ * any existing cache alone); false when there was nothing to preserve, or
+ * when this call just wrote a fresh successful generation.
+ */
+export const OnboardingGenerateResponse = z.object({
+  tour: OnboardingTour,
+  cached_tour_preserved: z.boolean(),
+});
+export type OnboardingGenerateResponse = z.infer<typeof OnboardingGenerateResponse>;

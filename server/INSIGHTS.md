@@ -64,6 +64,23 @@
   UI/hooks need them type-checked) before that test is green again. Evidence:
   `server/src/vendor/shared/contracts/brief.ts` ("Route contracts (TASK-08)"
   section) vs. the unchanged client copy; `server/test/vendor-contracts-parity.test.ts`.
+- **2026-10-23** — L05/TASK-10 added `OnboardingReadResponse`/
+  `OnboardingGenerateResponse` route contracts to the SERVER copy of
+  `vendor/shared/contracts/onboarding.ts` only, under the same backend-only
+  constraint as the TASK-08 entry immediately above — same shape, a second
+  instance of the same gap: `onboarding.ts` was ALSO one of the
+  `test/vendor-contracts-parity.test.ts` byte-identical files, so
+  `pnpm exec vitest run --exclude '**/*.it.test.ts'` now has exactly ONE
+  failing assertion (confirmed: 402 passed / 1 failed, same single
+  `vendor-contracts-parity.test.ts` file, now failing on `onboarding.ts`'s
+  diff in addition to `brief.ts`'s pre-existing one — both diffs together
+  still produce only the one assertion failure per file pair). Needs a
+  follow-up hand-edit mirroring the same two exports into
+  `client/src/vendor/shared/contracts/onboarding.ts` (TASK-11's tour UI/hooks
+  need them type-checked) before that test is green again. Evidence:
+  `server/src/vendor/shared/contracts/onboarding.ts` ("Route contracts
+  (TASK-10)" section) vs. the unchanged client copy (which already has the
+  TASK-02 base contract, just not these two route additions).
 
 ## Codebase Patterns
 
@@ -439,6 +456,54 @@
   private-method-cast convention `project-context-service.test.ts` already
   uses for `.repo`/`.getRoots` overrides. Evidence:
   `server/test/review-executor-project-context.test.ts` (`makeExecutor`).
+- **2026-10-23** — L05/TASK-10 (Onboarding Tour) needed a THIRD read path over
+  untrusted repo content, distinct from both Project Context's (`.md`-only,
+  rooted under `**/{specs,docs,insights}/**/*.md`) and the review pipeline's
+  repo-map/diff reads: setup-evidence documents (`README.md`,
+  `package.json`, `Dockerfile`, …) that Project Context's own eligibility
+  check deliberately EXCLUDES (wrong extension/root entirely). Rather than
+  reusing `ProjectContextService`/`isEligibleMarkdownPath` (wrong shape) or
+  building a new filesystem reader (unsafe, see the TOCTOU entry above for
+  `GitClient.readFile`), `onboarding-tour/service.ts`'s own
+  `collectSetupEvidence` calls the SAME safe primitives one layer down —
+  `container.git.currentHead` + `container.gitTreeReader.listTree/readBlob`
+  directly — with its OWN narrow basename allowlist/denylist
+  (`onboarding-tour/constants.ts`'s `SETUP_EVIDENCE_BASENAMES`/
+  `_EXCLUDED_BASENAMES`) and its own bounds (20 docs, 64 KiB/doc, smaller
+  than Project Context's 256 KiB since these compete for the SAME
+  24,000-token whole-input budget as the repo map/critical paths/ranked
+  files). A future feature needing a third "which untrusted files are
+  eligible" rule should go to this same layer (`container.gitTreeReader`
+  directly, own allowlist) rather than stretching Project Context's
+  markdown-only check to fit. Evidence: `server/src/modules/onboarding-tour/
+  service.ts` (`collectSetupEvidence`), `server/src/modules/onboarding-tour/
+  constants.ts`.
+- **2026-10-23** — L05/TASK-10's plan text ("Ineligible/incomplete index
+  (flag off, no data, failed/partial): deterministic 5-section skeleton,
+  ZERO model calls") and the `OnboardingTour` contract's own doc comment for
+  `OnboardingTourStatus.partial` ("Some sections generated, others
+  skeleton/unavailable (e.g. partial index)") read as mutually exclusive at
+  first glance — the plan says a `partial` INDEX gets zero calls, but the
+  contract comment's parenthetical example names "partial index" as a cause
+  of the top-level `partial` STATUS, which by definition only exists on the
+  one-call path. Reconciled by treating them as two DIFFERENT meanings of
+  "partial" that happen to share a word: `repo_index_state.status ===
+  'partial'` is NOT "eligible" for a model attempt in this module (it takes
+  the zero-call skeleton branch, same as `failed`/`degraded`/no-data/flag-off
+  — eligibility is `status === 'full' && !degraded`, full stop); the
+  top-level `OnboardingTour.status === 'partial'` instead arises from a
+  SUCCESSFUL one-call attempt where a specific SECTION (today: `local_setup`)
+  gets force-downgraded to `'unavailable'` because its own evidence category
+  (setup docs/manifests) was empty, even though the index itself was
+  complete. A future reader should not assume the contract comment's
+  "partial index" parenthetical describes this module's actual branching —
+  check `service.ts`'s `describeIneligible`/eligibility-gate code, not just
+  the contract doc comment, before changing either. Evidence:
+  `server/src/modules/onboarding-tour/service.ts` (the `eligible` check and
+  the `setupDocuments.length === 0` downgrade), `server/src/vendor/shared/
+  contracts/onboarding.ts` (`OnboardingTourStatus`'s doc comments),
+  `server/test/onboarding-tour-generate.test.ts` ("partial index: zero model
+  calls" and "downgrades local_setup... and the top status to 'partial'").
 
 ## Tool & Library Notes
 
