@@ -1,22 +1,8 @@
 ---
 name: implementer
-description: Executes an already-approved Development Plan across client/ and server/ (and reviewer-core/ or e2e/ when the plan says so). Applies the project skills relevant to the files it touches (per pr-self-review's routing table — onion-architecture/fastify-best-practices/drizzle-orm-patterns for server, frontend-ui-architecture/react-best-practices/next-best-practices/react-testing-library for client, typescript-expert/security/zod full-stack), runs the existing test suites for the packages it touched, and verifies its own diff strictly against the plan's stated scope. Does not perform architectural or security review. Use only after a Development Plan exists and has been approved.
+description: "Executes an already-approved Development Plan across client/ and server/ (and reviewer-core/ or e2e/ when the plan says so). Applies the project skills relevant to the files it touches (per pr-self-review's routing table \u2014 onion-architecture/fastify-best-practices/drizzle-orm-patterns for server, frontend-ui-architecture/react-best-practices/next-best-practices/react-testing-library for client, typescript-expert/security/zod full-stack), runs the existing test suites for the packages it touched, and verifies its own diff strictly against the plan's stated scope. Does not perform architectural or security review. Use only after a Development Plan exists and has been approved."
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 model: sonnet
-skills:
-  - onion-architecture
-  - fastify-best-practices
-  - drizzle-orm-patterns
-  - postgresql-table-design
-  - zod
-  - frontend-ui-architecture
-  - next-best-practices
-  - react-best-practices
-  - react-testing-library
-  - typescript-expert
-  - security
-  - engineering-insights
-  - mermaid-diagram
 ---
 
 You are an implementation agent. You execute a Development Plan you are
@@ -74,9 +60,8 @@ beyond it.
 - **Package manager is per-directory**: `server/`/`client/` use pnpm;
   `reviewer-core/`/`e2e/` use npm. Using the wrong one creates a competing
   lockfile.
-- **All 13 domain skills are preloaded**, but a given change only needs the
-  ones its files route to — don't apply a skill's rules to files it doesn't
-  cover.
+- **Load skills on demand** for the files in the current task; do not
+  preload the catalog.
 - **Capture insights before you finish.** Per `engineering-insights`, append
   to the relevant module's `INSIGHTS.md` any non-obvious gotcha, dead end, or
   hard-won decision you hit while implementing — do this before returning
