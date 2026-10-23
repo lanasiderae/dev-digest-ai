@@ -41,7 +41,7 @@ This report was produced by **Claude Sonnet 5** (`claude-sonnet-5`, Anthropic), 
 | BRIEF-AC-05 | 09,12 | Navigation tests + `09-pr-brief.flow.json`. | DONE |
 | BRIEF-AC-06 | 08,09,12 | `brief-read.test.ts:99-138` (zero-call reload, stale on head change) + `brief-lock.test.ts` refresh/regeneration. | DONE |
 | BRIEF-AC-07 | 01,14,15 | Spec + plan are committed in this branch's history (verifiable); whether they are "present in the open PR" cannot be confirmed without `gh`/network access. | CANNOT VERIFY (PR state) |
-| BRIEF-AC-08 | 14,15 | No `demo.md`, no video link, no PR URL found anywhere in the repo (`grep` for youtube/loom/mp4/etc. across all `.md` returned only requirement-text mentions, not actual links). | MISSING |
+| BRIEF-AC-08 | 14,15 | The author later confirmed a demo video exists at a separate URL, but it is not linked in PR #14 and the URL was not provided for review. The required PR-linked evidence is therefore incomplete; video contents are unverified. | PARTIAL (link needed) |
 | BRIEF-AC-09 | 04,08,14 | `brief-generate.test.ts:204-221` — exactly one `completeStructured` call, `disableTransportRetry` set, read directly; `resolveFeatureModel` confirmed dynamic (`feature-models.ts:53-59`). Live call-count/usage logs from an actual successful generation are absent — last recorded live attempt failed schema validation. | PARTIAL |
 | BRIEF-AC-10 | 04,08 | `brief-generate.test.ts:221-237` (fails before model call over 8,000-token mandatory-input budget); no hunks included per prompt-assembly order in `brief/service.ts`. | DONE |
 | BRIEF-AC-11 | 02,08 | `server/test/vendor-contracts-parity.test.ts:32-50` — byte-identical vendored copies, both new contract files present; read directly. | DONE |
@@ -82,7 +82,7 @@ This report was produced by **Claude Sonnet 5** (`claude-sonnet-5`, Anthropic), 
 | 11 | DONE | Onboarding UI tests + `10-onboarding-tour.flow.json`/`06-onboarding.flow.json` present. |
 | 12 | DONE | `task-12-validation.md`: 10/10 hermetic browser flows, 403 server / 232-233 client unit tests, typecheck/lint clean, independently corroborated by new flow files (`08/09/10-*.flow.json`) added in the same commit (`ba44b2e`). |
 | 13 | DONE (review itself) / gaps noted | `architecture-review.md`: explicitly states Sonnet review was *rejected* by an approval gate and substituted with two Codex sessions — "No external [Claude] review was executed." This is an honest, self-disclosed deviation from the plan's "Sonnet architecture reviewer where available" intent, not a fabricated pass. |
-| 14 | PARTIAL/MISSING | `pr-brief-layout.md` + screenshot exist (layout-only, self-labeled "not evidence of a paid generation"); `docs/sdd/l05/demo.md` (named in TASK-14's own file list) was never created; no video/log link found anywhere. |
+| 14 | PARTIAL | `pr-brief-layout.md` + screenshot exist (layout-only); author confirms a demo video exists separately, but its URL is not linked in the PR or available for inspection. `docs/sdd/l05/demo.md` was not created. |
 | 15 | **This report** | First genuine Sonnet pass; prior `plan-verifier-report.md` was explicitly Codex standing in. |
 | 16 | DONE | `docs/retro/ledger.md` entry committed `f7566bf`, manually invoked, current-context evidence, honest unknowns. |
 
@@ -125,7 +125,7 @@ I did not rerun suites; I independently opened and read the cited test files (no
 
 **INCOMPLETE.**
 
-Required-criteria gaps that block a COMPLETE verdict: no real-model demonstration for Project Context rule-violation (CTX-AC-09), Onboarding unfamiliar-repo tour (ONBOARD-AC-01/10), or a successful live PR Brief generation (BRIEF-AC-02/09 remain PARTIAL — the one recorded live attempt failed schema validation and was never retried to success); no required 1–3 minute demo video or `docs/sdd/l05/demo.md` (BRIEF-AC-08/14, ONBOARD-AC-09/10); DB-integration (`.it.test.ts`) execution is undocumented against the plan's own honesty requirement; and PR-presence facts (BRIEF-AC-07, SDD-AC-07's "before merge" persistence) are unverifiable from this read-only, network-denied session.
+Required-criteria gaps that block a COMPLETE verdict: no real-model demonstration for Project Context rule-violation (CTX-AC-09), Onboarding unfamiliar-repo tour (ONBOARD-AC-01/10), or a successful live PR Brief generation (BRIEF-AC-02/09 remain PARTIAL — the one recorded live attempt failed schema validation and was never retried to success); the 1–3 minute demo URL is not linked in the PR, so its contents and required coverage cannot be verified (BRIEF-AC-08/14, ONBOARD-AC-09/10); DB-integration (`.it.test.ts`) execution is undocumented against the plan's own honesty requirement; and PR-presence facts (BRIEF-AC-07, SDD-AC-07's "before merge" persistence) are unverifiable from this read-only, network-denied session.
 
 What has materially improved and is now independently confirmed since the prior (Codex) pass: a genuine Sonnet final-verifier pass now exists (this report, closing SDD-AC-07's content requirement), and the manual retrospective/ledger (SDD-AC-09/10, BRIEF-AC-20) is now done, which the prior report had marked CANNOT VERIFY. All Project Context, Brief-contract/grounding/cache, and Onboarding-generation backend ACs with hermetic test evidence remain DONE on independent re-inspection — no regressions were found in code that the prior report had marked DONE.
 
@@ -134,3 +134,17 @@ What has materially improved and is now independently confirmed since the prior 
 - Model: `claude-sonnet-5` (Anthropic); verifier completed successfully.
 - Cost reported by Claude Code: `$1.0694`.
 - This report was generated before CI-fix commit `0c80c64`; it does not assess that follow-up commit.
+
+
+### Follow-up clarification (2026-10-23)
+
+The author clarified after this verification that the demo video exists as a separate link, but is not included in PR #14. The earlier wording that the video was “absent” was too strong: the verifier established only that no video/link was present in the repository or PR content it could inspect, not that no video exists elsewhere. BRIEF-AC-08 remains incomplete as submission evidence until the URL is added to the PR; the video contents cannot be assessed without that URL. The author has not provided the URL in this conversation, so this report and the PR description do not invent or imply one.
+
+GitHub access is now available to the follow-up editor, who confirmed PR #14 is open and updated its description. This supersedes the earlier environment-limited statement that PR state could not be confirmed; it does not change the verifier’s other findings. The separate context-rule and unfamiliar-repository demonstrations, successful live Brief generation/cost evidence, and other listed gaps remain unverified.
+
+
+### Follow-up clarification (2026-10-23)
+
+The author clarified after this verification that the demo video exists as a separate link, but is not included in PR #14. The earlier wording that the video was “absent” was too strong: the verifier established only that no video/link was present in the repository or PR content it could inspect, not that no video exists elsewhere. BRIEF-AC-08 remains incomplete as submission evidence until the URL is added to the PR; the video contents cannot be assessed without that URL. The author has not provided the URL in this conversation, so this report and the PR description do not invent or imply one.
+
+GitHub access is now available to the follow-up editor, who confirmed PR #14 is open and updated its description. This supersedes the earlier environment-limited statement that PR state could not be confirmed; it does not change the verifier’s other findings. The separate context-rule and unfamiliar-repository demonstrations, successful live Brief generation/cost evidence, and other listed gaps remain unverified.

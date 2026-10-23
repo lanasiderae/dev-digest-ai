@@ -12,3 +12,13 @@
 - **Improvements:** (1) capture bounded schema-validation paths in API errors while never returning raw model output (implemented); (2) add a brief preflight/demo checklist that confirms configured model, successful structured response, and cache reload on the selected test PR before recording; (3) have the planner map planned artifact/support files explicitly and reserve a final-verifier slot after implementation fixes, with provider/session budget checked before invocation.
 
 No prior ledger entries were available for comparison.
+
+
+### Follow-up correction — demo link (2026-10-23)
+
+The author clarified that a demo video exists at a separate link, but it was not included in PR #14 and the URL was not provided here. Earlier retrospective wording that no demo video existed was not established by evidence; the accurate status is that the video/link was unavailable to inspect. The PR requirement remains unmet until the URL is added to the PR and the video content can be checked.
+
+
+### Follow-up correction — demo link (2026-10-23)
+
+The author clarified that a demo video exists at a separate link, but it was not included in PR #14 and the URL was not provided here. Earlier retrospective wording that no demo video existed was not established by evidence; the accurate status is that the video/link was unavailable to inspect. The PR requirement remains unmet until the URL is added to the PR and the video content can be checked.
